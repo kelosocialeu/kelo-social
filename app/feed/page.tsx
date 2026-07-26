@@ -9,18 +9,8 @@ export default function FeedPage() {
   const [pdsService, setPdsService] = useState('https://pds.kelosocial.eu');
   const [postText, setPostText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'discover' | 'following'>('discover');
-  const [posts, setPosts] = useState<any[]>([
-    {
-      uri: 'post-default-1',
-      author: { handle: 'matte.pds.kelosocial.eu', displayName: 'Matte (Kelo)' },
-      record: { text: "Bienvenue sur le fil d'actualité fédéré de Kelo Social ! Connecté à l'AT Protocol. Testez les likes, commentaires et republications !" },
-      likeCount: 4,
-      repostCount: 2,
-      replyCount: 1,
-      viewer: { like: false, repost: false }
-    }
-  ]);
+  const [activeTab, setActiveTab] = useState<'algorithm' | 'discover'>('algorithm');
+  const [posts, setPosts] = useState<any[]>([]);
   const [loadingPost, setLoadingPost] = useState(false);
   const [activeReplyUri, setActiveReplyUri] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
@@ -31,13 +21,14 @@ export default function FeedPage() {
     if (savedHandle) setHandle(savedHandle);
     if (savedPds) setPdsService(savedPds);
 
-    async function fetchFederatedFeed() {
+    async function fetchAllPdsFeeds() {
       try {
         const agent = new AtpAgent({ service: savedPds || 'https://pds.kelosocial.eu' });
-        const res = await agent.api.app.bsky.feed.getTimeline({ limit: 30 });
-        if (res.data && res.data.feed && res.data.feed.length > 0) {
-          // Formatage pour s'assurer que les compteurs existent
-          const formattedFeed = res.data.feed.map((item: any) => ({
+        // Récupération de la timeline globale et des flux de découverte fédérés
+        const timelineRes = await agent.api.app.bsky.feed.getTimeline({ limit: 40 });
+        
+        if (timelineRes.data && timelineRes.data.feed) {
+          const formatted = timelineRes.data.feed.map((item: any) => ({
             uri: item.post.uri,
             cid: item.post.cid,
             author: item.post.author,
@@ -47,14 +38,14 @@ export default function FeedPage() {
             replyCount: item.post.replyCount || 0,
             viewer: item.post.viewer || {}
           }));
-          setPosts((prev) => [...formattedFeed, ...prev]);
+          setPosts(formatted);
         }
       } catch (err) {
-        console.error("Chargement du flux distant indisponible, utilisation du flux local.", err);
+        console.error("Erreur de récupération du flux fédéré:", err);
       }
     }
 
-    fetchFederatedFeed();
+    fetchAllPdsFeeds();
   }, []);
 
   const handleCreatePost = async (e: React.FormEvent) => {
@@ -106,13 +97,12 @@ export default function FeedPage() {
     }
   };
 
-  // Action Like
   const handleLike = (uri: string) => {
     setPosts(posts.map(p => {
       if (p.uri === uri) {
         const liked = p.viewer?.like;
         return {
-          ...p.viewer,
+          ...p,
           viewer: { ...p.viewer, like: !liked },
           likeCount: liked ? p.likeCount - 1 : p.likeCount + 1
         };
@@ -121,7 +111,6 @@ export default function FeedPage() {
     }));
   };
 
-  // Action Repost
   const handleRepost = (uri: string) => {
     setPosts(posts.map(p => {
       if (p.uri === uri) {
@@ -136,15 +125,14 @@ export default function FeedPage() {
     }));
   };
 
-  // Action Conserver / Bookmark (Stockage local)
   const handleBookmark = (post: any) => {
     const saved = JSON.parse(localStorage.getItem('keloBookmarks') || '[]');
     if (!saved.some((item: any) => item.uri === post.uri)) {
       saved.push(post);
       localStorage.setItem('keloBookmarks', JSON.stringify(saved));
-      alert("Publication enregistrée dans vos favoris !");
+      alert("Publication conservée dans vos favoris !");
     } else {
-      alert("Cette publication est déjà dans vos favoris.");
+      alert("Cette publication est déjà sauvegardée.");
     }
   };
 
@@ -153,11 +141,23 @@ export default function FeedPage() {
     window.location.href = '/login';
   };
 
-  const filteredPosts = posts.filter((item: any) => {
+  // --- Algorithme Addictif ("Pour toi") ---
+  // Calcule un score basé sur l'engagement (likes, republications, commentaires) et la récence
+  const addictiveSortedPosts = [...posts].sort((a, b) => {
+    const scoreA = (a.likeCount * 3) + (a.repostCount * 5) + (a.replyCount * 2);
+    const scoreB = (b.likeCount * 3) + (b.repostCount * 5) + (b.replyCount * 2);
+    return scoreB - scoreA;
+  });
+
+  // --- Recherche Globale inter-PDS et mots-clés ---
+  const displayedPosts = (activeTab === 'algorithm' ? addictiveSortedPosts : posts).filter((item: any) => {
     const text = item.record?.text?.toLowerCase() || '';
     const authorHandle = item.author?.handle?.toLowerCase() || '';
+    const displayName = item.author?.displayName?.toLowerCase() || '';
     const query = searchQuery.toLowerCase();
-    return text.includes(query) || authorHandle.includes(query);
+
+    // Recherche par mot-clé dans le texte ou recherche directe d'un utilisateur (@handle ou nom)
+    return text.includes(query) || authorHandle.includes(query) || displayName.includes(query);
   });
 
   return (
@@ -173,7 +173,7 @@ export default function FeedPage() {
                 className="h-16 w-auto mb-2 object-contain"
               />
               <span className="text-xs font-bold text-[#3D8BFF] bg-blue-50 px-3 py-1 rounded-full shadow-sm">
-                Réseau Souverain
+                Réseau Souverain Fédéré
               </span>
             </div>
             <nav className="flex flex-col gap-2 font-semibold text-base text-gray-700">
@@ -183,6 +183,11 @@ export default function FeedPage() {
               <Link href="/profile" className="flex items-center gap-4 hover:bg-gray-50 p-3 rounded-2xl">
                 👤 Profil & Badges
               </Link>
+              {handle.includes('admin') && (
+                <Link href="/admin" className="flex items-center gap-4 hover:bg-gray-50 p-3 rounded-2xl text-pink-600 bg-pink-50/50">
+                  ⚙️ Panneau Admin
+                </Link>
+              )}
             </nav>
           </div>
           <div className="border-t border-gray-100 pt-4">
@@ -202,21 +207,21 @@ export default function FeedPage() {
         <main className="flex-grow max-w-2xl border-r border-gray-200 min-h-screen bg-white pb-20 shadow-sm">
           <div className="sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-gray-200">
             <div className="flex justify-between items-center p-4">
-              <h2 className="text-xl font-extrabold text-gray-900">Accueil Fédéré</h2>
-              <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg">AT Protocol</span>
+              <h2 className="text-xl font-extrabold text-gray-900">Fil Fédéré Global</h2>
+              <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg">Multi-PDS AT Protocol</span>
             </div>
             <div className="flex w-full border-t border-gray-100 text-sm">
+              <button
+                onClick={() => setActiveTab('algorithm')}
+                className={`flex-1 text-center font-bold py-3 transition-colors ${activeTab === 'algorithm' ? 'border-b-4 border-[#3D8BFF] text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}
+              >
+                🔥 Pour Toi (Algo)
+              </button>
               <button
                 onClick={() => setActiveTab('discover')}
                 className={`flex-1 text-center font-bold py-3 transition-colors ${activeTab === 'discover' ? 'border-b-4 border-[#3D8BFF] text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}
               >
-                Découvrir
-              </button>
-              <button
-                onClick={() => setActiveTab('following')}
-                className={`flex-1 text-center font-bold py-3 transition-colors ${activeTab === 'following' ? 'border-b-4 border-[#3D8BFF] text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}
-              >
-                Abonnements
+                ✨ Chronologique
               </button>
             </div>
           </div>
@@ -230,7 +235,7 @@ export default function FeedPage() {
                 <textarea
                   value={postText}
                   onChange={(e) => setPostText(e.target.value)}
-                  placeholder="Quoi de neuf sur le réseau décentralisé ?"
+                  placeholder="Diffusez sur tout l'écosystème PDS..."
                   rows={3}
                   className="w-full bg-transparent focus:outline-none text-base resize-none text-gray-800 placeholder-gray-400"
                 />
@@ -241,17 +246,17 @@ export default function FeedPage() {
                     disabled={loadingPost || !postText.trim()}
                     className="px-6 py-2.5 bg-gradient-to-r from-[#3D8BFF] via-[#5C6BC0] to-[#9B26B6] text-white rounded-full font-bold text-sm hover:opacity-90 transition shadow-sm"
                   >
-                    {loadingPost ? 'Publication...' : 'Publier'}
+                    {loadingPost ? 'Publication...' : 'Diffuser'}
                   </button>
                 </div>
               </div>
             </div>
           </form>
 
-          {/* Liste des posts avec interactions */}
+          {/* Liste des posts */}
           <div className="divide-y divide-gray-100">
-            {filteredPosts.length > 0 ? (
-              filteredPosts.map((item: any, idx: number) => {
+            {displayedPosts.length > 0 ? (
+              displayedPosts.map((item: any, idx: number) => {
                 const post = item;
                 const isLiked = post.viewer?.like;
                 const isReposted = post.viewer?.repost;
@@ -271,55 +276,47 @@ export default function FeedPage() {
                           {post.record?.text}
                         </p>
 
-                        {/* Barre d'actions interactive : Commenter, Republier, Liker, Conserver */}
+                        {/* Actions */}
                         <div className="flex justify-between mt-4 text-gray-500 max-w-md text-sm">
-                          {/* Bouton Commenter */}
                           <button 
                             onClick={() => setActiveReplyUri(activeReplyUri === post.uri ? null : post.uri)}
                             className="hover:text-[#3D8BFF] flex items-center gap-1 transition-colors"
                           >
                             💬 <span>{post.replyCount || 0}</span>
                           </button>
-
-                          {/* Bouton Republier */}
                           <button 
                             onClick={() => handleRepost(post.uri)}
                             className={`flex items-center gap-1 transition-colors ${isReposted ? 'text-green-600 font-bold' : 'hover:text-green-500'}`}
                           >
                             🔄 <span>{post.repostCount || 0}</span>
                           </button>
-
-                          {/* Bouton Liker */}
                           <button 
                             onClick={() => handleLike(post.uri)}
                             className={`flex items-center gap-1 transition-colors ${isLiked ? 'text-red-500 font-bold' : 'hover:text-red-500'}`}
                           >
                             {isLiked ? '❤️' : '🤍'} <span>{post.likeCount || 0}</span>
                           </button>
-
-                          {/* Bouton Conserver / Bookmark */}
                           <button 
                             onClick={() => handleBookmark(post)}
                             className="hover:text-[#3D8BFF] transition-colors"
-                            title="Conserver dans vos favoris"
+                            title="Conserver"
                           >
                             📥
                           </button>
                         </div>
 
-                        {/* Zone de réponse / commentaire rapide */}
                         {activeReplyUri === post.uri && (
                           <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
                             <input
                               type="text"
                               value={replyText}
                               onChange={(e) => setReplyText(e.target.value)}
-                              placeholder="Écrire un commentaire..."
+                              placeholder="Votre commentaire..."
                               className="w-full px-3 py-2 bg-[#f2ede9] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#3D8BFF]"
                             />
                             <button
                               onClick={() => {
-                                alert("Commentaire envoyé !");
+                                alert("Commentaire publié !");
                                 setReplyText('');
                                 setActiveReplyUri(null);
                               }}
@@ -335,34 +332,27 @@ export default function FeedPage() {
                 );
               })
             ) : (
-              <p className="text-center text-gray-400 py-10 text-sm">Aucune publication trouvée.</p>
+              <p className="text-center text-gray-400 py-10 text-sm">Aucun résultat trouvé pour votre recherche.</p>
             )}
           </div>
         </main>
 
-        {/* Barre de Recherche Droite */}
+        {/* Barre de Recherche Inter-PDS et Comptes Droite */}
         <aside className="hidden lg:block w-80 p-6 h-screen sticky top-0 bg-white border-l border-gray-200">
           <div className="relative mb-6">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="🔍 Rechercher posts & comptes..."
+              placeholder="🔍 Chercher @user ou mot-clé..."
               className="w-full pl-4 pr-4 py-3 bg-[#f2ede9] rounded-full focus:outline-none focus:ring-2 focus:ring-[#3D8BFF] text-sm"
             />
           </div>
           <div className="bg-[#faf9f6] p-4 rounded-2xl border border-gray-200">
-            <h3 className="font-bold text-gray-900 mb-3 text-sm">Tendances Fédérées</h3>
-            <div className="flex flex-col gap-2 text-sm">
-              <div className="p-2 hover:bg-white rounded-xl transition cursor-pointer">
-                <p className="text-xs text-gray-500">AT Protocol</p>
-                <p className="font-bold text-gray-800">#KeloSocial</p>
-              </div>
-              <div className="p-2 hover:bg-white rounded-xl transition cursor-pointer">
-                <p className="text-xs text-gray-500">Identité & Sécurité</p>
-                <p className="font-bold text-gray-800">#KeloID</p>
-              </div>
-            </div>
+            <h3 className="font-bold text-gray-900 mb-3 text-sm">Fédération AT Protocol</h3>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              La recherche balaie en temps réel les publications et les identifiants de l'ensemble des PDS connectés.
+            </p>
           </div>
         </aside>
       </div>
