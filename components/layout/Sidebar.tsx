@@ -27,11 +27,11 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { href: "/feed", label: "Accueil", icon: Home },
-  { href: "/feed", label: "Actualités", icon: Newspaper },
+  { href: "/news", label: "Actualités", icon: Newspaper },
   { href: "/search", label: "Explorer", icon: Search },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/messages", label: "Discussions", icon: MessageCircle },
-  { href: "/feed", label: "Fils d'actu", icon: Hash },
+  { href: "/feeds", label: "Fils d'actu", icon: Hash },
   { href: "/lists", label: "Listes", icon: ListChecks },
   { href: "/bookmarks", label: "Conservés", icon: Bookmark },
   { href: "/profile", label: "Profil", icon: User },
