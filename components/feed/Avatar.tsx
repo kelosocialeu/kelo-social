@@ -1,7 +1,7 @@
 interface AvatarProps {
   src?: string;
   fallback: string;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
   gradient?: boolean;
 }
 
@@ -10,7 +10,8 @@ interface AvatarProps {
  * (post.author.avatar), sinon un cercle avec l'initiale du handle.
  */
 export default function Avatar({ src, fallback, size = "md", gradient = false }: AvatarProps) {
-  const dimension = size === "sm" ? "h-8 w-8 text-xs" : "h-10 w-10 text-sm";
+  const dimension =
+    size === "sm" ? "h-8 w-8 text-xs" : size === "lg" ? "h-24 w-24 text-3xl" : "h-10 w-10 text-sm";
 
   if (src) {
     return (
