@@ -1,52 +1,70 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { AtpAgent } from '@atproto/api';
+import { useState, useEffect } from "react";
+import { AtpAgent } from "@atproto/api";
+import Sidebar from "@/components/layout/Sidebar";
+import { getDiscoverFeed } from "@/lib/atproto/feed";
+
+type Tab = "pourvous" | "decouvrir" | "chronologique";
 
 export default function FeedPage() {
-  const [handle, setHandle] = useState('');
-  const [pdsService, setPdsService] = useState('https://pds.kelosocial.eu');
-  const [postText, setPostText] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'algorithm' | 'discover'>('algorithm');
+  const [handle, setHandle] = useState("");
+  const [pdsService, setPdsService] = useState("https://pds.kelosocial.eu");
+  const [postText, setPostText] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<Tab>("decouvrir");
   const [posts, setPosts] = useState<any[]>([]);
   const [loadingPost, setLoadingPost] = useState(false);
   const [activeReplyUri, setActiveReplyUri] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState('');
+  const [replyText, setReplyText] = useState("");
 
   useEffect(() => {
-    const savedHandle = localStorage.getItem('userHandle');
-    const savedPds = localStorage.getItem('pdsService');
+    const savedHandle = localStorage.getItem("userHandle");
+    const savedPds = localStorage.getItem("pdsService");
     if (savedHandle) setHandle(savedHandle);
     if (savedPds) setPdsService(savedPds);
 
-    async function fetchAllPdsFeeds() {
-      try {
-        const agent = new AtpAgent({ service: savedPds || 'https://pds.kelosocial.eu' });
-        // Récupération de la timeline globale et des flux de découverte fédérés
-        const timelineRes = await agent.api.app.bsky.feed.getTimeline({ limit: 40 });
-        
-        if (timelineRes.data && timelineRes.data.feed) {
-          const formatted = timelineRes.data.feed.map((item: any) => ({
-            uri: item.post.uri,
-            cid: item.post.cid,
-            author: item.post.author,
-            record: item.post.record,
-            likeCount: item.post.likeCount || 0,
-            repostCount: item.post.repostCount || 0,
-            replyCount: item.post.replyCount || 0,
-            viewer: item.post.viewer || {}
-          }));
-          setPosts(formatted);
-        }
-      } catch (err) {
-        console.error("Erreur de récupération du flux fédéré:", err);
-      }
-    }
-
-    fetchAllPdsFeeds();
+    loadFeed(activeTab, savedPds || "https://pds.kelosocial.eu");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function loadFeed(tab: Tab, pds: string) {
+    try {
+      if (tab === "decouvrir") {
+        // Fil "Découvrir" : agrège Bluesky, WSocial, Eurosky, Kelo Social...
+        // via l'AppView public, indépendamment des comptes suivis.
+        const feed = await getDiscoverFeed(40);
+        setPosts(formatFeed(feed));
+        return;
+      }
+
+      // "Pour vous" / "Chronologique" : timeline personnelle (comptes suivis),
+      // proxyée par le PDS de l'utilisateur.
+      const agent = new AtpAgent({ service: pds });
+      const timelineRes = await agent.api.app.bsky.feed.getTimeline({ limit: 40 });
+      setPosts(formatFeed(timelineRes.data.feed));
+    } catch (err) {
+      console.error("Erreur de récupération du flux :", err);
+    }
+  }
+
+  function formatFeed(feed: any[]) {
+    return feed.map((item: any) => ({
+      uri: item.post.uri,
+      cid: item.post.cid,
+      author: item.post.author,
+      record: item.post.record,
+      likeCount: item.post.likeCount || 0,
+      repostCount: item.post.repostCount || 0,
+      replyCount: item.post.replyCount || 0,
+      viewer: item.post.viewer || {},
+    }));
+  }
+
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    loadFeed(tab, pdsService);
+  };
 
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,41 +72,38 @@ export default function FeedPage() {
 
     setLoadingPost(true);
     try {
-      const accessToken = localStorage.getItem('accessJwt');
-      const currentHandle = localStorage.getItem('userHandle');
-      const currentPds = localStorage.getItem('pdsService') || 'https://pds.kelosocial.eu';
+      const accessToken = localStorage.getItem("accessJwt");
+      const currentHandle = localStorage.getItem("userHandle");
+      const currentPds = localStorage.getItem("pdsService") || "https://pds.kelosocial.eu";
 
       if (accessToken && currentHandle) {
         const agent = new AtpAgent({ service: currentPds });
         await agent.resumeSession({
           accessJwt: accessToken,
-          refreshJwt: localStorage.getItem('refreshJwt') || '',
+          refreshJwt: localStorage.getItem("refreshJwt") || "",
           active: true,
           handle: currentHandle,
-          did: localStorage.getItem('userDid') || '',
+          did: localStorage.getItem("userDid") || "",
         });
 
         await agent.api.app.bsky.feed.post.create(
           { repo: agent.session?.did || currentHandle },
-          {
-            text: postText,
-            createdAt: new Date().toISOString(),
-          }
+          { text: postText, createdAt: new Date().toISOString() }
         );
       }
 
       const newPostItem = {
-        uri: 'local-' + Date.now(),
-        author: { handle: currentHandle || 'moi.kelosocial.eu', displayName: currentHandle || 'Moi' },
+        uri: "local-" + Date.now(),
+        author: { handle: currentHandle || "moi.kelosocial.eu", displayName: currentHandle || "Moi" },
         record: { text: postText, createdAt: new Date().toISOString() },
         likeCount: 0,
         repostCount: 0,
         replyCount: 0,
-        viewer: {}
+        viewer: {},
       };
 
       setPosts([newPostItem, ...posts]);
-      setPostText('');
+      setPostText("");
     } catch (err) {
       console.error("Erreur lors de la publication", err);
       alert("Erreur lors de la publication sur le PDS.");
@@ -98,38 +113,38 @@ export default function FeedPage() {
   };
 
   const handleLike = (uri: string) => {
-    setPosts(posts.map(p => {
-      if (p.uri === uri) {
-        const liked = p.viewer?.like;
-        return {
-          ...p,
-          viewer: { ...p.viewer, like: !liked },
-          likeCount: liked ? p.likeCount - 1 : p.likeCount + 1
-        };
-      }
-      return p;
-    }));
+    setPosts(
+      posts.map((p) => {
+        if (p.uri === uri) {
+          const liked = p.viewer?.like;
+          return { ...p, viewer: { ...p.viewer, like: !liked }, likeCount: liked ? p.likeCount - 1 : p.likeCount + 1 };
+        }
+        return p;
+      })
+    );
   };
 
   const handleRepost = (uri: string) => {
-    setPosts(posts.map(p => {
-      if (p.uri === uri) {
-        const reposted = p.viewer?.repost;
-        return {
-          ...p,
-          viewer: { ...p.viewer, repost: !reposted },
-          repostCount: reposted ? p.repostCount - 1 : p.repostCount + 1
-        };
-      }
-      return p;
-    }));
+    setPosts(
+      posts.map((p) => {
+        if (p.uri === uri) {
+          const reposted = p.viewer?.repost;
+          return {
+            ...p,
+            viewer: { ...p.viewer, repost: !reposted },
+            repostCount: reposted ? p.repostCount - 1 : p.repostCount + 1,
+          };
+        }
+        return p;
+      })
+    );
   };
 
   const handleBookmark = (post: any) => {
-    const saved = JSON.parse(localStorage.getItem('keloBookmarks') || '[]');
+    const saved = JSON.parse(localStorage.getItem("keloBookmarks") || "[]");
     if (!saved.some((item: any) => item.uri === post.uri)) {
       saved.push(post);
-      localStorage.setItem('keloBookmarks', JSON.stringify(saved));
+      localStorage.setItem("keloBookmarks", JSON.stringify(saved));
       alert("Publication conservée dans vos favoris !");
     } else {
       alert("Cette publication est déjà sauvegardée.");
@@ -138,98 +153,57 @@ export default function FeedPage() {
 
   const handleLogout = () => {
     localStorage.clear();
-    window.location.href = '/login';
+    window.location.href = "/login";
   };
 
-  // --- Algorithme Addictif ("Pour toi") ---
-  // Calcule un score basé sur l'engagement (likes, republications, commentaires) et la récence
-  const addictiveSortedPosts = [...posts].sort((a, b) => {
-    const scoreA = (a.likeCount * 3) + (a.repostCount * 5) + (a.replyCount * 2);
-    const scoreB = (b.likeCount * 3) + (b.repostCount * 5) + (b.replyCount * 2);
-    return scoreB - scoreA;
-  });
-
-  // --- Recherche Globale inter-PDS et mots-clés ---
-  const displayedPosts = (activeTab === 'algorithm' ? addictiveSortedPosts : posts).filter((item: any) => {
-    const text = item.record?.text?.toLowerCase() || '';
-    const authorHandle = item.author?.handle?.toLowerCase() || '';
-    const displayName = item.author?.displayName?.toLowerCase() || '';
+  const displayedPosts = posts.filter((item: any) => {
+    const text = item.record?.text?.toLowerCase() || "";
+    const authorHandle = item.author?.handle?.toLowerCase() || "";
+    const displayName = item.author?.displayName?.toLowerCase() || "";
     const query = searchQuery.toLowerCase();
-
-    // Recherche par mot-clé dans le texte ou recherche directe d'un utilisateur (@handle ou nom)
     return text.includes(query) || authorHandle.includes(query) || displayName.includes(query);
   });
 
   return (
-    <div className="min-h-screen bg-[#faf9f6] flex justify-center font-sans text-gray-900">
-      <div className="w-full max-w-7xl flex">
-        {/* Navigation Gauche */}
-        <aside className="hidden md:flex flex-col w-72 p-6 border-r border-gray-200 h-screen sticky top-0 justify-between bg-white">
-          <div>
-            <div className="flex flex-col items-center mb-8">
-              <img
-                src="https://kelosocial.sirv.com/logo.png"
-                alt="Logo Kelo Social"
-                className="h-16 w-auto mb-2 object-contain"
-              />
-              <span className="text-xs font-bold text-[#3D8BFF] bg-blue-50 px-3 py-1 rounded-full shadow-sm">
-                Réseau Souverain Fédéré
+    <div className="flex min-h-screen justify-center bg-kelo-background font-sans text-kelo-text">
+      <div className="flex w-full max-w-7xl">
+        <Sidebar handle={handle} isAdmin={handle.includes("admin")} onLogout={handleLogout} />
+
+        <main className="min-h-screen max-w-2xl flex-grow border-r border-kelo-border bg-white pb-20 shadow-kelo">
+          <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 backdrop-blur-md">
+            <div className="flex items-center justify-between p-4">
+              <h2 className="text-xl font-extrabold text-kelo-text">Fil Fédéré Global</h2>
+              <span className="rounded-lg bg-kelo-background px-2.5 py-1 text-xs font-semibold text-kelo-muted">
+                Multi-PDS AT Protocol
               </span>
             </div>
-            <nav className="flex flex-col gap-2 font-semibold text-base text-gray-700">
-              <Link href="/feed" className="flex items-center gap-4 hover:bg-gray-50 p-3 rounded-2xl text-[#3D8BFF] bg-blue-50/60">
-                🏠 Accueil
-              </Link>
-              <Link href="/profile" className="flex items-center gap-4 hover:bg-gray-50 p-3 rounded-2xl">
-                👤 Profil & Badges
-              </Link>
-              {handle.includes('admin') && (
-                <Link href="/admin" className="flex items-center gap-4 hover:bg-gray-50 p-3 rounded-2xl text-pink-600 bg-pink-50/50">
-                  ⚙️ Panneau Admin
-                </Link>
-              )}
-            </nav>
-          </div>
-          <div className="border-t border-gray-100 pt-4">
-            <div className="text-xs text-gray-500 mb-2 truncate">
-              Connecté : <span className="font-bold text-gray-800">@{handle || 'invité'}</span>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold text-sm hover:bg-gray-200 transition"
-            >
-              Déconnexion
-            </button>
-          </div>
-        </aside>
-
-        {/* Fil Central */}
-        <main className="flex-grow max-w-2xl border-r border-gray-200 min-h-screen bg-white pb-20 shadow-sm">
-          <div className="sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-gray-200">
-            <div className="flex justify-between items-center p-4">
-              <h2 className="text-xl font-extrabold text-gray-900">Fil Fédéré Global</h2>
-              <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg">Multi-PDS AT Protocol</span>
-            </div>
-            <div className="flex w-full border-t border-gray-100 text-sm">
-              <button
-                onClick={() => setActiveTab('algorithm')}
-                className={`flex-1 text-center font-bold py-3 transition-colors ${activeTab === 'algorithm' ? 'border-b-4 border-[#3D8BFF] text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}
-              >
-                🔥 Pour Toi (Algo)
-              </button>
-              <button
-                onClick={() => setActiveTab('discover')}
-                className={`flex-1 text-center font-bold py-3 transition-colors ${activeTab === 'discover' ? 'border-b-4 border-[#3D8BFF] text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}
-              >
-                ✨ Chronologique
-              </button>
+            <div className="flex w-full border-t border-kelo-border text-sm">
+              {(
+                [
+                  ["decouvrir", "✨ Découvrir"],
+                  ["pourvous", "🔥 Pour vous"],
+                  ["chronologique", "🕓 Chronologique"],
+                ] as [Tab, string][]
+              ).map(([tab, label]) => (
+                <button
+                  key={tab}
+                  onClick={() => handleTabChange(tab)}
+                  className={`flex-1 py-3 text-center font-bold transition-colors ${
+                    activeTab === tab
+                      ? "border-b-4 border-kelo-primary text-kelo-text"
+                      : "text-kelo-muted hover:bg-kelo-background"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
 
-          <form onSubmit={handleCreatePost} className="p-4 border-b border-gray-200 bg-[#faf9f6]/50">
+          <form onSubmit={handleCreatePost} className="border-b border-kelo-border bg-kelo-background/50 p-4">
             <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#3D8BFF] to-[#9B26B6] flex items-center justify-center font-bold text-white flex-shrink-0 shadow-sm">
-                {handle ? handle[0].toUpperCase() : 'K'}
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-kelo-gradient font-bold text-white shadow-sm">
+                {handle ? handle[0].toUpperCase() : "K"}
               </div>
               <div className="w-full">
                 <textarea
@@ -237,24 +211,23 @@ export default function FeedPage() {
                   onChange={(e) => setPostText(e.target.value)}
                   placeholder="Diffusez sur tout l'écosystème PDS..."
                   rows={3}
-                  className="w-full bg-transparent focus:outline-none text-base resize-none text-gray-800 placeholder-gray-400"
+                  className="w-full resize-none bg-transparent text-base text-kelo-text placeholder-kelo-muted focus:outline-none"
                 />
-                <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-200/60">
-                  <span className="text-xs text-gray-400 truncate max-w-[200px]">PDS : {pdsService}</span>
+                <div className="mt-2 flex items-center justify-between border-t border-kelo-border/60 pt-2">
+                  <span className="max-w-[200px] truncate text-xs text-kelo-muted">PDS : {pdsService}</span>
                   <button
                     type="submit"
                     disabled={loadingPost || !postText.trim()}
-                    className="px-6 py-2.5 bg-gradient-to-r from-[#3D8BFF] via-[#5C6BC0] to-[#9B26B6] text-white rounded-full font-bold text-sm hover:opacity-90 transition shadow-sm"
+                    className="rounded-full bg-kelo-gradient px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
                   >
-                    {loadingPost ? 'Publication...' : 'Diffuser'}
+                    {loadingPost ? "Publication..." : "Diffuser"}
                   </button>
                 </div>
               </div>
             </div>
           </form>
 
-          {/* Liste des posts */}
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-kelo-border">
             {displayedPosts.length > 0 ? (
               displayedPosts.map((item: any, idx: number) => {
                 const post = item;
@@ -262,43 +235,46 @@ export default function FeedPage() {
                 const isReposted = post.viewer?.repost;
 
                 return (
-                  <div key={post.uri || idx} className="p-4 hover:bg-gray-50/60 transition-colors">
+                  <div key={post.uri || idx} className="p-4 transition-colors hover:bg-kelo-background/60">
                     <div className="flex gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-gray-700 to-gray-900 flex items-center justify-center text-white font-bold flex-shrink-0 shadow-sm">
-                        {post.author?.handle ? post.author.handle[0].toUpperCase() : 'U'}
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-gray-700 to-gray-900 font-bold text-white shadow-sm">
+                        {post.author?.handle ? post.author.handle[0].toUpperCase() : "U"}
                       </div>
                       <div className="flex-grow">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-gray-900">{post.author?.displayName || 'Utilisateur'}</span>
-                          <span className="text-gray-500 text-sm">@{post.author?.handle}</span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-kelo-text">{post.author?.displayName || "Utilisateur"}</span>
+                          <span className="text-sm text-kelo-muted">@{post.author?.handle}</span>
                         </div>
-                        <p className="mt-2 text-gray-800 leading-relaxed text-sm whitespace-pre-wrap">
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-kelo-text">
                           {post.record?.text}
                         </p>
 
-                        {/* Actions */}
-                        <div className="flex justify-between mt-4 text-gray-500 max-w-md text-sm">
-                          <button 
+                        <div className="mt-4 flex max-w-md justify-between text-sm text-kelo-muted">
+                          <button
                             onClick={() => setActiveReplyUri(activeReplyUri === post.uri ? null : post.uri)}
-                            className="hover:text-[#3D8BFF] flex items-center gap-1 transition-colors"
+                            className="flex items-center gap-1 transition-colors hover:text-kelo-primary"
                           >
                             💬 <span>{post.replyCount || 0}</span>
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleRepost(post.uri)}
-                            className={`flex items-center gap-1 transition-colors ${isReposted ? 'text-green-600 font-bold' : 'hover:text-green-500'}`}
+                            className={`flex items-center gap-1 transition-colors ${
+                              isReposted ? "font-bold text-kelo-success" : "hover:text-kelo-success"
+                            }`}
                           >
                             🔄 <span>{post.repostCount || 0}</span>
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleLike(post.uri)}
-                            className={`flex items-center gap-1 transition-colors ${isLiked ? 'text-red-500 font-bold' : 'hover:text-red-500'}`}
+                            className={`flex items-center gap-1 transition-colors ${
+                              isLiked ? "font-bold text-kelo-secondary" : "hover:text-kelo-secondary"
+                            }`}
                           >
-                            {isLiked ? '❤️' : '🤍'} <span>{post.likeCount || 0}</span>
+                            {isLiked ? "❤️" : "🤍"} <span>{post.likeCount || 0}</span>
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleBookmark(post)}
-                            className="hover:text-[#3D8BFF] transition-colors"
+                            className="transition-colors hover:text-kelo-primary"
                             title="Conserver"
                           >
                             📥
@@ -306,21 +282,21 @@ export default function FeedPage() {
                         </div>
 
                         {activeReplyUri === post.uri && (
-                          <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
+                          <div className="mt-3 flex gap-2 border-t border-kelo-border pt-3">
                             <input
                               type="text"
                               value={replyText}
                               onChange={(e) => setReplyText(e.target.value)}
                               placeholder="Votre commentaire..."
-                              className="w-full px-3 py-2 bg-[#f2ede9] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#3D8BFF]"
+                              className="w-full rounded-xl bg-kelo-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-kelo-primary"
                             />
                             <button
                               onClick={() => {
                                 alert("Commentaire publié !");
-                                setReplyText('');
+                                setReplyText("");
                                 setActiveReplyUri(null);
                               }}
-                              className="px-4 py-2 bg-[#3D8BFF] text-white text-xs font-bold rounded-xl hover:opacity-90"
+                              className="rounded-xl bg-kelo-gradient px-4 py-2 text-xs font-bold text-white hover:opacity-90"
                             >
                               Répondre
                             </button>
@@ -332,26 +308,26 @@ export default function FeedPage() {
                 );
               })
             ) : (
-              <p className="text-center text-gray-400 py-10 text-sm">Aucun résultat trouvé pour votre recherche.</p>
+              <p className="py-10 text-center text-sm text-kelo-muted">Aucun résultat trouvé pour votre recherche.</p>
             )}
           </div>
         </main>
 
-        {/* Barre de Recherche Inter-PDS et Comptes Droite */}
-        <aside className="hidden lg:block w-80 p-6 h-screen sticky top-0 bg-white border-l border-gray-200">
+        <aside className="sticky top-0 hidden h-screen w-80 border-l border-kelo-border bg-white p-6 lg:block">
           <div className="relative mb-6">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="🔍 Chercher @user ou mot-clé..."
-              className="w-full pl-4 pr-4 py-3 bg-[#f2ede9] rounded-full focus:outline-none focus:ring-2 focus:ring-[#3D8BFF] text-sm"
+              className="w-full rounded-full bg-kelo-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-kelo-primary"
             />
           </div>
-          <div className="bg-[#faf9f6] p-4 rounded-2xl border border-gray-200">
-            <h3 className="font-bold text-gray-900 mb-3 text-sm">Fédération AT Protocol</h3>
-            <p className="text-xs text-gray-500 leading-relaxed">
-              La recherche balaie en temps réel les publications et les identifiants de l'ensemble des PDS connectés.
+          <div className="rounded-2xl border border-kelo-border bg-kelo-background p-4">
+            <h3 className="mb-3 text-sm font-bold text-kelo-text">Fédération AT Protocol</h3>
+            <p className="text-xs leading-relaxed text-kelo-muted">
+              Le fil « Découvrir » agrège en temps réel les publications de tout le réseau fédéré
+              (Bluesky, WSocial, Eurosky, Kelo Social...), quel que soit le PDS d'origine.
             </p>
           </div>
         </aside>
