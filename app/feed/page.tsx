@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import { AtpAgent } from "@atproto/api";
 import Sidebar from "@/components/layout/Sidebar";
+import Avatar from "@/components/feed/Avatar";
 import { getDiscoverFeed } from "@/lib/atproto/feed";
+import { searchNetworkPosts, searchNetworkActors } from "@/lib/atproto/search";
 
 type Tab = "pourvous" | "decouvrir" | "chronologique";
 
@@ -12,6 +14,9 @@ export default function FeedPage() {
   const [pdsService, setPdsService] = useState("https://pds.kelosocial.eu");
   const [postText, setPostText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchPosts, setSearchPosts] = useState<any[] | null>(null);
+  const [searchProfiles, setSearchProfiles] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>("decouvrir");
   const [posts, setPosts] = useState<any[]>([]);
   const [loadingPost, setLoadingPost] = useState(false);
@@ -27,6 +32,35 @@ export default function FeedPage() {
     loadFeed(activeTab, savedPds || "https://pds.kelosocial.eu");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Recherche réseau (comptes + publications) sur l'AppView public,
+  // avec un léger debounce pour éviter une requête à chaque frappe.
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 2) {
+      setSearchPosts(null);
+      setSearchProfiles([]);
+      return;
+    }
+
+    setSearching(true);
+    const timeout = setTimeout(async () => {
+      try {
+        const [foundPosts, foundActors] = await Promise.all([
+          searchNetworkPosts(trimmed),
+          searchNetworkActors(trimmed),
+        ]);
+        setSearchPosts(formatSearchPosts(foundPosts));
+        setSearchProfiles(foundActors);
+      } catch (err) {
+        console.error("Erreur de recherche :", err);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
 
   async function loadFeed(tab: Tab, pds: string) {
     try {
@@ -58,6 +92,20 @@ export default function FeedPage() {
       repostCount: item.post.repostCount || 0,
       replyCount: item.post.replyCount || 0,
       viewer: item.post.viewer || {},
+    }));
+  }
+
+  // searchPosts renvoie les PostView directement (pas de wrapper .post)
+  function formatSearchPosts(results: any[]) {
+    return results.map((post: any) => ({
+      uri: post.uri,
+      cid: post.cid,
+      author: post.author,
+      record: post.record,
+      likeCount: post.likeCount || 0,
+      repostCount: post.repostCount || 0,
+      replyCount: post.replyCount || 0,
+      viewer: post.viewer || {},
     }));
   }
 
@@ -113,20 +161,21 @@ export default function FeedPage() {
   };
 
   const handleLike = (uri: string) => {
-    setPosts(
-      posts.map((p) => {
+    const updater = (list: any[]) =>
+      list.map((p) => {
         if (p.uri === uri) {
           const liked = p.viewer?.like;
           return { ...p, viewer: { ...p.viewer, like: !liked }, likeCount: liked ? p.likeCount - 1 : p.likeCount + 1 };
         }
         return p;
-      })
-    );
+      });
+    setPosts(updater(posts));
+    if (searchPosts) setSearchPosts(updater(searchPosts));
   };
 
   const handleRepost = (uri: string) => {
-    setPosts(
-      posts.map((p) => {
+    const updater = (list: any[]) =>
+      list.map((p) => {
         if (p.uri === uri) {
           const reposted = p.viewer?.repost;
           return {
@@ -136,8 +185,9 @@ export default function FeedPage() {
           };
         }
         return p;
-      })
-    );
+      });
+    setPosts(updater(posts));
+    if (searchPosts) setSearchPosts(updater(searchPosts));
   };
 
   const handleBookmark = (post: any) => {
@@ -156,13 +206,8 @@ export default function FeedPage() {
     window.location.href = "/login";
   };
 
-  const displayedPosts = posts.filter((item: any) => {
-    const text = item.record?.text?.toLowerCase() || "";
-    const authorHandle = item.author?.handle?.toLowerCase() || "";
-    const displayName = item.author?.displayName?.toLowerCase() || "";
-    const query = searchQuery.toLowerCase();
-    return text.includes(query) || authorHandle.includes(query) || displayName.includes(query);
-  });
+  const isSearching = searchQuery.trim().length >= 2;
+  const displayedPosts = isSearching ? searchPosts ?? [] : posts;
 
   return (
     <div className="flex min-h-screen justify-center bg-kelo-background font-sans text-kelo-text">
@@ -172,63 +217,71 @@ export default function FeedPage() {
         <main className="min-h-screen max-w-2xl flex-grow border-r border-kelo-border bg-white pb-20 shadow-kelo">
           <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 backdrop-blur-md">
             <div className="flex items-center justify-between p-4">
-              <h2 className="text-xl font-extrabold text-kelo-text">Fil Fédéré Global</h2>
+              <h2 className="text-xl font-extrabold text-kelo-text">
+                {isSearching ? `Résultats pour « ${searchQuery} »` : "Fil Fédéré Global"}
+              </h2>
               <span className="rounded-lg bg-kelo-background px-2.5 py-1 text-xs font-semibold text-kelo-muted">
                 Multi-PDS AT Protocol
               </span>
             </div>
-            <div className="flex w-full border-t border-kelo-border text-sm">
-              {(
-                [
-                  ["decouvrir", "✨ Découvrir"],
-                  ["pourvous", "🔥 Pour vous"],
-                  ["chronologique", "🕓 Chronologique"],
-                ] as [Tab, string][]
-              ).map(([tab, label]) => (
-                <button
-                  key={tab}
-                  onClick={() => handleTabChange(tab)}
-                  className={`flex-1 py-3 text-center font-bold transition-colors ${
-                    activeTab === tab
-                      ? "border-b-4 border-kelo-primary text-kelo-text"
-                      : "text-kelo-muted hover:bg-kelo-background"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            {!isSearching && (
+              <div className="flex w-full border-t border-kelo-border text-sm">
+                {(
+                  [
+                    ["decouvrir", "✨ Découvrir"],
+                    ["pourvous", "🔥 Pour vous"],
+                    ["chronologique", "🕓 Chronologique"],
+                  ] as [Tab, string][]
+                ).map(([tab, label]) => (
+                  <button
+                    key={tab}
+                    onClick={() => handleTabChange(tab)}
+                    className={`flex-1 py-3 text-center font-bold transition-colors ${
+                      activeTab === tab
+                        ? "border-b-4 border-kelo-primary text-kelo-text"
+                        : "text-kelo-muted hover:bg-kelo-background"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <form onSubmit={handleCreatePost} className="border-b border-kelo-border bg-kelo-background/50 p-4">
-            <div className="flex gap-3">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-kelo-gradient font-bold text-white shadow-sm">
-                {handle ? handle[0].toUpperCase() : "K"}
-              </div>
-              <div className="w-full">
-                <textarea
-                  value={postText}
-                  onChange={(e) => setPostText(e.target.value)}
-                  placeholder="Diffusez sur tout l'écosystème PDS..."
-                  rows={3}
-                  className="w-full resize-none bg-transparent text-base text-kelo-text placeholder-kelo-muted focus:outline-none"
-                />
-                <div className="mt-2 flex items-center justify-between border-t border-kelo-border/60 pt-2">
-                  <span className="max-w-[200px] truncate text-xs text-kelo-muted">PDS : {pdsService}</span>
-                  <button
-                    type="submit"
-                    disabled={loadingPost || !postText.trim()}
-                    className="rounded-full bg-kelo-gradient px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
-                  >
-                    {loadingPost ? "Publication..." : "Diffuser"}
-                  </button>
+          {!isSearching && (
+            <form onSubmit={handleCreatePost} className="border-b border-kelo-border bg-kelo-background/50 p-4">
+              <div className="flex gap-3">
+                <Avatar fallback={handle ? handle[0].toUpperCase() : "K"} gradient />
+                <div className="w-full">
+                  <textarea
+                    value={postText}
+                    onChange={(e) => setPostText(e.target.value)}
+                    placeholder="Diffusez sur tout l'écosystème PDS..."
+                    rows={3}
+                    className="w-full resize-none bg-transparent text-base text-kelo-text placeholder-kelo-muted focus:outline-none"
+                  />
+                  <div className="mt-2 flex items-center justify-between border-t border-kelo-border/60 pt-2">
+                    <span className="max-w-[200px] truncate text-xs text-kelo-muted">PDS : {pdsService}</span>
+                    <button
+                      type="submit"
+                      disabled={loadingPost || !postText.trim()}
+                      className="rounded-full bg-kelo-gradient px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
+                    >
+                      {loadingPost ? "Publication..." : "Diffuser"}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </form>
+            </form>
+          )}
 
           <div className="divide-y divide-kelo-border">
-            {displayedPosts.length > 0 ? (
+            {searching && isSearching && (
+              <p className="py-6 text-center text-sm text-kelo-muted">Recherche en cours...</p>
+            )}
+
+            {!searching && displayedPosts.length > 0 ? (
               displayedPosts.map((item: any, idx: number) => {
                 const post = item;
                 const isLiked = post.viewer?.like;
@@ -237,9 +290,10 @@ export default function FeedPage() {
                 return (
                   <div key={post.uri || idx} className="p-4 transition-colors hover:bg-kelo-background/60">
                     <div className="flex gap-3">
-                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-gray-700 to-gray-900 font-bold text-white shadow-sm">
-                        {post.author?.handle ? post.author.handle[0].toUpperCase() : "U"}
-                      </div>
+                      <Avatar
+                        src={post.author?.avatar}
+                        fallback={post.author?.handle ? post.author.handle[0].toUpperCase() : "U"}
+                      />
                       <div className="flex-grow">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-bold text-kelo-text">{post.author?.displayName || "Utilisateur"}</span>
@@ -307,9 +361,9 @@ export default function FeedPage() {
                   </div>
                 );
               })
-            ) : (
-              <p className="py-10 text-center text-sm text-kelo-muted">Aucun résultat trouvé pour votre recherche.</p>
-            )}
+            ) : !searching ? (
+              <p className="py-10 text-center text-sm text-kelo-muted">Aucun résultat trouvé.</p>
+            ) : null}
           </div>
         </main>
 
@@ -323,13 +377,33 @@ export default function FeedPage() {
               className="w-full rounded-full bg-kelo-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-kelo-primary"
             />
           </div>
-          <div className="rounded-2xl border border-kelo-border bg-kelo-background p-4">
-            <h3 className="mb-3 text-sm font-bold text-kelo-text">Fédération AT Protocol</h3>
-            <p className="text-xs leading-relaxed text-kelo-muted">
-              Le fil « Découvrir » agrège en temps réel les publications de tout le réseau fédéré
-              (Bluesky, WSocial, Eurosky, Kelo Social...), quel que soit le PDS d'origine.
-            </p>
-          </div>
+
+          {isSearching && searchProfiles.length > 0 ? (
+            <div className="rounded-2xl border border-kelo-border bg-kelo-background p-4">
+              <h3 className="mb-3 text-sm font-bold text-kelo-text">Comptes trouvés</h3>
+              <div className="flex flex-col gap-3">
+                {searchProfiles.map((actor: any) => (
+                  <div key={actor.did} className="flex items-center gap-3">
+                    <Avatar src={actor.avatar} fallback={actor.handle[0].toUpperCase()} size="sm" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-kelo-text">
+                        {actor.displayName || actor.handle}
+                      </p>
+                      <p className="truncate text-xs text-kelo-muted">@{actor.handle}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-kelo-border bg-kelo-background p-4">
+              <h3 className="mb-3 text-sm font-bold text-kelo-text">Fédération AT Protocol</h3>
+              <p className="text-xs leading-relaxed text-kelo-muted">
+                La recherche balaie en temps réel les comptes et publications de tout le réseau fédéré
+                (Bluesky, WSocial, Eurosky, Kelo Social...), quel que soit le PDS d'origine.
+              </p>
+            </div>
+          )}
         </aside>
       </div>
     </div>
