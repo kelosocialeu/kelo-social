@@ -9,7 +9,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export default function Button({
   children,
-  className = "",
+  className = "w-full",
   loading = false,
   loadingText,
   variant = "primary",
@@ -26,7 +26,7 @@ export default function Button({
       {...props}
       disabled={disabled || loading}
       className={`
-        w-full rounded-full py-3 font-bold transition-all
+        rounded-full py-3 font-bold transition-all
         hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100
         ${base}
         ${className}
