@@ -1,158 +1,174 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { AtpAgent } from '@atproto/api';
-import Link from 'next/link';
+import { useEffect, useState } from "react";
+import Sidebar from "@/components/layout/Sidebar";
+import Avatar from "@/components/feed/Avatar";
+import Button from "@/components/ui/Button";
+import { getActorProfile, getActorFeed } from "@/lib/atproto/profile";
 
-export default function Profile() {
+type BadgeType = "trusted-verifier" | "certified" | "none";
+
+const TABS = ["Posts", "Réponses", "Média", "Vidéos", "Posts aimés", "Fils d'actu"] as const;
+
+export default function ProfilePage() {
+  const [handle, setHandle] = useState("");
   const [profile, setProfile] = useState<any>(null);
-  const [userPosts, setUserPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // 'trusted-verifier' | 'certified' | 'none'
-  const [badgeType, setBadgeType] = useState<'trusted-verifier' | 'certified' | 'none'>('none');
+  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Posts");
+  const [badgeType, setBadgeType] = useState<BadgeType>("none");
 
   useEffect(() => {
-    async function fetchProfileData() {
+    const savedHandle = localStorage.getItem("userHandle") || "";
+    setHandle(savedHandle);
+
+    async function load() {
       try {
-        const handle = localStorage.getItem('userHandle') || 'matte.pds.kelosocial.eu';
-        const pdsService = localStorage.getItem('pdsService') || 'https://pds.kelosocial.eu';
-        const accessJwt = localStorage.getItem('accessJwt');
+        const [profileData, feedData] = await Promise.all([
+          getActorProfile(savedHandle),
+          getActorFeed(savedHandle, 30),
+        ]);
+        setProfile(profileData);
+        setPosts(feedData);
 
-        if (accessJwt) {
-          const agent = new AtpAgent({ service: pdsService });
-          await agent.resumeSession({
-            accessJwt: accessJwt,
-            refreshJwt: localStorage.getItem('refreshJwt') || '',
-            active: true,
-            handle: handle,
-            did: localStorage.getItem('userDid') || '',
-          });
-
-          // Récupération du profil global AT Protocol
-          const res = await agent.api.app.bsky.actor.getProfile({ actor: handle });
-          setProfile(res.data);
-
-          // Exemple de logique de badge basée sur des métadonnées ou labels de l'instance
-          if (handle.includes('matte') || handle.includes('admin')) {
-            setBadgeType('trusted-verifier');
-          }
-
-          // Récupération des posts de l'utilisateur
-          const feedRes = await agent.api.app.bsky.feed.getAuthorFeed({ actor: handle, limit: 20 });
-          setUserPosts(feedRes.data.feed || []);
-        } else {
-          setProfile({
-            handle: handle,
-            displayName: 'Utilisateur Kelo',
-            description: "Membre de la bêta Kelo Social - Synchronisé avec l'AT Protocol",
-          });
+        if (savedHandle.includes("matte") || savedHandle.includes("admin")) {
+          setBadgeType("trusted-verifier");
         }
       } catch (err) {
-        console.error("Erreur lors de la récupération du profil:", err);
-        setProfile({
-          handle: localStorage.getItem('userHandle') || 'matte.pds.kelosocial.eu',
-          displayName: 'Utilisateur Kelo',
-          description: 'Profil hors-ligne ou session expirée.',
-        });
+        console.error("Erreur lors de la récupération du profil :", err);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchProfileData();
+    if (savedHandle) load();
+    else setLoading(false);
   }, []);
+
+  const handleLogout = () => {
+    localStorage.clear();
+    window.location.href = "/login";
+  };
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#faf9f6] text-gray-900 flex items-center justify-center font-sans">
-        <p className="text-lg font-medium text-gray-500">Chargement de votre profil souverain...</p>
-      </main>
+      <div className="flex min-h-screen items-center justify-center bg-kelo-background font-sans text-kelo-muted">
+        Chargement de votre profil souverain...
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#faf9f6] text-gray-900 flex flex-col items-center p-4 font-sans pb-20">
-      <div className="w-full max-w-2xl bg-white border border-gray-200 rounded-3xl p-6 shadow-sm mt-4 md:mt-10">
-        <div className="h-40 rounded-2xl bg-gradient-to-r from-[#3D8BFF] via-[#5C6BC0] to-[#9B26B6] mb-16 relative">
-          <div className="absolute -bottom-12 left-6 w-24 h-24 bg-white rounded-full p-1 shadow-md">
-            <div className="w-full h-full bg-[#f2ede9] rounded-full flex items-center justify-center overflow-hidden">
-              <img
-                src={profile?.avatar || "https://kelosocial.sirv.com/logo.png"}
-                alt="Avatar"
-                className="w-full h-full object-cover"
-              />
+    <div className="flex min-h-screen justify-center bg-kelo-background font-sans text-kelo-text">
+      <div className="flex w-full max-w-7xl">
+        <Sidebar handle={handle} isAdmin={handle.includes("admin")} onLogout={handleLogout} />
+
+        <main className="min-h-screen max-w-2xl flex-grow border-r border-kelo-border bg-white pb-20 shadow-kelo">
+          <div className="relative h-48 overflow-hidden bg-kelo-gradient">
+            {profile?.banner ? (
+              <img src={profile.banner} alt="Bannière" className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <span className="text-6xl font-extrabold text-white/90">
+                  {(profile?.displayName || handle || "Kelo").split(" ")[0]}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="px-6">
+            <div className="-mt-12 flex items-end justify-between">
+              <div className="rounded-full border-4 border-white bg-white shadow-md">
+                <Avatar src={profile?.avatar} fallback={(handle[0] || "K").toUpperCase()} size="lg" gradient />
+              </div>
+              <Button variant="secondary" className="mb-2 w-auto px-6">
+                Modifier le profil
+              </Button>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-extrabold text-kelo-text">{profile?.displayName || handle}</h1>
+
+              {badgeType === "trusted-verifier" && (
+                <span className="rounded-full border border-kelo-secondary/30 bg-kelo-secondary/10 px-3 py-1 text-xs font-bold text-kelo-secondary">
+                  Certificateur de confiance
+                </span>
+              )}
+              {badgeType === "certified" && (
+                <span className="rounded-full border border-kelo-primary/30 bg-kelo-primary/10 px-3 py-1 text-xs font-bold text-kelo-primary">
+                  Certifié
+                </span>
+              )}
+            </div>
+
+            <p className="font-semibold text-kelo-primary">@{handle}</p>
+
+            {profile?.description && (
+              <p className="mt-3 whitespace-pre-wrap leading-relaxed text-kelo-text">{profile.description}</p>
+            )}
+
+            <div className="mt-4 flex gap-6 text-sm">
+              <span>
+                <strong className="text-kelo-text">{profile?.followersCount ?? 0}</strong>{" "}
+                <span className="text-kelo-muted">abonné·e·s</span>
+              </span>
+              <span>
+                <strong className="text-kelo-text">{profile?.followsCount ?? 0}</strong>{" "}
+                <span className="text-kelo-muted">abonnements</span>
+              </span>
+              <span>
+                <strong className="text-kelo-text">{profile?.postsCount ?? 0}</strong>{" "}
+                <span className="text-kelo-muted">posts</span>
+              </span>
+            </div>
+
+            <div className="mt-6 flex gap-6 overflow-x-auto border-b border-kelo-border text-sm font-bold text-kelo-muted">
+              {TABS.map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`whitespace-nowrap border-b-2 pb-3 transition-colors ${
+                    activeTab === tab ? "border-kelo-primary text-kelo-text" : "border-transparent hover:text-kelo-text"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
             </div>
           </div>
-        </div>
 
-        <div className="px-2">
-          <div className="flex flex-wrap items-center gap-3 mb-1">
-            <h1 className="text-3xl font-extrabold text-gray-900">
-              {profile?.displayName || 'Mon Profil'}
-            </h1>
-
-            {/* Affichage conditionnel strict des badges */}
-            {badgeType === 'trusted-verifier' && (
-              <div className="flex items-center gap-1.5 bg-pink-50 border border-pink-200 px-3 py-1 rounded-full shadow-sm">
-                <img
-                  src="https://kelosocial.sirv.com/1784816368891-removebg-preview.png"
-                  alt="Badge Certificateur de confiance"
-                  className="h-5 w-5 object-contain"
-                />
-                <span className="text-xs font-bold text-[#d83f87]">Certificateur de confiance</span>
-              </div>
-            )}
-
-            {badgeType === 'certified' && (
-              <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 px-3 py-1 rounded-full shadow-sm">
-                <img
-                  src="https://kelosocial.sirv.com/ChatGPT%20Image%2025%20juil.%202026%2C%2022_56_32.png"
-                  alt="Badge Certifié"
-                  className="h-5 w-5 object-contain"
-                />
-                <span className="text-xs font-bold text-blue-600">Certifié</span>
-              </div>
-            )}
-          </div>
-
-          <p className="text-[#3D8BFF] font-semibold text-base mb-4">
-            @{profile?.handle || 'matte.pds.kelosocial.eu'}
-          </p>
-
-          <p className="text-gray-600 leading-relaxed mb-6">
-            {profile?.description || "Bienvenue sur mon profil Kelo Social."}
-          </p>
-
-          <div className="flex gap-4 mb-8">
-            <Link
-              href="/feed"
-              className="px-6 py-2.5 bg-gradient-to-r from-[#3D8BFF] to-[#9B26B6] text-white font-bold rounded-full hover:opacity-90 transition text-center text-sm shadow-sm"
-            >
-              Retour au fil d'actualité
-            </Link>
-          </div>
-
-          <h2 className="text-xl font-bold text-gray-900 mb-4 border-t border-gray-100 pt-6">
-            Publications de l'utilisateur
-          </h2>
-
-          <div className="divide-y divide-gray-100">
-            {userPosts.length > 0 ? (
-              userPosts.map((item: any) => (
-                <div key={item.post.uri} className="py-4">
-                  <p className="text-gray-800 text-sm whitespace-pre-wrap">{item.post.record.text}</p>
-                  <span className="text-xs text-gray-400 mt-1 block">
-                    {new Date(item.post.record.createdAt).toLocaleString()}
-                  </span>
+          <div className="divide-y divide-kelo-border">
+            {activeTab !== "Posts" ? (
+              <p className="py-10 text-center text-sm text-kelo-muted">Bientôt disponible.</p>
+            ) : posts.length > 0 ? (
+              posts.map((item: any) => (
+                <div key={item.post.uri} className="p-4 hover:bg-kelo-background/60">
+                  <div className="flex gap-3">
+                    <Avatar
+                      src={item.post.author?.avatar}
+                      fallback={item.post.author?.handle ? item.post.author.handle[0].toUpperCase() : "U"}
+                    />
+                    <div className="flex-grow">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-bold text-kelo-text">{item.post.author?.displayName}</span>
+                        <span className="text-sm text-kelo-muted">@{item.post.author?.handle}</span>
+                      </div>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-kelo-text">
+                        {item.post.record.text}
+                      </p>
+                      <span className="mt-2 block text-xs text-kelo-muted">
+                        {new Date(item.post.record.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               ))
             ) : (
-              <p className="text-gray-400 text-sm py-4">Aucune publication pour l'instant.</p>
+              <p className="py-10 text-center text-sm text-kelo-muted">Aucune publication pour l'instant.</p>
             )}
           </div>
-        </div>
+        </main>
       </div>
-    </main>
+    </div>
   );
 }
