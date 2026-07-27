@@ -15,6 +15,7 @@ export default function FeedPage() {
   const [postText, setPostText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [searchPosts, setSearchPosts] = useState<any[] | null>(null);
   const [searchProfiles, setSearchProfiles] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>("decouvrir");
@@ -33,17 +34,17 @@ export default function FeedPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Recherche réseau (comptes + publications) sur l'AppView public,
-  // avec un léger debounce pour éviter une requête à chaque frappe.
   useEffect(() => {
     const trimmed = searchQuery.trim();
     if (trimmed.length < 2) {
       setSearchPosts(null);
       setSearchProfiles([]);
+      setSearchError(null);
       return;
     }
 
     setSearching(true);
+    setSearchError(null);
     const timeout = setTimeout(async () => {
       try {
         const [foundPosts, foundActors] = await Promise.all([
@@ -54,6 +55,9 @@ export default function FeedPage() {
         setSearchProfiles(foundActors);
       } catch (err) {
         console.error("Erreur de recherche :", err);
+        setSearchError("La recherche a échoué. Réessayez dans un instant.");
+        setSearchPosts([]);
+        setSearchProfiles([]);
       } finally {
         setSearching(false);
       }
@@ -65,15 +69,11 @@ export default function FeedPage() {
   async function loadFeed(tab: Tab, pds: string) {
     try {
       if (tab === "decouvrir") {
-        // Fil "Découvrir" : agrège Bluesky, WSocial, Eurosky, Kelo Social...
-        // via l'AppView public, indépendamment des comptes suivis.
         const feed = await getDiscoverFeed(40);
         setPosts(formatFeed(feed));
         return;
       }
 
-      // "Pour vous" / "Chronologique" : timeline personnelle (comptes suivis),
-      // proxyée par le PDS de l'utilisateur.
       const agent = new AtpAgent({ service: pds });
       const timelineRes = await agent.api.app.bsky.feed.getTimeline({ limit: 40 });
       setPosts(formatFeed(timelineRes.data.feed));
@@ -95,7 +95,6 @@ export default function FeedPage() {
     }));
   }
 
-  // searchPosts renvoie les PostView directement (pas de wrapper .post)
   function formatSearchPosts(results: any[]) {
     return results.map((post: any) => ({
       uri: post.uri,
@@ -281,7 +280,11 @@ export default function FeedPage() {
               <p className="py-6 text-center text-sm text-kelo-muted">Recherche en cours...</p>
             )}
 
-            {!searching && displayedPosts.length > 0 ? (
+            {!searching && searchError && (
+              <p className="py-6 text-center text-sm text-kelo-danger">{searchError}</p>
+            )}
+
+            {!searching && !searchError && displayedPosts.length > 0 ? (
               displayedPosts.map((item: any, idx: number) => {
                 const post = item;
                 const isLiked = post.viewer?.like;
@@ -361,7 +364,7 @@ export default function FeedPage() {
                   </div>
                 );
               })
-            ) : !searching ? (
+            ) : !searching && !searchError ? (
               <p className="py-10 text-center text-sm text-kelo-muted">Aucun résultat trouvé.</p>
             ) : null}
           </div>
