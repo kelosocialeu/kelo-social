@@ -29,8 +29,11 @@ const config: Config = {
       },
 
       backgroundImage: {
+        // Dégradé en 90deg (horizontal) au lieu de 135deg : les trois
+        // couleurs restent visibles même sur des éléments courts/étroits
+        // (items de sidebar, petits boutons), pas seulement les grands.
         "kelo-gradient":
-          "linear-gradient(135deg,#7d4cff,#b14fff,#ff4fa0)",
+          "linear-gradient(90deg,#7d4cff 0%,#b14fff 50%,#ff4fa0 100%)",
       },
 
       borderRadius: {
