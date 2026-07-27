@@ -1,19 +1,8 @@
-export interface AtpSession {
-  accessJwt: string;
-  refreshJwt: string;
+export interface SignupPayload {
   handle: string;
-  did: string;
-  pdsUrl: string;
-}
-
-export interface LoginCredentials {
-  identifier: string;
+  email: string;
   password: string;
+  birthDate: string;
+  hcaptchaToken: string;
   pdsUrl: string;
-}
-
-export interface PdsProvider {
-  id: string;
-  label: string;
-  url: string;
 }
