@@ -1,7 +1,7 @@
 import { createAtpAgent } from "@/lib/atproto/client";
 import { sessionStorage } from "@/lib/session/session-storage";
 import { normalizePdsUrl } from "@/lib/atproto/pds";
-import { AtpSession, LoginCredentials } from "@/types/auth";
+import { AtpSession, LoginCredentials, SignupPayload } from "@/types/auth";
 
 export class AuthError extends Error {}
 
@@ -60,7 +60,6 @@ export async function resumeAgentSession(session: AtpSession) {
   });
   return agent;
 }
-// à ajouter dans l'import existant : import { AtpSession, LoginCredentials, SignupPayload } from "@/types/auth";
 
 export async function signup(payload: SignupPayload): Promise<void> {
   const response = await fetch("/api/register", {
