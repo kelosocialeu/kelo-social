@@ -10,9 +10,9 @@
   --secondary: #d54cff;
 
   --gradient: linear-gradient(
-    135deg,
+    90deg,
     #7d4cff 0%,
-    #b14fff 45%,
+    #b14fff 50%,
     #ff4fa0 100%
   );
 
