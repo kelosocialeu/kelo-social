@@ -60,3 +60,18 @@ export async function resumeAgentSession(session: AtpSession) {
   });
   return agent;
 }
+// à ajouter dans l'import existant : import { AtpSession, LoginCredentials, SignupPayload } from "@/types/auth";
+
+export async function signup(payload: SignupPayload): Promise<void> {
+  const response = await fetch("/api/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new AuthError(data.error || "Erreur lors de l'inscription.");
+  }
+}
