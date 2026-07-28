@@ -27,9 +27,16 @@ export async function POST(request: Request) {
       did: session.did || "",
     });
 
-    const verifiedHandle = agent.session?.handle?.toLowerCase();
+    // Même principe que /api/admin/verify : on valide réellement le token
+    // auprès du PDS d'origine plutôt que de faire confiance aux champs
+    // renvoyés par resumeSession().
+    const sessionRes = await agent.api.com.atproto.server.getSession();
+    const verifiedHandle = sessionRes.data.handle?.toLowerCase().trim();
+    const adminDid = sessionRes.data.did;
+
     const admins = getAdminHandles();
-    if (!verifiedHandle || !admins.includes(verifiedHandle) || !agent.session?.did) {
+    if (!verifiedHandle || !admins.includes(verifiedHandle) || !adminDid) {
+      console.warn("[admin/certify] accès refusé", { verifiedHandle, admins });
       return NextResponse.json({ error: "Accès refusé : réservé aux administrateurs." }, { status: 403 });
     }
 
@@ -38,10 +45,7 @@ export async function POST(request: Request) {
     }
 
     const cleanHandle = targetHandle.replace(/^@/, "").trim();
-    const adminDid = agent.session.did;
 
-    // Résout le handle cible vers son DID, quel que soit son PDS d'origine
-    // (Bluesky, WSocial, Eurosky, Kelo Social...).
     const resolved = await agent.api.com.atproto.identity.resolveHandle({ handle: cleanHandle });
     const subjectDid = resolved.data.did;
 
@@ -58,8 +62,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    // Publication dans le dépôt AT Protocol de @kelosocial.eu — visible
-    // par tout client du réseau fédéré, pas seulement ce panneau.
     await agent.api.com.atproto.repo.putRecord({
       repo: adminDid,
       collection: CERTIFICATION_COLLECTION,
@@ -76,7 +78,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error(error);
+    console.error("[admin/certify] erreur", error);
     return NextResponse.json({ error: error.message || "Erreur serveur." }, { status: 500 });
   }
 }
