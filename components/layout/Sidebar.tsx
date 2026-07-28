@@ -18,10 +18,10 @@ import {
   LogOut,
 } from "lucide-react";
 import Logo from "@/components/ui/Logo";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 interface SidebarProps {
   handle: string;
-  isAdmin?: boolean;
   onLogout: () => void;
 }
 
@@ -38,8 +38,9 @@ const NAV_ITEMS = [
   { href: "/settings", label: "Paramètres", icon: Settings },
 ];
 
-export default function Sidebar({ handle, isAdmin, onLogout }: SidebarProps) {
+export default function Sidebar({ handle, onLogout }: SidebarProps) {
   const pathname = usePathname();
+  const { isAdmin } = useIsAdmin();
 
   return (
     <aside className="sticky top-0 hidden h-screen w-72 flex-col justify-between border-r border-kelo-border bg-white p-6 md:flex">
