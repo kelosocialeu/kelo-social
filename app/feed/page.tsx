@@ -1,19 +1,51 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AtpAgent } from "@atproto/api";
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
 import Badge from "@/components/ui/Badge";
+import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
 import { useCertifications } from "@/hooks/useCertifications";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
 import { getDiscoverFeed } from "@/lib/atproto/feed";
+import { getFollowingTimeline } from "@/lib/atproto/timeline";
+import { deleteOwnPost } from "@/lib/atproto/posts";
+import { getStoredSession } from "@/services/auth.service";
 import { searchNetworkPosts, searchNetworkActors } from "@/lib/atproto/search";
 
-type Tab = "pourvous" | "decouvrir" | "chronologique";
+type Tab = "pourvous" | "decouvrir";
+
+function formatFeed(feed: any[]) {
+  return feed.map((item: any) => ({
+    uri: item.post.uri,
+    cid: item.post.cid,
+    author: item.post.author,
+    record: item.post.record,
+    likeCount: item.post.likeCount || 0,
+    repostCount: item.post.repostCount || 0,
+    replyCount: item.post.replyCount || 0,
+    viewer: item.post.viewer || {},
+  }));
+}
+
+function formatSearchPosts(results: any[]) {
+  return results.map((post: any) => ({
+    uri: post.uri,
+    cid: post.cid,
+    author: post.author,
+    record: post.record,
+    likeCount: post.likeCount || 0,
+    repostCount: post.repostCount || 0,
+    replyCount: post.replyCount || 0,
+    viewer: post.viewer || {},
+  }));
+}
 
 export default function FeedPage() {
   const { checked, handle } = useRequireAuth();
+  const [myDid, setMyDid] = useState<string | null>(null);
   const [pdsService, setPdsService] = useState("https://pds.kelosocial.eu");
   const [postText, setPostText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -21,8 +53,7 @@ export default function FeedPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchPosts, setSearchPosts] = useState<any[] | null>(null);
   const [searchProfiles, setSearchProfiles] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<Tab>("decouvrir");
-  const [posts, setPosts] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<Tab>("pourvous");
   const [loadingPost, setLoadingPost] = useState(false);
   const [activeReplyUri, setActiveReplyUri] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
@@ -32,9 +63,27 @@ export default function FeedPage() {
     if (!checked) return;
     const savedPds = localStorage.getItem("pdsService");
     if (savedPds) setPdsService(savedPds);
-    loadFeed(activeTab, savedPds || "https://pds.kelosocial.eu");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const session = getStoredSession();
+    if (session) setMyDid(session.did);
   }, [checked]);
+
+  const fetchFeedPage = useCallback(
+    async (cursor?: string) => {
+      if (!checked) return { items: [], cursor: undefined };
+      if (activeTab === "decouvrir") {
+        const { items, cursor: nextCursor } = await getDiscoverFeed(25, cursor);
+        return { items: formatFeed(items), cursor: nextCursor };
+      }
+      const { items, cursor: nextCursor } = await getFollowingTimeline(25, cursor);
+      return { items: formatFeed(items), cursor: nextCursor };
+    },
+    [activeTab, checked]
+  );
+
+  const { items: posts, setItems: setPosts, loading, hasMore, error: feedError, loadMore } = useInfiniteFeed(
+    fetchFeedPage,
+    [activeTab, checked]
+  );
 
   useEffect(() => {
     const trimmed = searchQuery.trim();
@@ -68,53 +117,6 @@ export default function FeedPage() {
     return () => clearTimeout(timeout);
   }, [searchQuery]);
 
-  async function loadFeed(tab: Tab, pds: string) {
-    try {
-      if (tab === "decouvrir") {
-        const feed = await getDiscoverFeed(40);
-        setPosts(formatFeed(feed));
-        return;
-      }
-
-      const agent = new AtpAgent({ service: pds });
-      const timelineRes = await agent.api.app.bsky.feed.getTimeline({ limit: 40 });
-      setPosts(formatFeed(timelineRes.data.feed));
-    } catch (err) {
-      console.error("Erreur de récupération du flux :", err);
-    }
-  }
-
-  function formatFeed(feed: any[]) {
-    return feed.map((item: any) => ({
-      uri: item.post.uri,
-      cid: item.post.cid,
-      author: item.post.author,
-      record: item.post.record,
-      likeCount: item.post.likeCount || 0,
-      repostCount: item.post.repostCount || 0,
-      replyCount: item.post.replyCount || 0,
-      viewer: item.post.viewer || {},
-    }));
-  }
-
-  function formatSearchPosts(results: any[]) {
-    return results.map((post: any) => ({
-      uri: post.uri,
-      cid: post.cid,
-      author: post.author,
-      record: post.record,
-      likeCount: post.likeCount || 0,
-      repostCount: post.repostCount || 0,
-      replyCount: post.replyCount || 0,
-      viewer: post.viewer || {},
-    }));
-  }
-
-  const handleTabChange = (tab: Tab) => {
-    setActiveTab(tab);
-    loadFeed(tab, pdsService);
-  };
-
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!postText.trim()) return;
@@ -143,7 +145,7 @@ export default function FeedPage() {
 
       const newPostItem = {
         uri: "local-" + Date.now(),
-        author: { handle: currentHandle || "moi.kelosocial.eu", displayName: currentHandle || "Moi" },
+        author: { handle: currentHandle || "moi.kelosocial.eu", displayName: currentHandle || "Moi", did: myDid },
         record: { text: postText, createdAt: new Date().toISOString() },
         likeCount: 0,
         repostCount: 0,
@@ -151,13 +153,25 @@ export default function FeedPage() {
         viewer: {},
       };
 
-      setPosts([newPostItem, ...posts]);
+      setPosts((prev) => [newPostItem, ...prev]);
       setPostText("");
     } catch (err) {
       console.error("Erreur lors de la publication", err);
       alert("Erreur lors de la publication sur le PDS.");
     } finally {
       setLoadingPost(false);
+    }
+  };
+
+  const handleDeletePost = async (uri: string) => {
+    if (!confirm("Supprimer définitivement cette publication ?")) return;
+    try {
+      await deleteOwnPost(uri);
+      setPosts((prev) => prev.filter((p) => p.uri !== uri));
+      if (searchPosts) setSearchPosts((prev) => (prev ? prev.filter((p) => p.uri !== uri) : prev));
+    } catch (err) {
+      console.error("Erreur lors de la suppression :", err);
+      alert("Impossible de supprimer cette publication.");
     }
   };
 
@@ -237,14 +251,13 @@ export default function FeedPage() {
               <div className="flex w-full border-t border-kelo-border text-sm">
                 {(
                   [
-                    ["decouvrir", "✨ Découvrir"],
                     ["pourvous", "🔥 Pour vous"],
-                    ["chronologique", "🕓 Chronologique"],
+                    ["decouvrir", "✨ Découvrir"],
                   ] as [Tab, string][]
                 ).map(([tab, label]) => (
                   <button
                     key={tab}
-                    onClick={() => handleTabChange(tab)}
+                    onClick={() => setActiveTab(tab)}
                     className={`flex-1 py-3 text-center font-bold transition-colors ${
                       activeTab === tab
                         ? "border-b-4 border-kelo-primary text-kelo-text"
@@ -294,91 +307,117 @@ export default function FeedPage() {
               <p className="py-6 text-center text-sm text-kelo-danger">{searchError}</p>
             )}
 
-            {!searching && !searchError && displayedPosts.length > 0 ? (
-              displayedPosts.map((item: any, idx: number) => {
-                const post = item;
-                const isLiked = post.viewer?.like;
-                const isReposted = post.viewer?.repost;
-                const authorBadge = getStatus(post.author?.handle);
+            {!isSearching && !loading && feedError && (
+              <p className="py-6 text-center text-sm text-kelo-danger">{feedError}</p>
+            )}
 
-                return (
-                  <div key={post.uri || idx} className="p-4 transition-colors hover:bg-kelo-background/60">
-                    <div className="flex gap-3">
-                      <Avatar
-                        src={post.author?.avatar}
-                        fallback={post.author?.handle ? post.author.handle[0].toUpperCase() : "U"}
-                      />
-                      <div className="flex-grow">
+            {!searching && !searchError && displayedPosts.map((item: any, idx: number) => {
+              const post = item;
+              const isLiked = post.viewer?.like;
+              const isReposted = post.viewer?.repost;
+              const authorBadge = getStatus(post.author?.handle);
+              const isMine = myDid && post.author?.did === myDid;
+
+              return (
+                <div key={post.uri || idx} className="p-4 transition-colors hover:bg-kelo-background/60">
+                  <div className="flex gap-3">
+                    <Avatar
+                      src={post.author?.avatar}
+                      fallback={post.author?.handle ? post.author.handle[0].toUpperCase() : "U"}
+                    />
+                    <div className="flex-grow">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-bold text-kelo-text">{post.author?.displayName || "Utilisateur"}</span>
                           {authorBadge && <Badge status={authorBadge} />}
                           <span className="text-sm text-kelo-muted">@{post.author?.handle}</span>
                         </div>
-                        <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-kelo-text">
-                          {post.record?.text}
-                        </p>
-
-                        <div className="mt-4 flex max-w-md justify-between text-sm text-kelo-muted">
+                        {isMine && (
                           <button
-                            onClick={() => setActiveReplyUri(activeReplyUri === post.uri ? null : post.uri)}
-                            className="flex items-center gap-1 transition-colors hover:text-kelo-primary"
+                            onClick={() => handleDeletePost(post.uri)}
+                            className="text-xs font-bold text-kelo-muted transition-colors hover:text-kelo-danger"
+                            title="Supprimer"
                           >
-                            💬 <span>{post.replyCount || 0}</span>
+                            🗑️
                           </button>
-                          <button
-                            onClick={() => handleRepost(post.uri)}
-                            className={`flex items-center gap-1 transition-colors ${
-                              isReposted ? "font-bold text-kelo-success" : "hover:text-kelo-success"
-                            }`}
-                          >
-                            🔄 <span>{post.repostCount || 0}</span>
-                          </button>
-                          <button
-                            onClick={() => handleLike(post.uri)}
-                            className={`flex items-center gap-1 transition-colors ${
-                              isLiked ? "font-bold text-kelo-secondary" : "hover:text-kelo-secondary"
-                            }`}
-                          >
-                            {isLiked ? "❤️" : "🤍"} <span>{post.likeCount || 0}</span>
-                          </button>
-                          <button
-                            onClick={() => handleBookmark(post)}
-                            className="transition-colors hover:text-kelo-primary"
-                            title="Conserver"
-                          >
-                            📥
-                          </button>
-                        </div>
-
-                        {activeReplyUri === post.uri && (
-                          <div className="mt-3 flex gap-2 border-t border-kelo-border pt-3">
-                            <input
-                              type="text"
-                              value={replyText}
-                              onChange={(e) => setReplyText(e.target.value)}
-                              placeholder="Votre commentaire..."
-                              className="w-full rounded-xl bg-kelo-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-kelo-primary"
-                            />
-                            <button
-                              onClick={() => {
-                                alert("Commentaire publié !");
-                                setReplyText("");
-                                setActiveReplyUri(null);
-                              }}
-                              className="rounded-xl bg-kelo-gradient px-4 py-2 text-xs font-bold text-white hover:opacity-90"
-                            >
-                              Répondre
-                            </button>
-                          </div>
                         )}
                       </div>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-kelo-text">
+                        {post.record?.text}
+                      </p>
+
+                      <div className="mt-4 flex max-w-md justify-between text-sm text-kelo-muted">
+                        <button
+                          onClick={() => setActiveReplyUri(activeReplyUri === post.uri ? null : post.uri)}
+                          className="flex items-center gap-1 transition-colors hover:text-kelo-primary"
+                        >
+                          💬 <span>{post.replyCount || 0}</span>
+                        </button>
+                        <button
+                          onClick={() => handleRepost(post.uri)}
+                          className={`flex items-center gap-1 transition-colors ${
+                            isReposted ? "font-bold text-kelo-success" : "hover:text-kelo-success"
+                          }`}
+                        >
+                          🔄 <span>{post.repostCount || 0}</span>
+                        </button>
+                        <button
+                          onClick={() => handleLike(post.uri)}
+                          className={`flex items-center gap-1 transition-colors ${
+                            isLiked ? "font-bold text-kelo-secondary" : "hover:text-kelo-secondary"
+                          }`}
+                        >
+                          {isLiked ? "❤️" : "🤍"} <span>{post.likeCount || 0}</span>
+                        </button>
+                        <button
+                          onClick={() => handleBookmark(post)}
+                          className="transition-colors hover:text-kelo-primary"
+                          title="Conserver"
+                        >
+                          📥
+                        </button>
+                      </div>
+
+                      {activeReplyUri === post.uri && (
+                        <div className="mt-3 flex gap-2 border-t border-kelo-border pt-3">
+                          <input
+                            type="text"
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                            placeholder="Votre commentaire..."
+                            className="w-full rounded-xl bg-kelo-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-kelo-primary"
+                          />
+                          <button
+                            onClick={() => {
+                              alert("Commentaire publié !");
+                              setReplyText("");
+                              setActiveReplyUri(null);
+                            }}
+                            className="rounded-xl bg-kelo-gradient px-4 py-2 text-xs font-bold text-white hover:opacity-90"
+                          >
+                            Répondre
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
-                );
-              })
-            ) : !searching && !searchError ? (
+                </div>
+              );
+            })}
+
+            {!isSearching && !loading && !feedError && displayedPosts.length === 0 && (
+              <p className="py-10 text-center text-sm text-kelo-muted">Aucune publication pour l'instant.</p>
+            )}
+
+            {isSearching && !searching && !searchError && displayedPosts.length === 0 && (
               <p className="py-10 text-center text-sm text-kelo-muted">Aucun résultat trouvé.</p>
-            ) : null}
+            )}
+
+            {!isSearching && loading && (
+              <p className="py-6 text-center text-sm text-kelo-muted">Chargement...</p>
+            )}
+
+            {!isSearching && <InfiniteScrollSentinel onIntersect={loadMore} disabled={loading || !hasMore} />}
           </div>
         </main>
 
@@ -414,8 +453,8 @@ export default function FeedPage() {
             <div className="rounded-2xl border border-kelo-border bg-kelo-background p-4">
               <h3 className="mb-3 text-sm font-bold text-kelo-text">Fédération AT Protocol</h3>
               <p className="text-xs leading-relaxed text-kelo-muted">
-                La recherche balaie en temps réel les comptes et publications de tout le réseau fédéré
-                (Bluesky, WSocial, Eurosky, Kelo Social...), quel que soit le PDS d'origine.
+                Le fil « Pour vous » agrège les publications de vos abonnements, « Découvrir » celles de tout le
+                réseau fédéré (Bluesky, WSocial, Eurosky, Kelo Social...), quel que soit le PDS d'origine.
               </p>
             </div>
           )}
