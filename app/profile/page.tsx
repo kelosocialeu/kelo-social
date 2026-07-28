@@ -6,40 +6,39 @@ import Avatar from "@/components/feed/Avatar";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { useCertifications } from "@/hooks/useCertifications";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { getActorProfile, getActorFeed } from "@/lib/atproto/profile";
 
 const TABS = ["Posts", "Réponses", "Média", "Vidéos", "Posts aimés", "Fils d'actu"] as const;
 
 export default function ProfilePage() {
-  const [handle, setHandle] = useState("");
+  const { checked, handle } = useRequireAuth();
   const [profile, setProfile] = useState<any>(null);
   const [posts, setPosts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Posts");
   const { getStatus } = useCertifications();
 
   useEffect(() => {
-    const savedHandle = localStorage.getItem("userHandle") || "";
-    setHandle(savedHandle);
+    if (!checked || !handle) return;
 
     async function load() {
       try {
         const [profileData, feedData] = await Promise.all([
-          getActorProfile(savedHandle),
-          getActorFeed(savedHandle, 30),
+          getActorProfile(handle),
+          getActorFeed(handle, 30),
         ]);
         setProfile(profileData);
         setPosts(feedData);
       } catch (err) {
         console.error("Erreur lors de la récupération du profil :", err);
       } finally {
-        setLoading(false);
+        setLoadingProfile(false);
       }
     }
 
-    if (savedHandle) load();
-    else setLoading(false);
-  }, []);
+    load();
+  }, [checked, handle]);
 
   const handleLogout = () => {
     localStorage.clear();
@@ -48,7 +47,7 @@ export default function ProfilePage() {
 
   const badgeStatus = getStatus(handle);
 
-  if (loading) {
+  if (!checked || loadingProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-kelo-background font-sans text-kelo-muted">
         Chargement de votre profil souverain...
