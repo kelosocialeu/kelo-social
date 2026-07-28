@@ -8,13 +8,6 @@ function getAdminHandles(): string[] {
     .filter(Boolean);
 }
 
-/**
- * Vérifie côté serveur si la session fournie appartient à un administrateur.
- * On ne fait JAMAIS confiance à une donnée envoyée par le client sans la
- * valider : ici, resumeSession() revalide le token directement auprès du
- * PDS d'origine, puis on compare le handle confirmé à ADMIN_HANDLES
- * (variable d'environnement serveur, jamais exposée au client).
- */
 export async function POST(request: Request) {
   try {
     const { accessJwt, refreshJwt, pdsUrl, handle, did } = await request.json();
@@ -32,12 +25,23 @@ export async function POST(request: Request) {
       did: did || "",
     });
 
-    const verifiedHandle = agent.session?.handle?.toLowerCase();
+    // resumeSession() n'initialise que l'état local de l'agent : il ne
+    // vérifie rien auprès du serveur. On force ici un vrai appel réseau
+    // vers le PDS d'origine pour valider le token et récupérer le handle
+    // CONFIRMÉ par le serveur — jamais celui envoyé tel quel par le client.
+    const sessionRes = await agent.api.com.atproto.server.getSession();
+    const verifiedHandle = sessionRes.data.handle?.toLowerCase().trim();
+
     const admins = getAdminHandles();
     const isAdmin = !!verifiedHandle && admins.includes(verifiedHandle);
 
+    if (!isAdmin) {
+      console.warn("[admin/verify] accès refusé", { verifiedHandle, admins, pdsUrl });
+    }
+
     return NextResponse.json({ isAdmin });
-  } catch {
+  } catch (err) {
+    console.error("[admin/verify] erreur de validation de session", err);
     return NextResponse.json({ isAdmin: false }, { status: 200 });
   }
 }
