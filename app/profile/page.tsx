@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
 import Button from "@/components/ui/Button";
+import Badge from "@/components/ui/Badge";
+import { useCertifications } from "@/hooks/useCertifications";
 import { getActorProfile, getActorFeed } from "@/lib/atproto/profile";
-
-type BadgeType = "trusted-verifier" | "certified" | "none";
 
 const TABS = ["Posts", "Réponses", "Média", "Vidéos", "Posts aimés", "Fils d'actu"] as const;
 
@@ -16,7 +16,7 @@ export default function ProfilePage() {
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Posts");
-  const [badgeType, setBadgeType] = useState<BadgeType>("none");
+  const { getStatus } = useCertifications();
 
   useEffect(() => {
     const savedHandle = localStorage.getItem("userHandle") || "";
@@ -30,10 +30,6 @@ export default function ProfilePage() {
         ]);
         setProfile(profileData);
         setPosts(feedData);
-
-        if (savedHandle.includes("matte") || savedHandle.includes("admin")) {
-          setBadgeType("trusted-verifier");
-        }
       } catch (err) {
         console.error("Erreur lors de la récupération du profil :", err);
       } finally {
@@ -49,6 +45,8 @@ export default function ProfilePage() {
     localStorage.clear();
     window.location.href = "/login";
   };
+
+  const badgeStatus = getStatus(handle);
 
   if (loading) {
     return (
@@ -88,17 +86,7 @@ export default function ProfilePage() {
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-extrabold text-kelo-text">{profile?.displayName || handle}</h1>
-
-              {badgeType === "trusted-verifier" && (
-                <span className="rounded-full border border-kelo-secondary/30 bg-kelo-secondary/10 px-3 py-1 text-xs font-bold text-kelo-secondary">
-                  Certificateur de confiance
-                </span>
-              )}
-              {badgeType === "certified" && (
-                <span className="rounded-full border border-kelo-primary/30 bg-kelo-primary/10 px-3 py-1 text-xs font-bold text-kelo-primary">
-                  Certifié
-                </span>
-              )}
+              {badgeStatus && <Badge status={badgeStatus} />}
             </div>
 
             <p className="font-semibold text-kelo-primary">@{handle}</p>
