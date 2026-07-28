@@ -211,7 +211,7 @@ export default function FeedPage() {
   return (
     <div className="flex min-h-screen justify-center bg-kelo-background font-sans text-kelo-text">
       <div className="flex w-full max-w-7xl">
-        <Sidebar handle={handle} isAdmin={handle.includes("admin")} onLogout={handleLogout} />
+        <Sidebar handle={handle} onLogout={handleLogout} />
 
         <main className="min-h-screen max-w-2xl flex-grow border-r border-kelo-border bg-white pb-20 shadow-kelo">
           <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 backdrop-blur-md">
