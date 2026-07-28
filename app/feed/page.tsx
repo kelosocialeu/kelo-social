@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { AtpAgent } from "@atproto/api";
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
+import Badge from "@/components/ui/Badge";
+import { useCertifications } from "@/hooks/useCertifications";
 import { getDiscoverFeed } from "@/lib/atproto/feed";
 import { searchNetworkPosts, searchNetworkActors } from "@/lib/atproto/search";
 
@@ -23,6 +25,7 @@ export default function FeedPage() {
   const [loadingPost, setLoadingPost] = useState(false);
   const [activeReplyUri, setActiveReplyUri] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
+  const { getStatus } = useCertifications();
 
   useEffect(() => {
     const savedHandle = localStorage.getItem("userHandle");
@@ -289,6 +292,7 @@ export default function FeedPage() {
                 const post = item;
                 const isLiked = post.viewer?.like;
                 const isReposted = post.viewer?.repost;
+                const authorBadge = getStatus(post.author?.handle);
 
                 return (
                   <div key={post.uri || idx} className="p-4 transition-colors hover:bg-kelo-background/60">
@@ -300,6 +304,7 @@ export default function FeedPage() {
                       <div className="flex-grow">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-bold text-kelo-text">{post.author?.displayName || "Utilisateur"}</span>
+                          {authorBadge && <Badge status={authorBadge} />}
                           <span className="text-sm text-kelo-muted">@{post.author?.handle}</span>
                         </div>
                         <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-kelo-text">
