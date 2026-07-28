@@ -6,15 +6,12 @@ import Sidebar from "@/components/layout/Sidebar";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
+import Badge from "@/components/ui/Badge";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { getStoredSession } from "@/services/auth.service";
+import { listCertifications, CertificationRecord } from "@/lib/atproto/certifications";
 
 type BadgeStatus = "certified" | "trusted-verifier" | "none";
-
-interface CertifiedUser {
-  handle: string;
-  status: BadgeStatus;
-}
 
 export default function AdminPage() {
   const router = useRouter();
@@ -23,14 +20,14 @@ export default function AdminPage() {
   const [handle, setHandle] = useState("");
   const [targetHandle, setTargetHandle] = useState("");
   const [status, setStatus] = useState<BadgeStatus>("certified");
-  const [certifiedUsers, setCertifiedUsers] = useState<CertifiedUser[]>([]);
+  const [certifiedUsers, setCertifiedUsers] = useState<CertificationRecord[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setHandle(localStorage.getItem("userHandle") || "");
-    const saved = JSON.parse(localStorage.getItem("keloCertifiedList") || "[]");
-    setCertifiedUsers(saved);
+    refreshList();
   }, []);
 
   useEffect(() => {
@@ -38,6 +35,18 @@ export default function AdminPage() {
       router.push("/feed");
     }
   }, [checked, isAdmin, router]);
+
+  async function refreshList() {
+    setLoadingList(true);
+    try {
+      const records = await listCertifications();
+      setCertifiedUsers(records);
+    } catch (err) {
+      console.error("Erreur de chargement des certifications :", err);
+    } finally {
+      setLoadingList(false);
+    }
+  }
 
   const handleLogout = () => {
     localStorage.clear();
@@ -64,13 +73,8 @@ export default function AdminPage() {
         throw new Error(data.error || "Erreur lors de l'attribution du badge.");
       }
 
-      const newList = [
-        ...certifiedUsers.filter((u) => u.handle !== targetHandle.trim()),
-        { handle: targetHandle.trim(), status },
-      ];
-      setCertifiedUsers(newList);
-      localStorage.setItem("keloCertifiedList", JSON.stringify(newList));
       setTargetHandle("");
+      await refreshList();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue.");
     } finally {
@@ -105,8 +109,8 @@ export default function AdminPage() {
           </div>
 
           <p className="mb-6 text-sm text-kelo-muted">
-            En tant qu'administrateur de la plateforme, attribuez les statuts officiels de certification ou de
-            certificateur de confiance aux comptes du réseau fédéré.
+            Les certifications sont publiées dans le dépôt AT Protocol de @kelosocial.eu : elles sont visibles par
+            tous les clients du réseau fédéré, pas seulement dans ce panneau.
           </p>
 
           <form
@@ -139,25 +143,19 @@ export default function AdminPage() {
             </Button>
           </form>
 
-          <h2 className="mb-4 text-lg font-bold text-kelo-text">Comptes gérés et certifiés</h2>
+          <h2 className="mb-4 text-lg font-bold text-kelo-text">Comptes certifiés</h2>
           <div className="divide-y divide-kelo-border overflow-hidden rounded-2xl border border-kelo-border bg-white">
-            {certifiedUsers.length > 0 ? (
-              certifiedUsers.map((user, idx) => (
-                <div key={idx} className="flex items-center justify-between p-4 text-sm">
-                  <span className="font-semibold text-kelo-text">@{user.handle}</span>
-                  <span
-                    className={`rounded-full border px-3 py-1 text-xs font-bold ${
-                      user.status === "trusted-verifier"
-                        ? "border-kelo-secondary/30 bg-kelo-secondary/10 text-kelo-secondary"
-                        : "border-kelo-primary/30 bg-kelo-primary/10 text-kelo-primary"
-                    }`}
-                  >
-                    {user.status === "trusted-verifier" ? "Certificateur de confiance" : "Certifié"}
-                  </span>
+            {loadingList ? (
+              <p className="p-4 text-center text-sm text-kelo-muted">Chargement...</p>
+            ) : certifiedUsers.length > 0 ? (
+              certifiedUsers.map((user) => (
+                <div key={user.subjectDid} className="flex items-center justify-between p-4 text-sm">
+                  <span className="font-semibold text-kelo-text">@{user.subjectHandle}</span>
+                  <Badge status={user.status} />
                 </div>
               ))
             ) : (
-              <p className="p-4 text-center text-sm text-kelo-muted">Aucun compte configuré pour l'instant.</p>
+              <p className="p-4 text-center text-sm text-kelo-muted">Aucun compte certifié pour l'instant.</p>
             )}
           </div>
         </main>
