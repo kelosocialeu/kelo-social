@@ -31,7 +31,7 @@ export default function LandingPage() {
         <div className="mt-12 flex w-full max-w-md flex-col gap-4">
 
           <Link
-            href="/register"
+            href="/signup"
             className="rounded-full bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 py-4 text-center text-lg font-bold text-white shadow-xl transition hover:scale-105"
           >
             Créer un compte
