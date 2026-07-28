@@ -13,6 +13,11 @@ import { listCertifications, CertificationRecord } from "@/lib/atproto/certifica
 
 type BadgeStatus = "certified" | "trusted-verifier" | "none";
 
+const LABELS: Record<"certified" | "trusted-verifier", string> = {
+  certified: "Certifié",
+  "trusted-verifier": "Certificateur de confiance",
+};
+
 export default function AdminPage() {
   const router = useRouter();
   const { isAdmin, checked } = useIsAdmin();
@@ -131,8 +136,8 @@ export default function AdminPage() {
               value={status}
               onChange={(e) => setStatus(e.target.value as BadgeStatus)}
             >
-              <option value="certified">Compte Certifié</option>
-              <option value="trusted-verifier">Certificateur de confiance</option>
+              <option value="certified">Compte Certifié (rond)</option>
+              <option value="trusted-verifier">Certificateur de confiance (fleur)</option>
               <option value="none">Révoquer (Aucun)</option>
             </Select>
 
@@ -151,7 +156,10 @@ export default function AdminPage() {
               certifiedUsers.map((user) => (
                 <div key={user.subjectDid} className="flex items-center justify-between p-4 text-sm">
                   <span className="font-semibold text-kelo-text">@{user.subjectHandle}</span>
-                  <Badge status={user.status} />
+                  <div className="flex items-center gap-2">
+                    <Badge status={user.status} size={22} />
+                    <span className="text-xs font-bold text-kelo-muted">{LABELS[user.status]}</span>
+                  </div>
                 </div>
               ))
             ) : (
