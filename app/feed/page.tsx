@@ -6,13 +6,14 @@ import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
 import Badge from "@/components/ui/Badge";
 import { useCertifications } from "@/hooks/useCertifications";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { getDiscoverFeed } from "@/lib/atproto/feed";
 import { searchNetworkPosts, searchNetworkActors } from "@/lib/atproto/search";
 
 type Tab = "pourvous" | "decouvrir" | "chronologique";
 
 export default function FeedPage() {
-  const [handle, setHandle] = useState("");
+  const { checked, handle } = useRequireAuth();
   const [pdsService, setPdsService] = useState("https://pds.kelosocial.eu");
   const [postText, setPostText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -28,14 +29,12 @@ export default function FeedPage() {
   const { getStatus } = useCertifications();
 
   useEffect(() => {
-    const savedHandle = localStorage.getItem("userHandle");
+    if (!checked) return;
     const savedPds = localStorage.getItem("pdsService");
-    if (savedHandle) setHandle(savedHandle);
     if (savedPds) setPdsService(savedPds);
-
     loadFeed(activeTab, savedPds || "https://pds.kelosocial.eu");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [checked]);
 
   useEffect(() => {
     const trimmed = searchQuery.trim();
@@ -207,6 +206,14 @@ export default function FeedPage() {
     localStorage.clear();
     window.location.href = "/login";
   };
+
+  if (!checked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-kelo-background font-sans text-kelo-muted">
+        Vérification de votre session...
+      </div>
+    );
+  }
 
   const isSearching = searchQuery.trim().length >= 2;
   const displayedPosts = isSearching ? searchPosts ?? [] : posts;
