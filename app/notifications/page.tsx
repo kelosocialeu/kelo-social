@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
 import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
@@ -25,6 +26,20 @@ const REASON_ICONS: Record<string, string> = {
   reply: "💬",
   quote: "🔁",
 };
+
+/**
+ * Détermine où amène le clic sur une notification :
+ * - "follow" -> le profil de la personne qui s'est abonnée
+ * - like/repost -> votre publication concernée (reasonSubject)
+ * - reply/mention/quote -> la nouvelle publication elle-même (uri)
+ */
+function getNotificationHref(notif: any): string {
+  if (notif.reason === "follow") {
+    return `/profile/${notif.author?.handle}`;
+  }
+  const targetUri = notif.reason === "like" || notif.reason === "repost" ? notif.reasonSubject : notif.uri;
+  return `/post?uri=${encodeURIComponent(targetUri || "")}`;
+}
 
 export default function NotificationsPage() {
   const { checked, handle } = useRequireAuth();
@@ -66,7 +81,11 @@ export default function NotificationsPage() {
 
           <div className="divide-y divide-kelo-border">
             {items.map((notif: any) => (
-              <div key={notif.uri + notif.indexedAt} className="flex gap-3 p-4 hover:bg-kelo-background/60">
+              <Link
+                key={notif.uri + notif.indexedAt}
+                href={getNotificationHref(notif)}
+                className="flex gap-3 p-4 transition-colors hover:bg-kelo-background/60"
+              >
                 <Avatar
                   src={notif.author?.avatar}
                   fallback={notif.author?.handle ? notif.author.handle[0].toUpperCase() : "U"}
@@ -87,7 +106,7 @@ export default function NotificationsPage() {
                   </span>
                 </div>
                 {!notif.isRead && <span className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-kelo-primary" />}
-              </div>
+              </Link>
             ))}
 
             {items.length === 0 && !loading && (
