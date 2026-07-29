@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { AtpAgent } from "@atproto/api";
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
-import Badge from "@/components/ui/Badge";
+import Composer from "@/components/feed/Composer";
+import PostCard from "@/components/feed/PostCard";
 import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
 import { useCertifications } from "@/hooks/useCertifications";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
+import { useBookmarks } from "@/hooks/useBookmarks";
 import { getDiscoverFeed } from "@/lib/atproto/feed";
 import { getFollowingTimeline } from "@/lib/atproto/timeline";
 import { deleteOwnPost } from "@/lib/atproto/posts";
@@ -27,6 +30,7 @@ function formatFeed(feed: any[]) {
     repostCount: item.post.repostCount || 0,
     replyCount: item.post.replyCount || 0,
     viewer: item.post.viewer || {},
+    repostedBy: item.reason?.$type === "app.bsky.feed.defs#reasonRepost" ? item.reason.by : null,
   }));
 }
 
@@ -58,6 +62,7 @@ export default function FeedPage() {
   const [activeReplyUri, setActiveReplyUri] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const { getStatus } = useCertifications();
+  const { isBookmarked, toggleBookmark } = useBookmarks();
 
   useEffect(() => {
     if (!checked) return;
@@ -205,17 +210,6 @@ export default function FeedPage() {
     if (searchPosts) setSearchPosts(updater(searchPosts));
   };
 
-  const handleBookmark = (post: any) => {
-    const saved = JSON.parse(localStorage.getItem("keloBookmarks") || "[]");
-    if (!saved.some((item: any) => item.uri === post.uri)) {
-      saved.push(post);
-      localStorage.setItem("keloBookmarks", JSON.stringify(saved));
-      alert("Publication conservée dans vos favoris !");
-    } else {
-      alert("Cette publication est déjà sauvegardée.");
-    }
-  };
-
   const handleLogout = () => {
     localStorage.clear();
     window.location.href = "/login";
@@ -272,30 +266,14 @@ export default function FeedPage() {
           </div>
 
           {!isSearching && (
-            <form onSubmit={handleCreatePost} className="border-b border-kelo-border bg-kelo-background/50 p-4">
-              <div className="flex gap-3">
-                <Avatar fallback={handle ? handle[0].toUpperCase() : "K"} gradient />
-                <div className="w-full">
-                  <textarea
-                    value={postText}
-                    onChange={(e) => setPostText(e.target.value)}
-                    placeholder="Diffusez sur tout l'écosystème PDS..."
-                    rows={3}
-                    className="w-full resize-none bg-transparent text-base text-kelo-text placeholder-kelo-muted focus:outline-none"
-                  />
-                  <div className="mt-2 flex items-center justify-between border-t border-kelo-border/60 pt-2">
-                    <span className="max-w-[200px] truncate text-xs text-kelo-muted">PDS : {pdsService}</span>
-                    <button
-                      type="submit"
-                      disabled={loadingPost || !postText.trim()}
-                      className="rounded-full bg-kelo-gradient px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
-                    >
-                      {loadingPost ? "Publication..." : "Diffuser"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </form>
+            <Composer
+              handle={handle}
+              pdsService={pdsService}
+              value={postText}
+              onChange={setPostText}
+              onSubmit={handleCreatePost}
+              loading={loadingPost}
+            />
           )}
 
           <div className="divide-y divide-kelo-border">
@@ -311,99 +289,34 @@ export default function FeedPage() {
               <p className="py-6 text-center text-sm text-kelo-danger">{feedError}</p>
             )}
 
-            {!searching && !searchError && displayedPosts.map((item: any, idx: number) => {
-              const post = item;
-              const isLiked = post.viewer?.like;
-              const isReposted = post.viewer?.repost;
-              const authorBadge = getStatus(post.author?.handle);
-              const isMine = myDid && post.author?.did === myDid;
+            {!searching &&
+              !searchError &&
+              displayedPosts.map((post: any, idx: number) => {
+                const isMine = !!myDid && post.author?.did === myDid;
 
-              return (
-                <div key={post.uri || idx} className="p-4 transition-colors hover:bg-kelo-background/60">
-                  <div className="flex gap-3">
-                    <Avatar
-                      src={post.author?.avatar}
-                      fallback={post.author?.handle ? post.author.handle[0].toUpperCase() : "U"}
-                    />
-                    <div className="flex-grow">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold text-kelo-text">{post.author?.displayName || "Utilisateur"}</span>
-                          {authorBadge && <Badge status={authorBadge} />}
-                          <span className="text-sm text-kelo-muted">@{post.author?.handle}</span>
-                        </div>
-                        {isMine && (
-                          <button
-                            onClick={() => handleDeletePost(post.uri)}
-                            className="text-xs font-bold text-kelo-muted transition-colors hover:text-kelo-danger"
-                            title="Supprimer"
-                          >
-                            🗑️
-                          </button>
-                        )}
-                      </div>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-kelo-text">
-                        {post.record?.text}
-                      </p>
-
-                      <div className="mt-4 flex max-w-md justify-between text-sm text-kelo-muted">
-                        <button
-                          onClick={() => setActiveReplyUri(activeReplyUri === post.uri ? null : post.uri)}
-                          className="flex items-center gap-1 transition-colors hover:text-kelo-primary"
-                        >
-                          💬 <span>{post.replyCount || 0}</span>
-                        </button>
-                        <button
-                          onClick={() => handleRepost(post.uri)}
-                          className={`flex items-center gap-1 transition-colors ${
-                            isReposted ? "font-bold text-kelo-success" : "hover:text-kelo-success"
-                          }`}
-                        >
-                          🔄 <span>{post.repostCount || 0}</span>
-                        </button>
-                        <button
-                          onClick={() => handleLike(post.uri)}
-                          className={`flex items-center gap-1 transition-colors ${
-                            isLiked ? "font-bold text-kelo-secondary" : "hover:text-kelo-secondary"
-                          }`}
-                        >
-                          {isLiked ? "❤️" : "🤍"} <span>{post.likeCount || 0}</span>
-                        </button>
-                        <button
-                          onClick={() => handleBookmark(post)}
-                          className="transition-colors hover:text-kelo-primary"
-                          title="Conserver"
-                        >
-                          📥
-                        </button>
-                      </div>
-
-                      {activeReplyUri === post.uri && (
-                        <div className="mt-3 flex gap-2 border-t border-kelo-border pt-3">
-                          <input
-                            type="text"
-                            value={replyText}
-                            onChange={(e) => setReplyText(e.target.value)}
-                            placeholder="Votre commentaire..."
-                            className="w-full rounded-xl bg-kelo-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-kelo-primary"
-                          />
-                          <button
-                            onClick={() => {
-                              alert("Commentaire publié !");
-                              setReplyText("");
-                              setActiveReplyUri(null);
-                            }}
-                            className="rounded-xl bg-kelo-gradient px-4 py-2 text-xs font-bold text-white hover:opacity-90"
-                          >
-                            Répondre
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                return (
+                  <PostCard
+                    key={post.uri || idx}
+                    post={post}
+                    badgeStatus={getStatus(post.author?.handle)}
+                    isMine={isMine}
+                    isBookmarked={isBookmarked(post.uri)}
+                    replyOpen={activeReplyUri === post.uri}
+                    replyText={replyText}
+                    onToggleReply={() => setActiveReplyUri(activeReplyUri === post.uri ? null : post.uri)}
+                    onReplyTextChange={setReplyText}
+                    onSendReply={() => {
+                      alert("Commentaire publié !");
+                      setReplyText("");
+                      setActiveReplyUri(null);
+                    }}
+                    onLike={() => handleLike(post.uri)}
+                    onRepost={() => handleRepost(post.uri)}
+                    onBookmark={() => toggleBookmark(post)}
+                    onDelete={() => handleDeletePost(post.uri)}
+                  />
+                );
+              })}
 
             {!isSearching && !loading && !feedError && displayedPosts.length === 0 && (
               <p className="py-10 text-center text-sm text-kelo-muted">Aucune publication pour l'instant.</p>
@@ -413,9 +326,7 @@ export default function FeedPage() {
               <p className="py-10 text-center text-sm text-kelo-muted">Aucun résultat trouvé.</p>
             )}
 
-            {!isSearching && loading && (
-              <p className="py-6 text-center text-sm text-kelo-muted">Chargement...</p>
-            )}
+            {!isSearching && loading && <p className="py-6 text-center text-sm text-kelo-muted">Chargement...</p>}
 
             {!isSearching && <InfiniteScrollSentinel onIntersect={loadMore} disabled={loading || !hasMore} />}
           </div>
@@ -437,7 +348,11 @@ export default function FeedPage() {
               <h3 className="mb-3 text-sm font-bold text-kelo-text">Comptes trouvés</h3>
               <div className="flex flex-col gap-3">
                 {searchProfiles.map((actor: any) => (
-                  <div key={actor.did} className="flex items-center gap-3">
+                  <Link
+                    key={actor.did}
+                    href={`/profile/${actor.handle}`}
+                    className="flex items-center gap-3 rounded-xl p-1 transition-colors hover:bg-white"
+                  >
                     <Avatar src={actor.avatar} fallback={actor.handle[0].toUpperCase()} size="sm" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-kelo-text">
@@ -445,7 +360,7 @@ export default function FeedPage() {
                       </p>
                       <p className="truncate text-xs text-kelo-muted">@{actor.handle}</p>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>
