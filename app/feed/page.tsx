@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { AtpAgent } from "@atproto/api";
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
 import Composer from "@/components/feed/Composer";
@@ -14,7 +13,7 @@ import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { getDiscoverFeed } from "@/lib/atproto/feed";
 import { getFollowingTimeline } from "@/lib/atproto/timeline";
-import { deleteOwnPost } from "@/lib/atproto/posts";
+import { createPost, deleteOwnPost } from "@/lib/atproto/posts";
 import { getStoredSession } from "@/services/auth.service";
 import { searchNetworkPosts, searchNetworkActors } from "@/lib/atproto/search";
 
@@ -26,6 +25,7 @@ function formatFeed(feed: any[]) {
     cid: item.post.cid,
     author: item.post.author,
     record: item.post.record,
+    embed: item.post.embed,
     likeCount: item.post.likeCount || 0,
     repostCount: item.post.repostCount || 0,
     replyCount: item.post.replyCount || 0,
@@ -40,6 +40,7 @@ function formatSearchPosts(results: any[]) {
     cid: post.cid,
     author: post.author,
     record: post.record,
+    embed: post.embed,
     likeCount: post.likeCount || 0,
     repostCount: post.repostCount || 0,
     replyCount: post.replyCount || 0,
@@ -128,30 +129,13 @@ export default function FeedPage() {
 
     setLoadingPost(true);
     try {
-      const accessToken = localStorage.getItem("accessJwt");
-      const currentHandle = localStorage.getItem("userHandle");
-      const currentPds = localStorage.getItem("pdsService") || "https://pds.kelosocial.eu";
-
-      if (accessToken && currentHandle) {
-        const agent = new AtpAgent({ service: currentPds });
-        await agent.resumeSession({
-          accessJwt: accessToken,
-          refreshJwt: localStorage.getItem("refreshJwt") || "",
-          active: true,
-          handle: currentHandle,
-          did: localStorage.getItem("userDid") || "",
-        });
-
-        await agent.api.app.bsky.feed.post.create(
-          { repo: agent.session?.did || currentHandle },
-          { text: postText, createdAt: new Date().toISOString() }
-        );
-      }
+      const created = await createPost(postText);
 
       const newPostItem = {
-        uri: "local-" + Date.now(),
-        author: { handle: currentHandle || "moi.kelosocial.eu", displayName: currentHandle || "Moi", did: myDid },
-        record: { text: postText, createdAt: new Date().toISOString() },
+        uri: created.uri,
+        cid: created.cid,
+        author: { handle, displayName: handle, did: myDid },
+        record: { text: created.text, facets: created.facets, createdAt: new Date().toISOString() },
         likeCount: 0,
         repostCount: 0,
         replyCount: 0,
@@ -208,6 +192,12 @@ export default function FeedPage() {
       });
     setPosts(updater(posts));
     if (searchPosts) setSearchPosts(updater(searchPosts));
+  };
+
+  const removeAuthorPosts = (authorDid?: string) => {
+    if (!authorDid) return;
+    setPosts((prev) => prev.filter((p) => p.author?.did !== authorDid));
+    if (searchPosts) setSearchPosts((prev) => (prev ? prev.filter((p) => p.author?.did !== authorDid) : prev));
   };
 
   const handleLogout = () => {
@@ -314,6 +304,8 @@ export default function FeedPage() {
                     onRepost={() => handleRepost(post.uri)}
                     onBookmark={() => toggleBookmark(post)}
                     onDelete={() => handleDeletePost(post.uri)}
+                    onBlocked={() => removeAuthorPosts(post.author?.did)}
+                    onMuted={() => removeAuthorPosts(post.author?.did)}
                   />
                 );
               })}
