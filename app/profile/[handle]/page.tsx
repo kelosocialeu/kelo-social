@@ -21,6 +21,7 @@ function formatFeed(feed: any[]) {
     cid: item.post.cid,
     author: item.post.author,
     record: item.post.record,
+    embed: item.post.embed,
     likeCount: item.post.likeCount || 0,
     repostCount: item.post.repostCount || 0,
     replyCount: item.post.replyCount || 0,
@@ -107,6 +108,10 @@ export default function ProfilePage() {
       console.error(err);
       alert("Impossible de supprimer cette publication.");
     }
+  };
+
+  const handleModeration = () => {
+    setPosts([]);
   };
 
   const badgeStatus = getStatus(targetHandle);
@@ -232,6 +237,8 @@ export default function ProfilePage() {
                   onRepost={() => handleRepost(post.uri)}
                   onBookmark={() => toggleBookmark(post)}
                   onDelete={() => handleDelete(post.uri)}
+                  onBlocked={handleModeration}
+                  onMuted={handleModeration}
                 />
               ))
             ) : (
