@@ -17,6 +17,7 @@ function flattenPost(view: any) {
     cid: view.cid,
     author: view.author,
     record: view.record,
+    embed: view.embed,
     likeCount: view.likeCount || 0,
     repostCount: view.repostCount || 0,
     replyCount: view.replyCount || 0,
