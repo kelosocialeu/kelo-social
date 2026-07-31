@@ -6,7 +6,6 @@ import { searchNetworkActors } from "@/lib/atproto/search";
 
 interface ComposerProps {
   handle: string;
-  pdsService: string;
   value: string;
   onChange: (v: string) => void;
   onSubmit: (e: React.FormEvent) => void;
@@ -14,15 +13,7 @@ interface ComposerProps {
   placeholder?: string;
 }
 
-export default function Composer({
-  handle,
-  pdsService,
-  value,
-  onChange,
-  onSubmit,
-  loading,
-  placeholder,
-}: ComposerProps) {
+export default function Composer({ handle, value, onChange, onSubmit, loading, placeholder }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionResults, setMentionResults] = useState<any[]>([]);
@@ -98,8 +89,7 @@ export default function Composer({
             </div>
           )}
 
-          <div className="mt-2 flex items-center justify-between border-t border-kelo-border/60 pt-2">
-            <span className="max-w-[200px] truncate text-xs text-kelo-muted">PDS : {pdsService}</span>
+          <div className="mt-2 flex items-center justify-end border-t border-kelo-border/60 pt-2">
             <button
               type="submit"
               disabled={loading || !value.trim()}
