@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home,
-  Newspaper,
   Search,
   Bell,
   MessageCircle,
@@ -27,7 +26,6 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { href: "/feed", label: "Accueil", icon: Home },
-  { href: "/news", label: "Actualités", icon: Newspaper },
   { href: "/search", label: "Explorer", icon: Search },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/messages", label: "Discussions", icon: MessageCircle },
