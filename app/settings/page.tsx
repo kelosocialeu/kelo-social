@@ -27,8 +27,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex min-h-screen justify-center bg-kelo-background font-sans text-kelo-text">
-      <div className="flex w-full max-w-7xl">
+    <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
         <Sidebar handle={handle} onLogout={handleLogout} />
 
         <main className="min-h-screen w-full max-w-3xl flex-grow border-r border-kelo-border bg-white shadow-kelo">
@@ -64,7 +63,6 @@ export default function SettingsPage() {
             />
           )}
         </main>
-      </div>
     </div>
   );
 }
