@@ -13,11 +13,6 @@ import { listCertifications, CertificationRecord } from "@/lib/atproto/certifica
 
 type BadgeStatus = "certified" | "trusted-verifier" | "none";
 
-const LABELS: Record<"certified" | "trusted-verifier", string> = {
-  certified: "Certifié",
-  "trusted-verifier": "Certificateur de confiance",
-};
-
 export default function AdminPage() {
   const router = useRouter();
   const { isAdmin, checked } = useIsAdmin();
@@ -104,8 +99,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="flex min-h-screen justify-center bg-kelo-background font-sans text-kelo-text">
-      <div className="flex w-full max-w-7xl">
+    <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
         <Sidebar handle={handle} onLogout={handleLogout} />
 
         <main className="min-h-screen w-full max-w-3xl flex-grow bg-white p-8 shadow-kelo">
@@ -136,8 +130,8 @@ export default function AdminPage() {
               value={status}
               onChange={(e) => setStatus(e.target.value as BadgeStatus)}
             >
-              <option value="certified">Compte Certifié (rond)</option>
-              <option value="trusted-verifier">Certificateur de confiance (fleur)</option>
+              <option value="certified">Compte Certifié</option>
+              <option value="trusted-verifier">Certificateur de confiance</option>
               <option value="none">Révoquer (Aucun)</option>
             </Select>
 
@@ -156,10 +150,7 @@ export default function AdminPage() {
               certifiedUsers.map((user) => (
                 <div key={user.subjectDid} className="flex items-center justify-between p-4 text-sm">
                   <span className="font-semibold text-kelo-text">@{user.subjectHandle}</span>
-                  <div className="flex items-center gap-2">
-                    <Badge status={user.status} size={22} />
-                    <span className="text-xs font-bold text-kelo-muted">{LABELS[user.status]}</span>
-                  </div>
+                  <Badge status={user.status} />
                 </div>
               ))
             ) : (
@@ -167,7 +158,6 @@ export default function AdminPage() {
             )}
           </div>
         </main>
-      </div>
     </div>
   );
 }
