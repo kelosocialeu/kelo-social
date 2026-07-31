@@ -132,20 +132,17 @@ export default function ProfilePage() {
 
   if (loadError) {
     return (
-      <div className="flex min-h-screen justify-center bg-kelo-background font-sans text-kelo-text">
-        <div className="flex w-full max-w-7xl">
+      <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
           <Sidebar handle={myHandle} onLogout={handleLogout} />
           <main className="flex min-h-screen max-w-2xl flex-grow items-center justify-center border-r border-kelo-border bg-white shadow-kelo">
             <p className="text-sm text-kelo-muted">{loadError}</p>
           </main>
-        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen justify-center bg-kelo-background font-sans text-kelo-text">
-      <div className="flex w-full max-w-7xl">
+    <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
         <Sidebar handle={myHandle} onLogout={handleLogout} />
 
         <main className="min-h-screen max-w-2xl flex-grow border-r border-kelo-border bg-white pb-20 shadow-kelo">
@@ -281,7 +278,6 @@ export default function ProfilePage() {
             )}
           </div>
         </main>
-      </div>
     </div>
   );
 }
