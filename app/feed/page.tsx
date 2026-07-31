@@ -51,7 +51,6 @@ function formatSearchPosts(results: any[]) {
 export default function FeedPage() {
   const { checked, handle } = useRequireAuth();
   const [myDid, setMyDid] = useState<string | null>(null);
-  const [pdsService, setPdsService] = useState("https://pds.kelosocial.eu");
   const [postText, setPostText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -67,8 +66,6 @@ export default function FeedPage() {
 
   useEffect(() => {
     if (!checked) return;
-    const savedPds = localStorage.getItem("pdsService");
-    if (savedPds) setPdsService(savedPds);
     const session = getStoredSession();
     if (session) setMyDid(session.did);
   }, [checked]);
@@ -217,19 +214,15 @@ export default function FeedPage() {
   const displayedPosts = isSearching ? searchPosts ?? [] : posts;
 
   return (
-    <div className="flex min-h-screen justify-center bg-kelo-background font-sans text-kelo-text">
-      <div className="flex w-full max-w-7xl">
+    <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
         <Sidebar handle={handle} onLogout={handleLogout} />
 
         <main className="min-h-screen max-w-2xl flex-grow border-r border-kelo-border bg-white pb-20 shadow-kelo">
           <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 backdrop-blur-md">
-            <div className="flex items-center justify-between p-4">
+            <div className="p-4">
               <h2 className="text-xl font-extrabold text-kelo-text">
                 {isSearching ? `Résultats pour « ${searchQuery} »` : "Fil Fédéré Global"}
               </h2>
-              <span className="rounded-lg bg-kelo-background px-2.5 py-1 text-xs font-semibold text-kelo-muted">
-                Multi-PDS AT Protocol
-              </span>
             </div>
             {!isSearching && (
               <div className="flex w-full border-t border-kelo-border text-sm">
@@ -258,7 +251,6 @@ export default function FeedPage() {
           {!isSearching && (
             <Composer
               handle={handle}
-              pdsService={pdsService}
               value={postText}
               onChange={setPostText}
               onSubmit={handleCreatePost}
@@ -366,7 +358,6 @@ export default function FeedPage() {
             </div>
           )}
         </aside>
-      </div>
     </div>
   );
 }
