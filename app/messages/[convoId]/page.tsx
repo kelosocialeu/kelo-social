@@ -30,8 +30,6 @@ export default function ConversationPage() {
     async function load() {
       try {
         const res = await getConversationMessages(convoId, 50);
-        // L'API renvoie les plus récents en premier : on inverse pour un
-        // affichage chronologique classique (haut = ancien, bas = récent).
         setMessages([...res.items].reverse());
         await markConversationRead(convoId);
       } catch (err) {
@@ -80,8 +78,7 @@ export default function ConversationPage() {
   }
 
   return (
-    <div className="flex min-h-screen justify-center bg-kelo-background font-sans text-kelo-text">
-      <div className="flex w-full max-w-7xl">
+    <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
         <Sidebar handle={handle} onLogout={handleLogout} />
 
         <main className="flex min-h-screen max-w-2xl flex-grow flex-col border-r border-kelo-border bg-white shadow-kelo">
@@ -135,7 +132,6 @@ export default function ConversationPage() {
             </button>
           </form>
         </main>
-      </div>
     </div>
   );
 }
