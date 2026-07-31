@@ -27,12 +27,6 @@ const REASON_ICONS: Record<string, string> = {
   quote: "🔁",
 };
 
-/**
- * Détermine où amène le clic sur une notification :
- * - "follow" -> le profil de la personne qui s'est abonnée
- * - like/repost -> votre publication concernée (reasonSubject)
- * - reply/mention/quote -> la nouvelle publication elle-même (uri)
- */
 function getNotificationHref(notif: any): string {
   if (notif.reason === "follow") {
     return `/profile/${notif.author?.handle}`;
@@ -70,8 +64,7 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="flex min-h-screen justify-center bg-kelo-background font-sans text-kelo-text">
-      <div className="flex w-full max-w-7xl">
+    <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
         <Sidebar handle={handle} onLogout={handleLogout} />
 
         <main className="min-h-screen max-w-2xl flex-grow border-r border-kelo-border bg-white pb-20 shadow-kelo">
@@ -119,7 +112,6 @@ export default function NotificationsPage() {
             <InfiniteScrollSentinel onIntersect={loadMore} disabled={loading || !hasMore} />
           </div>
         </main>
-      </div>
     </div>
   );
 }
