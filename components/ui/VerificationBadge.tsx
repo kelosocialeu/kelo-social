@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import Avatar from "@/components/feed/Avatar";
 import { getVerificationBadge, getVerificationIssuers, getIssuerProfile } from "@/lib/atproto/verification";
@@ -109,14 +108,8 @@ export default function VerificationBadge({ actor }: VerificationBadgeProps) {
               className="fixed left-1/2 top-1/2 z-40 w-80 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-kelo-border bg-white p-5 shadow-kelo"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="mb-4 flex items-center justify-center gap-4">
-                <Avatar
-                  src={actor?.avatar}
-                  fallback={actor?.handle ? actor.handle[0].toUpperCase() : "K"}
-                  size="lg"
-                />
-                <ArrowRight className="h-5 w-5 flex-shrink-0 text-kelo-muted" />
-                <img src={TRUSTED_VERIFIER_IMAGE} alt="Certificateur de confiance" className="h-24 w-24 object-contain" />
+              <div className="mb-4 flex items-center justify-center">
+                <img src={TRUSTED_VERIFIER_IMAGE} alt="Certificateur de confiance" className="h-28 w-28 object-contain" />
               </div>
 
               <h3 className="mb-2 text-center text-base font-extrabold text-kelo-text">
