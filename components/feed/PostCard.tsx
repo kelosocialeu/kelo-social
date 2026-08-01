@@ -3,15 +3,13 @@
 import Link from "next/link";
 import { Repeat2 } from "lucide-react";
 import Avatar from "@/components/feed/Avatar";
-import Badge from "@/components/ui/Badge";
+import VerificationBadge from "@/components/ui/VerificationBadge";
 import PostText from "@/components/feed/PostText";
 import PostEmbed from "@/components/feed/PostEmbed";
 import PostActions from "@/components/feed/PostActions";
-import type { CertificationStatus } from "@/lib/atproto/certifications";
 
 interface PostCardProps {
   post: any;
-  badgeStatus?: CertificationStatus | null;
   isMine?: boolean;
   isBookmarked?: boolean;
   replyOpen?: boolean;
@@ -29,15 +27,15 @@ interface PostCardProps {
 
 /**
  * Affichage complet d'une publication : avatar/nom cliquables vers le
- * profil de l'auteur, bandeau "a reposté" si c'est un repost dans le fil,
- * texte enrichi (mentions/liens/hashtags cliquables), médias (images,
- * vidéo, lien), actions (commentaire/repost/like/conserver/partager/plus)
- * et zone de réponse. Composant unique réutilisé sur Feed, Profil,
- * Conservés et le fil de publication.
+ * profil de l'auteur, badge de vérification réseau (rond/fleur), bandeau
+ * "a reposté" si c'est un repost dans le fil, texte enrichi (mentions/
+ * liens/hashtags cliquables), médias (images, vidéo, lien), actions
+ * (commentaire/repost/like/conserver/partager/plus) et zone de réponse.
+ * Composant unique réutilisé sur Feed, Profil, Conservés et le fil de
+ * publication.
  */
 export default function PostCard({
   post,
-  badgeStatus,
   isMine,
   isBookmarked,
   replyOpen,
@@ -69,11 +67,13 @@ export default function PostCard({
         </Link>
         <div className="min-w-0 flex-grow">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <Link href={`/profile/${handle}`} className="flex flex-wrap items-center gap-2 hover:underline">
-              <span className="font-bold text-kelo-text">{post.author?.displayName || "Utilisateur"}</span>
-              {badgeStatus && <Badge status={badgeStatus} />}
-              <span className="text-sm text-kelo-muted">@{handle}</span>
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href={`/profile/${handle}`} className="flex flex-wrap items-center gap-2 hover:underline">
+                <span className="font-bold text-kelo-text">{post.author?.displayName || "Utilisateur"}</span>
+                <span className="text-sm text-kelo-muted">@{handle}</span>
+              </Link>
+              <VerificationBadge actor={post.author} />
+            </div>
             {isMine && onDelete && (
               <button
                 onClick={onDelete}
