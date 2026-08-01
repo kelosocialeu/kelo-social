@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Repeat2 } from "lucide-react";
 import Avatar from "@/components/feed/Avatar";
 import VerificationBadge from "@/components/ui/VerificationBadge";
@@ -23,16 +24,19 @@ interface PostCardProps {
   onDelete?: () => void;
   onBlocked?: () => void;
   onMuted?: () => void;
+  /** À passer sur la page du fil de publication elle-même, pour éviter de re-naviguer vers la même page. */
+  disableThreadLink?: boolean;
 }
 
 /**
- * Affichage complet d'une publication : avatar/nom cliquables vers le
- * profil de l'auteur, badge de vérification réseau (rond/fleur), bandeau
- * "a reposté" si c'est un repost dans le fil, texte enrichi (mentions/
- * liens/hashtags cliquables), médias (images, vidéo, lien), actions
- * (commentaire/repost/like/conserver/partager/plus) et zone de réponse.
- * Composant unique réutilisé sur Feed, Profil, Conservés et le fil de
- * publication.
+ * Affichage complet d'une publication : cliquer dessus ouvre son fil de
+ * discussion complet (/post?uri=...). Avatar/nom restent cliquables vers
+ * le profil de l'auteur, badge de vérification réseau (rond/fleur),
+ * bandeau "a reposté" si c'est un repost dans le fil, texte enrichi
+ * (mentions/liens/hashtags cliquables), médias (images, vidéo, lien),
+ * actions (commentaire/repost/like/conserver/partager/plus) et zone de
+ * réponse. Composant unique réutilisé sur Feed, Profil, Conservés,
+ * Recherche et le fil de publication.
  */
 export default function PostCard({
   post,
@@ -49,11 +53,23 @@ export default function PostCard({
   onDelete,
   onBlocked,
   onMuted,
+  disableThreadLink,
 }: PostCardProps) {
+  const router = useRouter();
   const handle = post.author?.handle;
 
+  const handleCardClick = () => {
+    if (disableThreadLink || !post.uri || post.uri.startsWith("local-")) return;
+    router.push(`/post?uri=${encodeURIComponent(post.uri)}`);
+  };
+
   return (
-    <div className="p-4 transition-colors hover:bg-kelo-background/60">
+    <div
+      onClick={handleCardClick}
+      className={`p-4 transition-colors hover:bg-kelo-background/60 ${
+        disableThreadLink ? "" : "cursor-pointer"
+      }`}
+    >
       {post.repostedBy && (
         <div className="mb-2 flex items-center gap-2 pl-10 text-xs font-semibold text-kelo-muted">
           <Repeat2 className="h-3.5 w-3.5" />
@@ -62,21 +78,30 @@ export default function PostCard({
       )}
 
       <div className="flex gap-3">
-        <Link href={`/profile/${handle}`}>
+        <Link href={`/profile/${handle}`} onClick={(e) => e.stopPropagation()}>
           <Avatar src={post.author?.avatar} fallback={handle ? handle[0].toUpperCase() : "U"} />
         </Link>
         <div className="min-w-0 flex-grow">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
-              <Link href={`/profile/${handle}`} className="flex flex-wrap items-center gap-2 hover:underline">
+              <Link
+                href={`/profile/${handle}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex flex-wrap items-center gap-2 hover:underline"
+              >
                 <span className="font-bold text-kelo-text">{post.author?.displayName || "Utilisateur"}</span>
                 <span className="text-sm text-kelo-muted">@{handle}</span>
               </Link>
-              <VerificationBadge actor={post.author} />
+              <span onClick={(e) => e.stopPropagation()}>
+                <VerificationBadge actor={post.author} />
+              </span>
             </div>
             {isMine && onDelete && (
               <button
-                onClick={onDelete}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
                 className="text-xs font-bold text-kelo-muted transition-colors hover:text-kelo-danger"
                 title="Supprimer"
               >
@@ -105,7 +130,7 @@ export default function PostCard({
           />
 
           {replyOpen && (
-            <div className="mt-3 flex gap-2 border-t border-kelo-border pt-3">
+            <div className="mt-3 flex gap-2 border-t border-kelo-border pt-3" onClick={(e) => e.stopPropagation()}>
               <input
                 type="text"
                 value={replyText}
