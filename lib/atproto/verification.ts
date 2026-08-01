@@ -17,7 +17,7 @@ import { getReadAgent } from "@/lib/atproto/read-agent";
 export type VerificationBadgeType = "verified" | "trusted-verifier" | null;
 
 export interface VerificationIssuer {
-  did: string;
+  issuer: string;
   uri: string;
   isValid: boolean;
   createdAt: string;
