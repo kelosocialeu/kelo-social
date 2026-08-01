@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import PostCard from "@/components/feed/PostCard";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import { useCertifications } from "@/hooks/useCertifications";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { getStoredSession } from "@/services/auth.service";
 import { deleteOwnPost } from "@/lib/atproto/posts";
@@ -12,7 +11,6 @@ import { deleteOwnPost } from "@/lib/atproto/posts";
 export default function BookmarksPage() {
   const { checked, handle } = useRequireAuth();
   const { bookmarks, isBookmarked, toggleBookmark } = useBookmarks();
-  const { getStatus } = useCertifications();
   const [myDid, setMyDid] = useState<string | null>(null);
 
   useEffect(() => {
@@ -59,7 +57,6 @@ export default function BookmarksPage() {
                 <PostCard
                   key={post.uri}
                   post={post}
-                  badgeStatus={getStatus(post.author?.handle)}
                   isMine={!!myDid && post.author?.did === myDid}
                   isBookmarked={isBookmarked(post.uri)}
                   onBookmark={() => toggleBookmark(post)}
