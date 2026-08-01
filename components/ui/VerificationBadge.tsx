@@ -105,11 +105,11 @@ export default function VerificationBadge({ actor }: VerificationBadgeProps) {
             </div>
           ) : (
             <div
-              className="fixed left-1/2 top-1/2 z-40 w-80 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-kelo-border bg-white p-5 shadow-kelo"
+              className="fixed left-1/2 top-1/2 z-40 w-96 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-kelo-border bg-white p-6 shadow-kelo"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-4 flex items-center justify-center">
-                <img src={TRUSTED_VERIFIER_IMAGE} alt="Certificateur de confiance" className="h-28 w-28 object-contain" />
+                <img src={TRUSTED_VERIFIER_IMAGE} alt="Certificateur de confiance" className="h-48 w-48 object-contain" />
               </div>
 
               <h3 className="mb-2 text-center text-base font-extrabold text-kelo-text">
