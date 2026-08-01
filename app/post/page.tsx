@@ -5,7 +5,6 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import PostCard from "@/components/feed/PostCard";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import { useCertifications } from "@/hooks/useCertifications";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { getPostThread } from "@/lib/atproto/post-thread";
 import { deleteOwnPost } from "@/lib/atproto/posts";
@@ -38,7 +37,6 @@ function PostThreadContent() {
   const [error, setError] = useState<string | null>(null);
   const [activeReplyUri, setActiveReplyUri] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
-  const { getStatus } = useCertifications();
   const { isBookmarked, toggleBookmark } = useBookmarks();
 
   useEffect(() => {
@@ -105,7 +103,6 @@ function PostThreadContent() {
             <div className="divide-y divide-kelo-border">
               <PostCard
                 post={rootPost}
-                badgeStatus={getStatus(rootPost.author?.handle)}
                 isMine={!!myDid && rootPost.author?.did === myDid}
                 isBookmarked={isBookmarked(rootPost.uri)}
                 replyOpen={activeReplyUri === rootPost.uri}
@@ -125,7 +122,6 @@ function PostThreadContent() {
                 <PostCard
                   key={reply.uri}
                   post={reply}
-                  badgeStatus={getStatus(reply.author?.handle)}
                   isMine={!!myDid && reply.author?.did === myDid}
                   isBookmarked={isBookmarked(reply.uri)}
                   onBookmark={() => toggleBookmark(reply)}
