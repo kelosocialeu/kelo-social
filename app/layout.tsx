@@ -4,6 +4,11 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Kelo Social',
   description: 'Le réseau social décentralisé propulsé par AT Protocol',
+  icons: {
+    icon: 'https://kelosocial.sirv.com/logo.png',
+    shortcut: 'https://kelosocial.sirv.com/logo.png',
+    apple: 'https://kelosocial.sirv.com/logo.png',
+  },
 };
 
 export default function RootLayout({
