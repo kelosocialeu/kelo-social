@@ -7,7 +7,6 @@ import Avatar from "@/components/feed/Avatar";
 import Composer from "@/components/feed/Composer";
 import PostCard from "@/components/feed/PostCard";
 import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
-import { useCertifications } from "@/hooks/useCertifications";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
 import { useBookmarks } from "@/hooks/useBookmarks";
@@ -61,7 +60,6 @@ export default function FeedPage() {
   const [loadingPost, setLoadingPost] = useState(false);
   const [activeReplyUri, setActiveReplyUri] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
-  const { getStatus } = useCertifications();
   const { isBookmarked, toggleBookmark } = useBookmarks();
 
   useEffect(() => {
@@ -280,7 +278,6 @@ export default function FeedPage() {
                   <PostCard
                     key={post.uri || idx}
                     post={post}
-                    badgeStatus={getStatus(post.author?.handle)}
                     isMine={isMine}
                     isBookmarked={isBookmarked(post.uri)}
                     replyOpen={activeReplyUri === post.uri}
