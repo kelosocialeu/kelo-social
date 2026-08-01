@@ -3,53 +3,72 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+
 import Badge from "@/components/ui/Badge";
 import Logo from "@/components/ui/Logo";
 import Avatar from "@/components/feed/Avatar";
-import { getVerificationBadge, getVerificationIssuers, getIssuerProfile } from "@/lib/atproto/verification";
+
+import {
+  getVerificationBadge,
+  getVerificationIssuers,
+  getIssuerProfile,
+} from "@/lib/atproto/verification";
 
 interface VerificationBadgeProps {
   actor: any;
 }
 
-const TRUSTED_VERIFIER_IMAGE = "https://kelosocial.sirv.com/Trusted%20Verifier.png";
-const CERTIFIED_IMAGE = "https://kelosocial.sirv.com/ChatGPT%20Image%2025%20juil.%202026%2C%2022_56_32.png";
+interface IssuerProfile {
+  handle: string;
+  displayName?: string;
+  avatar?: string;
+}
 
-/**
- * Affiche le badge de vérification réseau d'un compte (rond = vérifié,
- * fleur = certificateur de confiance).
- * - Rond : ouvre une fenêtre indiquant par qui le compte a été certifié.
- * - Fleur : ouvre une fenêtre façon Bluesky (Kelo -> Certificateur de
- *   confiance -> Compte vérifié) expliquant ce qu'est un certificateur
- *   de confiance.
- */
-export default function VerificationBadge({ actor }: VerificationBadgeProps) {
+const CERTIFIER_IMAGE =
+  "https://kelosocial.sirv.com/Certificateur.png";
+
+const VERIFIED_IMAGE =
+  "https://kelosocial.sirv.com/Verified.png";
+
+export default function VerificationBadge({
+  actor,
+}: VerificationBadgeProps) {
   const badgeType = getVerificationBadge(actor);
+
   const [open, setOpen] = useState(false);
-  const [issuer, setIssuer] = useState<any>(null);
+  const [issuer, setIssuer] = useState<IssuerProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
   if (!badgeType) return null;
 
-  const handleClick = async (e: React.MouseEvent) => {
+  const handleClick = async (
+    e: React.MouseEvent<HTMLDivElement>
+  ) => {
     e.preventDefault();
     e.stopPropagation();
+
     setOpen(true);
 
     if (badgeType === "verified" && !issuer && !loading) {
       const issuers = getVerificationIssuers(actor);
       const issuerDid = issuers[0]?.issuer;
+
       if (!issuerDid) {
         setLoadError(true);
         return;
       }
+
       setLoading(true);
+
       try {
         const profile = await getIssuerProfile(issuerDid);
         setIssuer(profile);
-      } catch (err) {
-        console.error(err);
+      } catch (error) {
+        console.error(
+          "Erreur récupération certificateur :",
+          error
+        );
         setLoadError(true);
       } finally {
         setLoading(false);
@@ -57,22 +76,26 @@ export default function VerificationBadge({ actor }: VerificationBadgeProps) {
     }
   };
 
-  const close = () => setOpen(false);
-
   return (
-    <span className="relative inline-flex">
-      <button onClick={handleClick} className="inline-flex" title="Compte certifié">
-        <Badge status={badgeType === "trusted-verifier" ? "trusted-verifier" : "certified"} />
-      </button>
+    <>
+      <div
+        onClick={handleClick}
+        className="inline-flex cursor-pointer"
+      >
+        <Badge
+          status={
+            badgeType === "trusted-verifier"
+              ? "trusted-verifier"
+              : "certified"
+          }
+        />
+      </div>
 
       {open && (
         <>
           <div
             className="fixed inset-0 z-30"
-            onClick={(e) => {
-              e.stopPropagation();
-              close();
-            }}
+            onClick={() => setOpen(false)}
           />
 
           {badgeType === "verified" ? (
@@ -80,31 +103,49 @@ export default function VerificationBadge({ actor }: VerificationBadgeProps) {
               className="absolute left-1/2 top-full z-40 mt-2 w-72 -translate-x-1/2 rounded-2xl border border-kelo-border bg-white p-4 shadow-kelo"
               onClick={(e) => e.stopPropagation()}
             >
-              <p className="mb-3 text-sm font-bold text-kelo-text">Compte certifié</p>
+              <p className="mb-3 text-sm font-bold text-kelo-text">
+                Compte certifié
+              </p>
 
-              {loading && <p className="text-sm text-kelo-muted">Chargement...</p>}
+              {loading && (
+                <p className="text-sm text-kelo-muted">
+                  Chargement...
+                </p>
+              )}
 
               {!loading && issuer && (
                 <>
-                  <p className="mb-2 text-xs text-kelo-muted">Ce compte a été certifié par :</p>
+                  <p className="mb-2 text-xs text-kelo-muted">
+                    Certifié par :
+                  </p>
+
                   <Link
                     href={`/profile/${issuer.handle}`}
-                    className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-kelo-background"
-                    onClick={close}
+                    className="flex items-center gap-3 rounded-xl p-2 hover:bg-kelo-background"
+                    onClick={() => setOpen(false)}
                   >
-                    <Avatar src={issuer.avatar} fallback={issuer.handle[0].toUpperCase()} size="sm" />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-kelo-text">
+                    <Avatar
+                      src={issuer.avatar}
+                      fallback={issuer.handle[0].toUpperCase()}
+                      size="sm"
+                    />
+
+                    <div>
+                      <p className="text-sm font-bold text-kelo-text">
                         {issuer.displayName || issuer.handle}
                       </p>
-                      <p className="truncate text-xs text-kelo-muted">@{issuer.handle}</p>
+                      <p className="text-xs text-kelo-muted">
+                        @{issuer.handle}
+                      </p>
                     </div>
                   </Link>
                 </>
               )}
 
               {!loading && loadError && (
-                <p className="text-sm text-kelo-muted">Impossible de déterminer le certificateur.</p>
+                <p className="text-sm text-kelo-muted">
+                  Impossible de déterminer le certificateur.
+                </p>
               )}
             </div>
           ) : (
@@ -118,13 +159,21 @@ export default function VerificationBadge({ actor }: VerificationBadgeProps) {
                     <div className="flex h-14 w-14 items-center justify-center rounded-full bg-kelo-gradient">
                       <Logo className="h-8 w-8" />
                     </div>
-                    <span className="text-xs font-semibold text-kelo-muted">Kelo</span>
+
+                    <span className="text-xs font-semibold text-kelo-muted">
+                      Kelo
+                    </span>
                   </div>
 
-                  <ArrowRight className="h-4 w-4 flex-shrink-0 text-kelo-muted" />
+                  <ArrowRight className="h-4 w-4 text-kelo-muted" />
 
                   <div className="flex flex-col items-center gap-2">
-                    <img src={TRUSTED_VERIFIER_IMAGE} alt="Certificateur de confiance" className="h-14 w-14 object-contain" />
+                    <img
+                      src={CERTIFIER_IMAGE}
+                      alt="Certificateur de confiance"
+                      className="h-14 w-14 object-contain"
+                    />
+
                     <span className="text-center text-xs font-semibold text-kelo-muted">
                       Certificateur
                       <br />
@@ -132,10 +181,15 @@ export default function VerificationBadge({ actor }: VerificationBadgeProps) {
                     </span>
                   </div>
 
-                  <ArrowRight className="h-4 w-4 flex-shrink-0 text-kelo-muted" />
+                  <ArrowRight className="h-4 w-4 text-kelo-muted" />
 
                   <div className="flex flex-col items-center gap-2">
-                    <img src={CERTIFIED_IMAGE} alt="Compte vérifié" className="h-14 w-14 object-contain" />
+                    <img
+                      src={VERIFIED_IMAGE}
+                      alt="Compte vérifié"
+                      className="h-14 w-14 object-contain"
+                    />
+
                     <span className="text-center text-xs font-semibold text-kelo-muted">
                       Compte
                       <br />
@@ -148,14 +202,15 @@ export default function VerificationBadge({ actor }: VerificationBadgeProps) {
               <h3 className="mb-2 text-center text-base font-extrabold text-kelo-text">
                 {actor?.displayName || actor?.handle} est un certificateur de confiance
               </h3>
+
               <p className="mb-5 text-center text-sm text-kelo-muted">
-                Les comptes avec ce badge peuvent en certifier d'autres. Ces certificateurs de confiance sont
-                sélectionnés par Kelo Social.
+                Les comptes avec ce badge peuvent certifier d'autres comptes.
+                Les certificateurs de confiance sont sélectionnés par Kelo Social.
               </p>
 
               <button
-                onClick={close}
-                className="w-full rounded-full bg-kelo-background py-2.5 text-sm font-bold text-kelo-text transition hover:bg-kelo-border/60"
+                onClick={() => setOpen(false)}
+                className="w-full rounded-full bg-kelo-background py-2.5 text-sm font-bold text-kelo-text hover:bg-kelo-border/60"
               >
                 Fermer
               </button>
@@ -163,6 +218,6 @@ export default function VerificationBadge({ actor }: VerificationBadgeProps) {
           )}
         </>
       )}
-    </span>
+    </>
   );
 }
