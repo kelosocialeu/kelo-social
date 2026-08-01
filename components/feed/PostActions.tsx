@@ -117,7 +117,10 @@ export default function PostActions({
   };
 
   return (
-    <div className="relative mt-3 flex items-center justify-between text-kelo-muted">
+    <div
+      className="relative mt-3 flex items-center justify-between text-kelo-muted"
+      onClick={(e) => e.stopPropagation()}
+    >
       <div className="flex items-center gap-6">
         <button
           onClick={onReply}
