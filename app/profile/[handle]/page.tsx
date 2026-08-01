@@ -5,11 +5,10 @@ import { useParams } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
 import Button from "@/components/ui/Button";
-import Badge from "@/components/ui/Badge";
+import VerificationBadge from "@/components/ui/VerificationBadge";
 import PostCard from "@/components/feed/PostCard";
 import FollowButton from "@/components/profile/FollowButton";
 import ProfileMoreMenu from "@/components/profile/ProfileMoreMenu";
-import { useCertifications } from "@/hooks/useCertifications";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { getActorProfile, getActorFeed } from "@/lib/atproto/profile";
@@ -45,7 +44,6 @@ export default function ProfilePage() {
   const [activeReplyUri, setActiveReplyUri] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const [postSearchQuery, setPostSearchQuery] = useState("");
-  const { getStatus } = useCertifications();
   const { isBookmarked, toggleBookmark } = useBookmarks();
 
   const isOwnProfile = checked && myHandle?.toLowerCase() === targetHandle.toLowerCase();
@@ -115,8 +113,6 @@ export default function ProfilePage() {
   const handleModeration = () => {
     setPosts([]);
   };
-
-  const badgeStatus = getStatus(targetHandle);
 
   const displayedPosts = postSearchQuery.trim()
     ? posts.filter((p) => (p.record?.text || "").toLowerCase().includes(postSearchQuery.trim().toLowerCase()))
@@ -192,7 +188,7 @@ export default function ProfilePage() {
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-extrabold text-kelo-text">{profile?.displayName || targetHandle}</h1>
-              {badgeStatus && <Badge status={badgeStatus} />}
+              <VerificationBadge actor={profile} />
             </div>
 
             <p className="font-semibold text-kelo-primary">@{targetHandle}</p>
@@ -251,7 +247,6 @@ export default function ProfilePage() {
                 <PostCard
                   key={post.uri}
                   post={post}
-                  badgeStatus={getStatus(post.author?.handle)}
                   isMine={isOwnProfile}
                   isBookmarked={isBookmarked(post.uri)}
                   replyOpen={activeReplyUri === post.uri}
