@@ -188,7 +188,7 @@ export default function ProfilePage() {
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-extrabold text-kelo-text">{profile?.displayName || targetHandle}</h1>
-              <VerificationBadge actor={profile} />
+              <VerificationBadge actor={profile} size={28} />
             </div>
 
             <p className="font-semibold text-kelo-primary">@{targetHandle}</p>
