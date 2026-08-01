@@ -33,63 +33,96 @@ const [issuer, setIssuer] = useState<any>(null);
 const [loading, setLoading] = useState(true);
 
 useEffect(() => {
+
 ```
 async function loadVerification() {
+
   try {
+
     if (!actor?.did) {
       setLoading(false);
       return;
     }
+
+
     const badge = await getVerificationBadge(actor.did);
+
     if (badge) {
+
       setVerified(true);
+
+
       const issuers = await getVerificationIssuers(
         actor.did
       );
+
+
       if (issuers?.length) {
+
         const profile =
           await getIssuerProfile(
             issuers[0]
           );
+
         setIssuer(profile);
+
       }
+
     }
+
   } catch (error) {
+
     console.error(
       "Erreur chargement vérification Kelo ID:",
       error
     );
+
   } finally {
+
     setLoading(false);
+
   }
+
 }
+
+
 loadVerification();
 ```
+
 }, [actor]);
+
 if (loading || !verified) {
 return null;
 }
+
 const sizes = {
+
 ```
 small: {
   image: 28,
   text: "text-xs",
   box: "px-2 py-1",
 },
+
 medium: {
   image: 38,
   text: "text-sm",
   box: "px-3 py-2",
 },
+
 large: {
   image: 52,
   text: "text-base",
   box: "px-4 py-3",
 },
 ```
+
 };
+
 const current = sizes[size];
+
 return (
+
 ```
 <Link
   href="/kelo-id"
@@ -111,6 +144,7 @@ return (
     transition
   `}
 >
+
   <div
     className="
       relative
@@ -122,6 +156,7 @@ return (
       overflow-hidden
     "
   >
+
     <Image
       src={KELO_ID_BADGE_IMAGE}
       alt="Kelo ID Verified"
@@ -129,9 +164,14 @@ return (
       height={current.image}
       className="object-contain"
     />
+
   </div>
+
+
   {showLabel && (
+
     <div className="flex flex-col">
+
       <span
         className={`
           ${current.text}
@@ -141,25 +181,38 @@ return (
       >
         Vérifié Kelo ID
       </span>
+
+
       {issuer && (
+
         <span
           className="
             text-[10px]
             text-white/80
           "
         >
+
           Certifié par {issuer.name}
+
         </span>
+
       )}
+
     </div>
+
   )}
+
+
   <Image
     src={TRUSTED_VERIFIER_IMAGE}
     alt="Trusted verifier"
     width={18}
     height={18}
   />
+
 </Link>
 ```
+
 );
+
 }
