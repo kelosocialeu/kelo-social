@@ -13,11 +13,14 @@ import {
   removeFeed,
   togglePinFeed,
 } from "@/lib/atproto/feeds";
+import { KELO_CURATED_LISTS, getListInfo } from "@/lib/atproto/lists";
 
 export default function FeedsPage() {
   const { checked, handle } = useRequireAuth();
   const [savedFeeds, setSavedFeeds] = useState<any[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(true);
+  const [curatedLists, setCuratedLists] = useState<any[]>([]);
+  const [loadingCurated, setLoadingCurated] = useState(true);
   const [discoverQuery, setDiscoverQuery] = useState("");
   const [discoverFeeds, setDiscoverFeeds] = useState<any[]>([]);
   const [loadingDiscover, setLoadingDiscover] = useState(true);
@@ -43,6 +46,25 @@ export default function FeedsPage() {
     }
   }
 
+  async function loadCurated() {
+    setLoadingCurated(true);
+    try {
+      const lists = await Promise.all(
+        KELO_CURATED_LISTS.map(async (l) => {
+          try {
+            return await getListInfo(l.uri);
+          } catch (err) {
+            console.error(`Impossible de charger la liste ${l.label}`, err);
+            return null;
+          }
+        })
+      );
+      setCuratedLists(lists.filter(Boolean));
+    } finally {
+      setLoadingCurated(false);
+    }
+  }
+
   async function loadDiscover(query?: string) {
     setLoadingDiscover(true);
     try {
@@ -58,6 +80,7 @@ export default function FeedsPage() {
   useEffect(() => {
     if (!checked) return;
     loadSaved();
+    loadCurated();
     loadDiscover();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checked]);
@@ -155,6 +178,32 @@ export default function FeedsPage() {
               </div>
             </Link>
           </div>
+
+          {!loadingCurated && curatedLists.length > 0 && (
+            <div className="mt-1 flex flex-col gap-1">
+              {curatedLists.map((list: any) => (
+                <Link
+                  key={list.uri}
+                  href={`/feeds/list?uri=${encodeURIComponent(list.uri)}`}
+                  className="flex items-center gap-3 rounded-2xl p-3 transition-colors hover:bg-kelo-background"
+                >
+                  {list.avatar ? (
+                    <img src={list.avatar} alt="" className="h-10 w-10 flex-shrink-0 rounded-2xl object-cover" />
+                  ) : (
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-kelo-gradient text-sm font-bold text-white">
+                      K
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-kelo-text">{list.name}</p>
+                    <p className="truncate text-xs text-kelo-muted">
+                      {list.listItemCount ?? 0} membre{(list.listItemCount ?? 0) > 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
 
           {loadingSaved ? (
             <p className="py-4 text-center text-sm text-kelo-muted">Chargement...</p>
