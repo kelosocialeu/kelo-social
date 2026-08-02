@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
+import VerificationBadge from "@/components/ui/VerificationBadge";
 import Composer from "@/components/feed/Composer";
 import PostCard from "@/components/feed/PostCard";
 import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
@@ -336,9 +337,12 @@ export default function FeedPage() {
                   >
                     <Avatar src={actor.avatar} fallback={actor.handle[0].toUpperCase()} size="sm" />
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-kelo-text">
-                        {actor.displayName || actor.handle}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-sm font-bold text-kelo-text">
+                          {actor.displayName || actor.handle}
+                        </p>
+                        <VerificationBadge actor={actor} />
+                      </div>
                       <p className="truncate text-xs text-kelo-muted">@{actor.handle}</p>
                     </div>
                   </Link>
