@@ -34,6 +34,9 @@ interface PostActionsProps {
  * gauche, conserver / partager / plus à droite — même mise en page sur
  * Feed, Profil, Conservés et le fil de publication. Le partage et le menu
  * "plus" (bloquer/signaler/masquer/copier) sont gérés ici directement.
+ * Le clic sur cette rangée ne doit jamais déclencher la navigation vers
+ * le fil de publication (géré par PostCard) — d'où le stopPropagation
+ * sur le conteneur racine.
  */
 export default function PostActions({
   post,
