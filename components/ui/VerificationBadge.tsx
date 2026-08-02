@@ -16,6 +16,7 @@ import {
 
 interface VerificationBadgeProps {
   actor: any;
+  size?: number;
 }
 
 interface IssuerProfile {
@@ -32,6 +33,7 @@ const VERIFIED_IMAGE =
 
 export default function VerificationBadge({
   actor,
+  size = 16,
 }: VerificationBadgeProps) {
   const badgeType = getVerificationBadge(actor);
 
@@ -83,12 +85,13 @@ export default function VerificationBadge({
         className="inline-flex cursor-pointer"
       >
         <Badge
-          status={
-            badgeType === "trusted-verifier"
-              ? "trusted-verifier"
-              : "certified"
-          }
-        />
+  status={
+    badgeType === "trusted-verifier"
+      ? "trusted-verifier"
+      : "certified"
+  }
+  size={size}
+/>
       </div>
 
       {open && (
