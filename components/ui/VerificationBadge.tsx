@@ -26,10 +26,10 @@ interface IssuerProfile {
 }
 
 const CERTIFIER_IMAGE =
-  "https://kelosocial.sirv.com/Certificateur.png";
+  "https://kelosocial.sirv.com/1784816368891-removebg-preview.png";
 
 const VERIFIED_IMAGE =
-  "https://kelosocial.sirv.com/Verified.png";
+  "https://kelosocial.sirv.com/ChatGPT%20Image%2025%20juil.%202026%2C%2022_56_32.png";
 
 export default function VerificationBadge({
   actor,
