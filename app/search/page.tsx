@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
 import VerificationBadge from "@/components/ui/VerificationBadge";
@@ -25,10 +26,11 @@ function formatSearchPosts(results: any[]) {
   }));
 }
 
-export default function SearchPage() {
+function SearchContent() {
+  const searchParams = useSearchParams();
   const { checked, handle } = useRequireAuth();
   const [myDid, setMyDid] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(searchParams.get("q") || "");
   const [tab, setTab] = useState<"posts" | "accounts">("posts");
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -217,5 +219,19 @@ export default function SearchPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-kelo-background font-sans text-kelo-muted">
+          Chargement...
+        </div>
+      }
+    >
+      <SearchContent />
+    </Suspense>
   );
 }
