@@ -7,6 +7,7 @@ import Avatar from "@/components/feed/Avatar";
 import VerificationBadge from "@/components/ui/VerificationBadge";
 import Composer from "@/components/feed/Composer";
 import PostCard from "@/components/feed/PostCard";
+import FeedsRail from "@/components/feed/FeedsRail";
 import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
@@ -350,13 +351,7 @@ export default function FeedPage() {
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl border border-kelo-border bg-kelo-background p-4">
-              <h3 className="mb-3 text-sm font-bold text-kelo-text">Fédération AT Protocol</h3>
-              <p className="text-xs leading-relaxed text-kelo-muted">
-                Le fil « Pour vous » agrège les publications de vos abonnements, « Découvrir » celles de tout le
-                réseau fédéré (Bluesky, WSocial, Eurosky, Kelo Social...), quel que soit le PDS d'origine.
-              </p>
-            </div>
+            <FeedsRail />
           )}
         </aside>
     </div>
