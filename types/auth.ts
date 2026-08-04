@@ -9,7 +9,6 @@ export interface AtpSession {
 export interface LoginCredentials {
   identifier: string;
   password: string;
-  pdsUrl: string;
 }
 
 export interface PdsProvider {
