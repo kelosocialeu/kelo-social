@@ -8,7 +8,7 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
 import { useSignup } from "@/hooks/useSignup";
-import { PDS_PROVIDERS } from "@/lib/atproto/pds";
+const SIGNUP_PDS_PROVIDERS = PDS_PROVIDERS.filter((p) => p.id === "kelo");
 
 const SIGNUP_PDS_PROVIDERS = PDS_PROVIDERS.filter((p) => p.id === "kelo");
 
