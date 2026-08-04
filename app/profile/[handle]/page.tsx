@@ -15,10 +15,11 @@ import { useBookmarks } from "@/hooks/useBookmarks";
 import { getActorProfile, getActorFeed } from "@/lib/atproto/profile";
 import { deleteOwnPost } from "@/lib/atproto/posts";
 import { getActorLists, ManagedList } from "@/lib/atproto/lists";
+import { getActorStarterPacks, StarterPackView } from "@/lib/atproto/starter-packs";
 
 const BASE_TABS = ["Posts", "Réponses", "Média", "Vidéos", "Posts aimés", "Fils d'actu"] as const;
 
-type ProfileTab = (typeof BASE_TABS)[number] | "Listes";
+type ProfileTab = (typeof BASE_TABS)[number] | "Listes" | "Kits de démarrage";
 
 function formatFeed(feed: any[]) {
   return feed.map((item: any) => ({
@@ -43,6 +44,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<any>(null);
   const [posts, setPosts] = useState<any[]>([]);
   const [lists, setLists] = useState<ManagedList[]>([]);
+  const [starterPacks, setStarterPacks] = useState<StarterPackView[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ProfileTab>("Posts");
@@ -58,18 +60,17 @@ export default function ProfilePage() {
 
     async function load() {
       try {
-        const [profileData, feedData, listData] = await Promise.all([
+        const [profileData, feedData, listData, starterPackData] = await Promise.all([
           getActorProfile(targetHandle),
           getActorFeed(targetHandle, 30),
-          getActorLists(targetHandle, 50).catch((error) => {
-            console.error("Impossible de charger les listes du profil :", error);
-            return { items: [], cursor: undefined };
-          }),
+          getActorLists(targetHandle, 50).catch(() => ({ items: [], cursor: undefined })),
+          getActorStarterPacks(targetHandle, 50).catch(() => ({ items: [], cursor: undefined })),
         ]);
 
         setProfile(profileData);
         setPosts(formatFeed(feedData));
         setLists(listData.items);
+        setStarterPacks(starterPackData.items);
       } catch (err) {
         console.error("Erreur lors de la récupération du profil :", err);
         setLoadError("Ce profil est introuvable.");
@@ -132,12 +133,11 @@ export default function ProfilePage() {
   const visibleTabs = useMemo<ProfileTab[]>(() => {
     const tabs: ProfileTab[] = [...BASE_TABS];
 
-    if (lists.length > 0) {
-      tabs.push("Listes");
-    }
+    if (lists.length > 0) tabs.push("Listes");
+    if (starterPacks.length > 0) tabs.push("Kits de démarrage");
 
     return tabs;
-  }, [lists.length]);
+  }, [lists.length, starterPacks.length]);
 
   useEffect(() => {
     if (!visibleTabs.includes(activeTab)) {
@@ -296,10 +296,6 @@ export default function ProfilePage() {
                     onMuted={handleModeration}
                   />
                 ))
-              ) : postSearchQuery.trim() ? (
-                <p className="py-10 text-center text-sm text-kelo-muted">
-                  Aucun résultat pour cette recherche.
-                </p>
               ) : (
                 <p className="py-10 text-center text-sm text-kelo-muted">
                   Aucune publication pour l&apos;instant.
@@ -314,32 +310,30 @@ export default function ProfilePage() {
                 <Link
                   key={list.uri}
                   href={`/lists/${encodeURIComponent(list.uri)}`}
-                  className="group flex min-w-0 items-start gap-3 rounded-2xl border border-kelo-border bg-white p-4 transition hover:-translate-y-0.5 hover:bg-kelo-background/60 hover:shadow-sm"
+                  className="flex min-w-0 items-start gap-3 rounded-2xl border border-kelo-border p-4 transition hover:bg-kelo-background/60"
                 >
                   {list.avatar ? (
                     <img
                       src={list.avatar}
-                      alt={`Image de ${list.name}`}
-                      className="h-14 w-14 flex-shrink-0 rounded-2xl border border-kelo-border object-cover"
+                      alt=""
+                      className="h-14 w-14 rounded-2xl object-cover"
                     />
                   ) : (
-                    <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-kelo-gradient text-lg font-bold text-white">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-kelo-gradient font-bold text-white">
                       {(list.name || "L").charAt(0).toUpperCase()}
                     </div>
                   )}
 
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-sm font-extrabold text-kelo-text">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-extrabold">
                       {list.name}
                     </h3>
-
                     {list.description && (
-                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-kelo-muted">
+                      <p className="mt-1 line-clamp-2 text-xs text-kelo-muted">
                         {list.description}
                       </p>
                     )}
-
-                    <p className="mt-2 text-xs font-semibold text-kelo-muted">
+                    <p className="mt-2 text-xs text-kelo-muted">
                       {list.listItemCount ?? 0} membre
                       {(list.listItemCount ?? 0) > 1 ? "s" : ""}
                     </p>
@@ -349,8 +343,50 @@ export default function ProfilePage() {
             </div>
           )}
 
+          {activeTab === "Kits de démarrage" && (
+            <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5 lg:p-6 2xl:grid-cols-3">
+              {starterPacks.map((pack) => (
+                <Link
+                  key={pack.uri}
+                  href={`/starter-packs/${encodeURIComponent(pack.uri)}`}
+                  className="overflow-hidden rounded-2xl border border-kelo-border transition hover:bg-kelo-background/60"
+                >
+                  {pack.list?.avatar ? (
+                    <img
+                      src={pack.list.avatar}
+                      alt=""
+                      className="h-36 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-36 items-center justify-center bg-kelo-gradient text-4xl text-white">
+                      🚀
+                    </div>
+                  )}
+
+                  <div className="p-4">
+                    <h3 className="truncate text-sm font-extrabold">
+                      {pack.record?.name || pack.list?.name || "Kit"}
+                    </h3>
+                    {(pack.record?.description ||
+                      pack.list?.description) && (
+                      <p className="mt-1 line-clamp-2 text-xs text-kelo-muted">
+                        {pack.record?.description ||
+                          pack.list?.description}
+                      </p>
+                    )}
+                    <p className="mt-2 text-xs text-kelo-muted">
+                      {pack.list?.listItemCount ?? 0} membre
+                      {(pack.list?.listItemCount ?? 0) > 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+
           {activeTab !== "Posts" &&
-            activeTab !== "Listes" && (
+            activeTab !== "Listes" &&
+            activeTab !== "Kits de démarrage" && (
               <p className="py-10 text-center text-sm text-kelo-muted">
                 Bientôt disponible.
               </p>
