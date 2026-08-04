@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import Link from "next/link";
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
 import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
-import { getNotifications, markNotificationsSeen } from "@/lib/atproto/notifications";
+import {
+  getNotifications,
+  markNotificationsSeen,
+} from "@/lib/atproto/notifications";
 
 const REASON_LABELS: Record<string, string> = {
   like: "a aimé votre publication",
@@ -27,27 +30,76 @@ const REASON_ICONS: Record<string, string> = {
   quote: "🔁",
 };
 
-function getNotificationHref(notif: any): string {
-  if (notif.reason === "follow") {
-    return `/profile/${notif.author?.handle}`;
+function getNotificationHref(notification: any): string {
+  if (notification.reason === "follow") {
+    return `/profile/${notification.author?.handle}`;
   }
-  const targetUri = notif.reason === "like" || notif.reason === "repost" ? notif.reasonSubject : notif.uri;
+
+  const targetUri =
+    notification.reason === "like" ||
+    notification.reason === "repost"
+      ? notification.reasonSubject
+      : notification.uri;
+
   return `/post?uri=${encodeURIComponent(targetUri || "")}`;
+}
+
+function formatNotificationDate(indexedAt?: string): string {
+  if (!indexedAt) {
+    return "";
+  }
+
+  try {
+    return new Date(indexedAt).toLocaleString("fr-BE", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch {
+    return indexedAt;
+  }
 }
 
 export default function NotificationsPage() {
   const { checked, handle } = useRequireAuth();
 
-  const fetcher = async (cursor?: string) => {
-    if (!checked) return { items: [], cursor: undefined };
-    const res = await getNotifications(30, cursor);
-    return { items: res.items, cursor: res.cursor };
-  };
+  const fetchNotificationsPage = useCallback(
+    async (cursor?: string) => {
+      if (!checked) {
+        return {
+          items: [],
+          cursor: undefined,
+        };
+      }
 
-  const { items, loading, hasMore, error, loadMore } = useInfiniteFeed(fetcher, [checked]);
+      const response = await getNotifications(30, cursor);
+
+      return {
+        items: response.items,
+        cursor: response.cursor,
+      };
+    },
+    [checked]
+  );
+
+  const {
+    items,
+    loading,
+    hasMore,
+    error,
+    loadMore,
+  } = useInfiniteFeed(fetchNotificationsPage, [checked]);
 
   useEffect(() => {
-    if (checked) markNotificationsSeen().catch(() => {});
+    if (!checked) {
+      return;
+    }
+
+    markNotificationsSeen().catch((error) => {
+      console.error(
+        "Impossible de marquer les notifications comme lues :",
+        error
+      );
+    });
   }, [checked]);
 
   const handleLogout = () => {
@@ -65,53 +117,129 @@ export default function NotificationsPage() {
 
   return (
     <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
-        <Sidebar handle={handle} onLogout={handleLogout} />
+      <Sidebar handle={handle} onLogout={handleLogout} />
 
-        <main className="min-h-screen max-w-2xl flex-grow border-r border-kelo-border bg-white pb-20 shadow-kelo">
-          <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 p-4 backdrop-blur-md">
-            <h2 className="text-xl font-extrabold text-kelo-text">Notifications</h2>
+      <main className="min-h-screen min-w-0 flex-1 border-x border-kelo-border bg-white pb-20 shadow-kelo">
+        <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 backdrop-blur-md">
+          <div className="px-4 py-4 sm:px-5 lg:px-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h1 className="text-xl font-extrabold text-kelo-text sm:text-2xl">
+                  Notifications
+                </h1>
+
+                <p className="mt-1 text-xs text-kelo-muted sm:text-sm">
+                  Retrouvez les nouvelles interactions avec votre compte.
+                </p>
+              </div>
+
+              {items.length > 0 && (
+                <span className="flex-shrink-0 rounded-full bg-kelo-background px-3 py-1 text-xs font-semibold text-kelo-muted">
+                  {items.length}
+                </span>
+              )}
+            </div>
           </div>
+        </div>
 
-          <div className="divide-y divide-kelo-border">
-            {items.map((notif: any) => (
-              <Link
-                key={notif.uri + notif.indexedAt}
-                href={getNotificationHref(notif)}
-                className="flex gap-3 p-4 transition-colors hover:bg-kelo-background/60"
-              >
-                <Avatar
-                  src={notif.author?.avatar}
-                  fallback={notif.author?.handle ? notif.author.handle[0].toUpperCase() : "U"}
-                  size="sm"
-                />
-                <div className="flex-grow">
-                  <p className="text-sm text-kelo-text">
-                    <span className="font-bold">{notif.author?.displayName || notif.author?.handle}</span>{" "}
-                    <span className="text-kelo-muted">
-                      {REASON_ICONS[notif.reason] || "🔔"} {REASON_LABELS[notif.reason] || notif.reason}
-                    </span>
-                  </p>
-                  {notif.record?.text && (
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-kelo-muted">{notif.record.text}</p>
-                  )}
-                  <span className="mt-1 block text-xs text-kelo-muted">
-                    {new Date(notif.indexedAt).toLocaleString()}
+        <div className="divide-y divide-kelo-border">
+          {items.map((notification: any) => (
+            <Link
+              key={`${notification.uri}-${notification.indexedAt}`}
+              href={getNotificationHref(notification)}
+              className="group flex gap-3 px-4 py-4 transition-colors hover:bg-kelo-background/60 sm:px-5 lg:px-6"
+            >
+              <Avatar
+                src={notification.author?.avatar}
+                fallback={
+                  notification.author?.handle
+                    ? notification.author.handle[0].toUpperCase()
+                    : "U"
+                }
+                size="sm"
+              />
+
+              <div className="min-w-0 flex-grow">
+                <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
+                  <span className="truncate text-sm font-bold text-kelo-text">
+                    {notification.author?.displayName ||
+                      notification.author?.handle ||
+                      "Utilisateur"}
                   </span>
+
+                  {notification.author?.handle && (
+                    <span className="truncate text-xs text-kelo-muted">
+                      @{notification.author.handle}
+                    </span>
+                  )}
                 </div>
-                {!notif.isRead && <span className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-kelo-primary" />}
-              </Link>
-            ))}
 
-            {items.length === 0 && !loading && (
-              <p className="py-10 text-center text-sm text-kelo-muted">Aucune notification pour l'instant.</p>
-            )}
+                <p className="mt-1 text-sm text-kelo-muted">
+                  <span className="mr-1">
+                    {REASON_ICONS[notification.reason] || "🔔"}
+                  </span>
 
-            {error && <p className="py-6 text-center text-sm text-kelo-danger">{error}</p>}
-            {loading && <p className="py-6 text-center text-sm text-kelo-muted">Chargement...</p>}
+                  {REASON_LABELS[notification.reason] ||
+                    notification.reason}
+                </p>
 
-            <InfiniteScrollSentinel onIntersect={loadMore} disabled={loading || !hasMore} />
-          </div>
-        </main>
+                {notification.record?.text && (
+                  <p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-kelo-text">
+                    {notification.record.text}
+                  </p>
+                )}
+
+                <time className="mt-2 block text-xs text-kelo-muted">
+                  {formatNotificationDate(notification.indexedAt)}
+                </time>
+              </div>
+
+              {!notification.isRead && (
+                <span
+                  aria-label="Notification non lue"
+                  className="mt-2 h-2.5 w-2.5 flex-shrink-0 rounded-full bg-kelo-primary"
+                />
+              )}
+            </Link>
+          ))}
+
+          {items.length === 0 && !loading && !error && (
+            <div className="flex min-h-[calc(100vh-100px)] items-start justify-center px-6 py-12 sm:items-center">
+              <div className="max-w-md text-center">
+                <div className="text-4xl" aria-hidden="true">
+                  🔔
+                </div>
+
+                <h2 className="mt-4 text-lg font-bold text-kelo-text">
+                  Aucune notification
+                </h2>
+
+                <p className="mt-2 text-sm leading-relaxed text-kelo-muted">
+                  Les mentions, réponses, abonnements, likes et reposts
+                  apparaîtront ici.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <p className="px-4 py-8 text-center text-sm text-kelo-danger">
+              {error}
+            </p>
+          )}
+
+          {loading && (
+            <p className="px-4 py-6 text-center text-sm text-kelo-muted">
+              Chargement...
+            </p>
+          )}
+
+          <InfiniteScrollSentinel
+            onIntersect={loadMore}
+            disabled={loading || !hasMore}
+          />
+        </div>
+      </main>
     </div>
   );
 }
