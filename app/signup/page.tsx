@@ -8,9 +8,14 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
 import { useSignup } from "@/hooks/useSignup";
-const SIGNUP_PDS_PROVIDERS = PDS_PROVIDERS.filter((p) => p.id === "kelo");
 
-const SIGNUP_PDS_PROVIDERS = PDS_PROVIDERS.filter((p) => p.id === "kelo");
+const SIGNUP_PDS_PROVIDERS = [
+  {
+    id: "kelo",
+    label: "Kelo Social",
+    url: "https://pds.kelosocial.eu",
+  },
+];
 
 export default function SignupPage() {
   const [handle, setHandle] = useState("");
