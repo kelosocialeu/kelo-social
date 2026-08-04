@@ -163,22 +163,17 @@ export async function getListFeedPosts(
 ) {
   const agent = await getReadAgent();
 
-  const response = await agent.api.app.bsky.graph.getLists({
-  actor,
-  limit,
-  cursor,
-});
+  const response = await agent.api.app.bsky.feed.getListFeed({
+    list: uri,
+    limit,
+    cursor,
+  });
 
-const lists = (response.data.lists as ManagedList[]).filter(
-  (list) =>
-    !list.purpose ||
-    list.purpose === CURATE_LIST_PURPOSE
-);
-
-return {
-  items: lists,
-  cursor: response.data.cursor,
-};
+  return {
+    items: response.data.feed,
+    cursor: response.data.cursor,
+  };
+}
 
 /**
  * Récupère les listes publiques créées par un compte.
@@ -197,11 +192,16 @@ export async function getActorLists(
     actor,
     limit,
     cursor,
-    purposes: [CURATE_LIST_PURPOSE],
   });
 
+  const lists = (response.data.lists as ManagedList[]).filter(
+    (list) =>
+      !list.purpose ||
+      list.purpose === CURATE_LIST_PURPOSE
+  );
+
   return {
-    items: response.data.lists as ManagedList[],
+    items: lists,
     cursor: response.data.cursor,
   };
 }
