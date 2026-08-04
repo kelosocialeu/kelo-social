@@ -311,10 +311,10 @@ export default function FeedPage() {
 
   return (
     <div className="min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1380px]">
+      <div className="flex min-h-screen w-full">
         <Sidebar handle={handle} onLogout={handleLogout} />
 
-        <main className="min-h-screen min-w-0 flex-1 border-x border-kelo-border bg-white pb-20 shadow-kelo xl:max-w-[700px]">
+        <main className="min-h-screen min-w-0 flex-1 border-x border-kelo-border bg-white pb-20 shadow-kelo">
           <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 backdrop-blur-md">
             <div className="p-4">
               <h2 className="text-xl font-extrabold text-kelo-text">
@@ -448,7 +448,7 @@ export default function FeedPage() {
           </div>
         </main>
 
-        <aside className="sticky top-0 hidden h-screen w-[340px] flex-shrink-0 border-r border-kelo-border bg-white p-6 xl:block">
+        <aside className="sticky top-0 hidden h-screen flex-shrink-0 border-r border-kelo-border bg-white p-4 xl:block xl:w-[300px] 2xl:w-[360px] 2xl:p-6">
           <div className="relative mb-6">
             <input
               type="text"
