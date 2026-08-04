@@ -130,7 +130,7 @@ export default function ProfilePage() {
     return (
       <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
           <Sidebar handle={myHandle} onLogout={handleLogout} />
-          <main className="flex min-h-screen max-w-2xl flex-grow items-center justify-center border-r border-kelo-border bg-white shadow-kelo">
+          <main className="flex min-h-screen min-w-0 flex-1 items-center justify-center border-x border-kelo-border bg-white shadow-kelo">
             <p className="text-sm text-kelo-muted">{loadError}</p>
           </main>
       </div>
@@ -141,8 +141,8 @@ export default function ProfilePage() {
     <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
         <Sidebar handle={myHandle} onLogout={handleLogout} />
 
-        <main className="min-h-screen max-w-2xl flex-grow border-r border-kelo-border bg-white pb-20 shadow-kelo">
-          <div className="relative h-48 overflow-hidden bg-kelo-gradient">
+        <main className="min-h-screen min-w-0 flex-1 border-x border-kelo-border bg-white pb-20 shadow-kelo">
+          <div className="relative h-40 overflow-hidden bg-kelo-gradient sm:h-48 lg:h-56 xl:h-64">
             {profile?.banner ? (
               <img src={profile.banner} alt="Bannière" className="h-full w-full object-cover" />
             ) : (
@@ -154,8 +154,8 @@ export default function ProfilePage() {
             )}
           </div>
 
-          <div className="px-6">
-            <div className="-mt-12 flex items-end justify-between">
+          <div className="px-4 sm:px-6 lg:px-8">
+            <div className="-mt-10 flex flex-col gap-3 sm:-mt-12 sm:flex-row sm:items-end sm:justify-between">
               <div className="inline-block rounded-full border-4 border-white shadow-md">
                 <Avatar
                   src={profile?.avatar}
@@ -165,7 +165,7 @@ export default function ProfilePage() {
                 />
               </div>
 
-              <div className="mb-2 flex items-center gap-2">
+              <div className="mb-2 flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
                 {isOwnProfile ? (
                   <Button variant="secondary" className="w-auto px-6">
                     Modifier le profil
@@ -197,7 +197,7 @@ export default function ProfilePage() {
               <p className="mt-3 whitespace-pre-wrap leading-relaxed text-kelo-text">{profile.description}</p>
             )}
 
-            <div className="mt-4 flex gap-6 text-sm">
+            <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
               <span>
                 <strong className="text-kelo-text">{profile?.followersCount ?? 0}</strong>{" "}
                 <span className="text-kelo-muted">abonné·e·s</span>
