@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import CreateListModal from "@/components/lists/CreateListModal";
+import EditListModal from "@/components/lists/EditListModal";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import {
   deleteList,
@@ -31,6 +32,7 @@ export default function ListsPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [openMenuUri, setOpenMenuUri] = useState<string | null>(null);
   const [deletingUri, setDeletingUri] = useState<string | null>(null);
+  const [editingList, setEditingList] = useState<ManagedList | null>(null);
 
   const loadLists = useCallback(async () => {
     setLoading(true);
@@ -87,6 +89,14 @@ export default function ListsPage() {
 
   const handleCreated = (createdList: ManagedList) => {
     setLists((previousLists) => [createdList, ...previousLists]);
+  };
+
+  const handleUpdated = (updatedList: ManagedList) => {
+    setLists((previousLists) =>
+      previousLists.map((list) =>
+        list.uri === updatedList.uri ? updatedList : list
+      )
+    );
   };
 
   const handleDelete = async (list: ManagedList) => {
@@ -293,15 +303,17 @@ export default function ListsPage() {
                           onClick={(event) => event.stopPropagation()}
                           className="absolute right-0 top-11 z-30 w-48 overflow-hidden rounded-2xl border border-kelo-border bg-white py-1 shadow-xl"
                         >
-                          <Link
-                            href={`/lists/${encodeURIComponent(
-                              list.uri
-                            )}?edit=1`}
-                            className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-kelo-text transition hover:bg-kelo-background"
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingList(list);
+                              setOpenMenuUri(null);
+                            }}
+                            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-kelo-text transition hover:bg-kelo-background"
                           >
                             <Pencil className="h-4 w-4" />
                             Modifier
-                          </Link>
+                          </button>
 
                           <button
                             type="button"
@@ -375,6 +387,13 @@ export default function ListsPage() {
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         onCreated={handleCreated}
+      />
+
+      <EditListModal
+        open={!!editingList}
+        list={editingList}
+        onClose={() => setEditingList(null)}
+        onUpdated={handleUpdated}
       />
     </>
   );
