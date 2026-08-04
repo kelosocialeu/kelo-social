@@ -4,57 +4,67 @@ import { useState } from "react";
 import Link from "next/link";
 import AuthLayout from "@/components/layout/AuthLayout";
 import Input from "@/components/ui/Input";
-import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
-import { PDS_PROVIDERS, DEFAULT_PDS_URL } from "@/lib/atproto/pds";
 
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [pdsUrl, setPdsUrl] = useState(DEFAULT_PDS_URL);
   const { login, loading, error } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await login({ identifier, password, pdsUrl });
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    await login({
+      identifier,
+      password,
+    });
   };
 
   return (
     <AuthLayout
       title="Connexion"
-      tagline="Accédez à votre espace souverain et fédéré sur l'AT Protocol."
+      tagline="Accédez à votre espace souverain et fédéré sur l’AT Protocol."
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-        <Select label="Fournisseur d'identité (PDS)" value={pdsUrl} onChange={(e) => setPdsUrl(e.target.value)}>
-          {PDS_PROVIDERS.map((provider) => (
-            <option key={provider.id} value={provider.url}>
-              {provider.label}
-            </option>
-          ))}
-        </Select>
-
         <Input
           label="Identifiant / Handle"
           type="text"
           required
+          autoComplete="username"
           value={identifier}
-          onChange={(e) => setIdentifier(e.target.value)}
-          placeholder="votre-compte.kelosocial.eu"
+          onChange={(event) => setIdentifier(event.target.value)}
+          placeholder="votre-compte.wsocial.eu"
         />
+
+        <p className="-mt-3 text-xs text-kelo-muted">
+          Kelo Social détecte automatiquement le PDS associé à votre compte.
+        </p>
 
         <Input
           label="Mot de passe"
           type="password"
           required
+          autoComplete="current-password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(event) => setPassword(event.target.value)}
           placeholder="Votre mot de passe"
         />
 
-        {error && <p className="text-sm font-medium text-kelo-danger">{error}</p>}
+        {error && (
+          <p
+            role="alert"
+            className="text-sm font-medium text-kelo-danger"
+          >
+            {error}
+          </p>
+        )}
 
-        <Button type="submit" loading={loading} loadingText="Connexion en cours...">
+        <Button
+          type="submit"
+          loading={loading}
+          loadingText="Connexion en cours..."
+        >
           Se connecter
         </Button>
 
@@ -66,8 +76,11 @@ export default function LoginPage() {
         </Link>
 
         <div className="mt-2 flex justify-center">
-          <Link href="/" className="text-sm text-kelo-muted transition-colors hover:text-kelo-text">
-            ← Retour à l'accueil
+          <Link
+            href="/"
+            className="text-sm text-kelo-muted transition-colors hover:text-kelo-text"
+          >
+            ← Retour à l’accueil
           </Link>
         </div>
       </form>
