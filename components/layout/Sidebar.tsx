@@ -9,6 +9,7 @@ import {
   MessageCircle,
   Hash,
   ListChecks,
+  Rocket,
   Bookmark,
   User,
   Settings,
@@ -31,15 +32,14 @@ const NAV_ITEMS = [
   { href: "/messages", label: "Discussions", icon: MessageCircle },
   { href: "/feeds", label: "Fils d'actu", icon: Hash },
   { href: "/lists", label: "Listes", icon: ListChecks },
+  { href: "/starter-packs", label: "Kits de démarrage", icon: Rocket },
   { href: "/bookmarks", label: "Conservés", icon: Bookmark },
   { href: "/profile", label: "Profil", icon: User },
   { href: "/settings", label: "Paramètres", icon: Settings },
 ];
 
 function isRouteActive(pathname: string, href: string): boolean {
-  if (href === "/feed") {
-    return pathname === "/feed";
-  }
+  if (href === "/feed") return pathname === "/feed";
 
   if (href === "/profile") {
     return pathname === "/profile" || pathname.startsWith("/profile/");
@@ -57,10 +57,9 @@ export default function Sidebar({
 
   return (
     <aside className="sticky top-0 hidden h-screen w-72 flex-shrink-0 flex-col justify-between border-r border-kelo-border bg-white p-6 md:flex">
-      <div className="min-h-0">
+      <div className="min-h-0 overflow-y-auto">
         <div className="mb-8 flex items-center gap-2 px-2">
           <Logo className="h-9 w-auto" />
-
           <span className="text-lg font-extrabold text-kelo-text">
             Kelo
           </span>
@@ -78,11 +77,10 @@ export default function Sidebar({
                 className={`flex items-center gap-4 rounded-2xl p-3 transition-colors ${
                   active
                     ? "bg-kelo-gradient text-white"
-                    : "text-kelo-text hover:bg-kelo-background"
+                    : "hover:bg-kelo-background"
                 }`}
               >
                 <Icon className="h-5 w-5 flex-shrink-0" />
-
                 <span className="truncate">{label}</span>
               </Link>
             );
@@ -91,20 +89,14 @@ export default function Sidebar({
           {isAdmin && (
             <Link
               href="/admin"
-              aria-current={
-                isRouteActive(pathname, "/admin")
-                  ? "page"
-                  : undefined
-              }
-              className={`flex items-center gap-4 rounded-2xl p-3 transition-colors ${
+              className={`flex items-center gap-4 rounded-2xl p-3 ${
                 isRouteActive(pathname, "/admin")
                   ? "bg-kelo-gradient text-white"
                   : "text-kelo-secondary hover:bg-kelo-background"
               }`}
             >
-              <ShieldCheck className="h-5 w-5 flex-shrink-0" />
-
-              <span className="truncate">Panneau Admin</span>
+              <ShieldCheck className="h-5 w-5" />
+              Panneau Admin
             </Link>
           )}
         </nav>
@@ -113,7 +105,7 @@ export default function Sidebar({
       <div className="border-t border-kelo-border pt-4">
         <Link
           href="/feed"
-          className="mb-4 flex w-full items-center justify-center gap-2 rounded-full bg-kelo-gradient py-3 font-bold text-white transition-all hover:scale-[1.02] hover:shadow-kelo active:scale-95"
+          className="mb-4 flex w-full items-center justify-center gap-2 rounded-full bg-kelo-gradient py-3 font-bold text-white"
         >
           <PenSquare className="h-4 w-4" />
           Nouveau post
@@ -129,7 +121,7 @@ export default function Sidebar({
         <button
           type="button"
           onClick={onLogout}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-kelo-background py-2.5 text-sm font-bold text-kelo-text transition hover:bg-kelo-border/60"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-kelo-background py-2.5 text-sm font-bold text-kelo-text"
         >
           <LogOut className="h-4 w-4" />
           Déconnexion
