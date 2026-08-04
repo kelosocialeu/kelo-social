@@ -10,7 +10,10 @@ import PostCard from "@/components/feed/PostCard";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { getStoredSession } from "@/services/auth.service";
-import { searchNetworkPosts, searchNetworkActors } from "@/lib/atproto/search";
+import {
+  searchNetworkPosts,
+  searchNetworkActors,
+} from "@/lib/atproto/search";
 
 function formatSearchPosts(results: any[]) {
   return results.map((post: any) => ({
@@ -40,12 +43,17 @@ function SearchContent() {
 
   useEffect(() => {
     if (!checked) return;
+
     const session = getStoredSession();
-    if (session) setMyDid(session.did);
+
+    if (session) {
+      setMyDid(session.did);
+    }
   }, [checked]);
 
   useEffect(() => {
     const trimmed = query.trim();
+
     if (trimmed.length < 2) {
       setPosts([]);
       setActors([]);
@@ -55,12 +63,14 @@ function SearchContent() {
 
     setSearching(true);
     setError(null);
+
     const timeout = setTimeout(async () => {
       try {
         const [foundPosts, foundActors] = await Promise.all([
           searchNetworkPosts(trimmed, 25),
           searchNetworkActors(trimmed, 20),
         ]);
+
         setPosts(formatSearchPosts(foundPosts));
         setActors(foundActors);
       } catch (err) {
@@ -77,24 +87,46 @@ function SearchContent() {
   }, [query]);
 
   const handleLike = (uri: string) => {
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p.uri !== uri) return p;
-        const liked = p.viewer?.like;
-        return { ...p, viewer: { ...p.viewer, like: !liked }, likeCount: liked ? p.likeCount - 1 : p.likeCount + 1 };
+    setPosts((previousPosts) =>
+      previousPosts.map((post) => {
+        if (post.uri !== uri) {
+          return post;
+        }
+
+        const liked = post.viewer?.like;
+
+        return {
+          ...post,
+          viewer: {
+            ...post.viewer,
+            like: !liked,
+          },
+          likeCount: liked
+            ? post.likeCount - 1
+            : post.likeCount + 1,
+        };
       })
     );
   };
 
   const handleRepost = (uri: string) => {
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p.uri !== uri) return p;
-        const reposted = p.viewer?.repost;
+    setPosts((previousPosts) =>
+      previousPosts.map((post) => {
+        if (post.uri !== uri) {
+          return post;
+        }
+
+        const reposted = post.viewer?.repost;
+
         return {
-          ...p,
-          viewer: { ...p.viewer, repost: !reposted },
-          repostCount: reposted ? p.repostCount - 1 : p.repostCount + 1,
+          ...post,
+          viewer: {
+            ...post.viewer,
+            repost: !reposted,
+          },
+          repostCount: reposted
+            ? post.repostCount - 1
+            : post.repostCount + 1,
         };
       })
     );
@@ -119,16 +151,16 @@ function SearchContent() {
     <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
       <Sidebar handle={handle} onLogout={handleLogout} />
 
-      <main className="min-h-screen max-w-2xl flex-grow border-r border-kelo-border bg-white pb-20 shadow-kelo">
+      <main className="min-h-screen min-w-0 flex-1 border-x border-kelo-border bg-white pb-20 shadow-kelo">
         <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 backdrop-blur-md">
-          <div className="p-4">
+          <div className="p-3 sm:p-4 lg:p-5">
             <input
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(event) => setQuery(event.target.value)}
               placeholder="🔍 Chercher @user ou mot-clé sur tout le réseau fédéré..."
               autoFocus
-              className="w-full rounded-full bg-kelo-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-kelo-primary"
+              className="w-full rounded-full bg-kelo-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-kelo-primary sm:px-5"
             />
           </div>
 
@@ -136,8 +168,14 @@ function SearchContent() {
             <div className="flex w-full border-t border-kelo-border text-sm">
               {(
                 [
-                  ["posts", `Publications${posts.length ? ` (${posts.length})` : ""}`],
-                  ["accounts", `Comptes${actors.length ? ` (${actors.length})` : ""}`],
+                  [
+                    "posts",
+                    `Publications${posts.length ? ` (${posts.length})` : ""}`,
+                  ],
+                  [
+                    "accounts",
+                    `Comptes${actors.length ? ` (${actors.length})` : ""}`,
+                  ],
                 ] as [typeof tab, string][]
               ).map(([key, label]) => (
                 <button
@@ -157,15 +195,26 @@ function SearchContent() {
         </div>
 
         {!hasQuery && (
+          <div className="flex min-h-[calc(100vh-90px)] items-start justify-center px-6 py-10 sm:items-center">
+            <div className="max-w-xl text-center">
+              <p className="text-sm text-kelo-muted sm:text-base">
+                Cherchez un mot-clé ou un handle pour explorer tout le réseau
+                fédéré.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {hasQuery && searching && (
           <p className="py-10 text-center text-sm text-kelo-muted">
-            Cherchez un mot-clé ou un handle pour explorer tout le réseau fédéré.
+            Recherche en cours...
           </p>
         )}
 
-        {hasQuery && searching && <p className="py-10 text-center text-sm text-kelo-muted">Recherche en cours...</p>}
-
         {hasQuery && !searching && error && (
-          <p className="py-10 text-center text-sm text-kelo-danger">{error}</p>
+          <p className="py-10 text-center text-sm text-kelo-danger">
+            {error}
+          </p>
         )}
 
         {hasQuery && !searching && !error && tab === "posts" && (
@@ -183,7 +232,9 @@ function SearchContent() {
                 />
               ))
             ) : (
-              <p className="py-10 text-center text-sm text-kelo-muted">Aucune publication trouvée.</p>
+              <p className="py-10 text-center text-sm text-kelo-muted">
+                Aucune publication trouvée.
+              </p>
             )}
           </div>
         )}
@@ -195,25 +246,38 @@ function SearchContent() {
                 <Link
                   key={actor.did}
                   href={`/profile/${actor.handle}`}
-                  className="flex items-center gap-3 p-4 transition-colors hover:bg-kelo-background/60"
+                  className="flex items-center gap-3 p-4 transition-colors hover:bg-kelo-background/60 sm:px-5 lg:px-6"
                 >
-                  <Avatar src={actor.avatar} fallback={actor.handle[0].toUpperCase()} />
+                  <Avatar
+                    src={actor.avatar}
+                    fallback={actor.handle[0].toUpperCase()}
+                  />
+
                   <div className="min-w-0 flex-grow">
                     <div className="flex items-center gap-1.5">
                       <p className="truncate text-sm font-bold text-kelo-text">
                         {actor.displayName || actor.handle}
                       </p>
+
                       <VerificationBadge actor={actor} />
                     </div>
-                    <p className="truncate text-xs text-kelo-muted">@{actor.handle}</p>
+
+                    <p className="truncate text-xs text-kelo-muted">
+                      @{actor.handle}
+                    </p>
+
                     {actor.description && (
-                      <p className="mt-1 truncate text-xs text-kelo-muted">{actor.description}</p>
+                      <p className="mt-1 line-clamp-2 text-xs text-kelo-muted">
+                        {actor.description}
+                      </p>
                     )}
                   </div>
                 </Link>
               ))
             ) : (
-              <p className="py-10 text-center text-sm text-kelo-muted">Aucun compte trouvé.</p>
+              <p className="py-10 text-center text-sm text-kelo-muted">
+                Aucun compte trouvé.
+              </p>
             )}
           </div>
         )}
