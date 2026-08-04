@@ -14,9 +14,15 @@ export default function BookmarksPage() {
   const [myDid, setMyDid] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!checked) return;
+    if (!checked) {
+      return;
+    }
+
     const session = getStoredSession();
-    if (session) setMyDid(session.did);
+
+    if (session) {
+      setMyDid(session.did);
+    }
   }, [checked]);
 
   const handleLogout = () => {
@@ -25,11 +31,14 @@ export default function BookmarksPage() {
   };
 
   const handleDelete = async (uri: string) => {
-    if (!confirm("Supprimer définitivement cette publication ?")) return;
+    if (!confirm("Supprimer définitivement cette publication ?")) {
+      return;
+    }
+
     try {
       await deleteOwnPost(uri);
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
       alert("Impossible de supprimer cette publication.");
     }
   };
@@ -44,30 +53,62 @@ export default function BookmarksPage() {
 
   return (
     <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
-        <Sidebar handle={handle} onLogout={handleLogout} />
+      <Sidebar handle={handle} onLogout={handleLogout} />
 
-        <main className="min-h-screen max-w-2xl flex-grow border-r border-kelo-border bg-white pb-20 shadow-kelo">
-          <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 p-4 backdrop-blur-md">
-            <h2 className="text-xl font-extrabold text-kelo-text">Conservés</h2>
-          </div>
+      <main className="min-h-screen min-w-0 flex-1 border-x border-kelo-border bg-white pb-20 shadow-kelo">
+        <header className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 backdrop-blur-md">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5 lg:px-6">
+            <div>
+              <h1 className="text-xl font-extrabold text-kelo-text sm:text-2xl">
+                Conservés
+              </h1>
 
-          <div className="divide-y divide-kelo-border">
-            {bookmarks.length > 0 ? (
-              bookmarks.map((post: any) => (
-                <PostCard
-                  key={post.uri}
-                  post={post}
-                  isMine={!!myDid && post.author?.did === myDid}
-                  isBookmarked={isBookmarked(post.uri)}
-                  onBookmark={() => toggleBookmark(post)}
-                  onDelete={() => handleDelete(post.uri)}
-                />
-              ))
-            ) : (
-              <p className="py-10 text-center text-sm text-kelo-muted">Aucune publication conservée pour l'instant.</p>
+              <p className="mt-1 text-xs text-kelo-muted sm:text-sm">
+                Retrouvez les publications que vous avez enregistrées.
+              </p>
+            </div>
+
+            {bookmarks.length > 0 && (
+              <span className="rounded-full bg-kelo-background px-3 py-1 text-xs font-semibold text-kelo-muted">
+                {bookmarks.length} publication
+                {bookmarks.length > 1 ? "s" : ""}
+              </span>
             )}
           </div>
-        </main>
+        </header>
+
+        <div className="divide-y divide-kelo-border">
+          {bookmarks.length > 0 ? (
+            bookmarks.map((post: any) => (
+              <PostCard
+                key={post.uri}
+                post={post}
+                isMine={!!myDid && post.author?.did === myDid}
+                isBookmarked={isBookmarked(post.uri)}
+                onBookmark={() => toggleBookmark(post)}
+                onDelete={() => handleDelete(post.uri)}
+              />
+            ))
+          ) : (
+            <div className="flex min-h-[calc(100vh-100px)] items-start justify-center px-6 py-12 sm:items-center">
+              <div className="max-w-md text-center">
+                <div className="text-4xl" aria-hidden="true">
+                  🔖
+                </div>
+
+                <h2 className="mt-4 text-lg font-bold text-kelo-text">
+                  Aucune publication conservée
+                </h2>
+
+                <p className="mt-2 text-sm leading-relaxed text-kelo-muted">
+                  Utilisez l’icône de conservation sous une publication
+                  pour la retrouver ici plus tard.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
