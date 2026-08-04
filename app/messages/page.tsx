@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
@@ -10,7 +10,11 @@ import Button from "@/components/ui/Button";
 import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
-import { listConversations, getOrCreateConversation, resolveHandleToDid } from "@/lib/atproto/chat";
+import {
+  listConversations,
+  getOrCreateConversation,
+  resolveHandleToDid,
+} from "@/lib/atproto/chat";
 import { getStoredSession } from "@/services/auth.service";
 
 export default function MessagesPage() {
@@ -22,38 +26,72 @@ export default function MessagesPage() {
   const [startError, setStartError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!checked) return;
+    if (!checked) {
+      return;
+    }
+
     const session = getStoredSession();
-    if (session) setMyDid(session.did);
+
+    if (session) {
+      setMyDid(session.did);
+    }
   }, [checked]);
 
-  const fetcher = async (cursor?: string) => {
-    if (!checked) return { items: [], cursor: undefined };
-    const res = await listConversations(30, cursor);
-    return { items: res.items, cursor: res.cursor };
-  };
+  const fetchConversations = useCallback(
+    async (cursor?: string) => {
+      if (!checked) {
+        return {
+          items: [],
+          cursor: undefined,
+        };
+      }
 
-  const { items: convos, loading, hasMore, error, loadMore } = useInfiniteFeed(fetcher, [checked]);
+      const response = await listConversations(30, cursor);
+
+      return {
+        items: response.items,
+        cursor: response.cursor,
+      };
+    },
+    [checked]
+  );
+
+  const {
+    items: conversations,
+    loading,
+    hasMore,
+    error,
+    loadMore,
+  } = useInfiniteFeed(fetchConversations, [checked]);
 
   const handleLogout = () => {
     localStorage.clear();
     window.location.href = "/login";
   };
 
-  const handleStartConversation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newHandle.trim()) return;
+  const handleStartConversation = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+
+    if (!newHandle.trim()) {
+      return;
+    }
 
     setStarting(true);
     setStartError(null);
+
     try {
       const cleanHandle = newHandle.replace(/^@/, "").trim();
       const did = await resolveHandleToDid(cleanHandle);
-      const convo = await getOrCreateConversation(did);
-      router.push(`/messages/${convo.id}`);
-    } catch (err) {
-      console.error(err);
-      setStartError("Impossible de trouver ou de créer cette conversation.");
+      const conversation = await getOrCreateConversation(did);
+
+      router.push(`/messages/${conversation.id}`);
+    } catch (error) {
+      console.error(error);
+      setStartError(
+        "Impossible de trouver ou de créer cette conversation."
+      );
     } finally {
       setStarting(false);
     }
@@ -69,62 +107,146 @@ export default function MessagesPage() {
 
   return (
     <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
-        <Sidebar handle={handle} onLogout={handleLogout} />
+      <Sidebar handle={handle} onLogout={handleLogout} />
 
-        <main className="min-h-screen max-w-2xl flex-grow border-r border-kelo-border bg-white pb-20 shadow-kelo">
-          <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 p-4 backdrop-blur-md">
-            <h2 className="text-xl font-extrabold text-kelo-text">Discussions</h2>
+      <main className="min-h-screen min-w-0 flex-1 border-x border-kelo-border bg-white pb-20 shadow-kelo">
+        <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 backdrop-blur-md">
+          <div className="px-4 py-4 sm:px-5 lg:px-6">
+            <h1 className="text-xl font-extrabold text-kelo-text sm:text-2xl">
+              Discussions
+            </h1>
+
+            <p className="mt-1 text-xs text-kelo-muted sm:text-sm">
+              Retrouvez vos conversations ou démarrez-en une nouvelle.
+            </p>
           </div>
+        </div>
 
-          <form onSubmit={handleStartConversation} className="flex gap-2 border-b border-kelo-border p-4">
-            <div className="flex-grow">
+        <form
+          onSubmit={handleStartConversation}
+          className="border-b border-kelo-border px-4 py-4 sm:px-5 lg:px-6"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
               <Input
                 type="text"
                 placeholder="Démarrer une discussion avec @handle..."
                 value={newHandle}
-                onChange={(e) => setNewHandle(e.target.value)}
+                onChange={(event) => setNewHandle(event.target.value)}
               />
             </div>
-            <Button type="submit" loading={starting} loadingText="..." className="w-auto px-6">
+
+            <Button
+              type="submit"
+              loading={starting}
+              loadingText="..."
+              className="w-full px-6 sm:w-auto"
+            >
               Aller
             </Button>
-          </form>
-          {startError && <p className="px-4 pb-2 text-sm text-kelo-danger">{startError}</p>}
+          </div>
 
-          <div className="divide-y divide-kelo-border">
-            {convos.map((convo: any) => {
-              const other = convo.members?.find((m: any) => m.did !== myDid) || convo.members?.[0];
-              const lastText = convo.lastMessage?.text || "";
-              return (
-                <Link
-                  key={convo.id}
-                  href={`/messages/${convo.id}`}
-                  className="flex items-center gap-3 p-4 transition-colors hover:bg-kelo-background/60"
-                >
-                  <Avatar src={other?.avatar} fallback={other?.handle ? other.handle[0].toUpperCase() : "U"} />
-                  <div className="min-w-0 flex-grow">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-kelo-text">{other?.displayName || other?.handle}</span>
-                      {convo.unreadCount > 0 && (
-                        <span className="rounded-full bg-kelo-gradient px-2 py-0.5 text-xs font-bold text-white">
-                          {convo.unreadCount}
-                        </span>
+          {startError && (
+            <p className="mt-3 text-sm text-kelo-danger">
+              {startError}
+            </p>
+          )}
+        </form>
+
+        <div className="divide-y divide-kelo-border">
+          {conversations.map((conversation: any) => {
+            const otherMember =
+              conversation.members?.find(
+                (member: any) => member.did !== myDid
+              ) || conversation.members?.[0];
+
+            const lastText = conversation.lastMessage?.text || "";
+            const displayName =
+              otherMember?.displayName ||
+              otherMember?.handle ||
+              "Utilisateur";
+
+            return (
+              <Link
+                key={conversation.id}
+                href={`/messages/${conversation.id}`}
+                className="group flex items-center gap-3 px-4 py-4 transition-colors hover:bg-kelo-background/60 sm:px-5 lg:px-6"
+              >
+                <Avatar
+                  src={otherMember?.avatar}
+                  fallback={
+                    otherMember?.handle
+                      ? otherMember.handle[0].toUpperCase()
+                      : "U"
+                  }
+                />
+
+                <div className="min-w-0 flex-grow">
+                  <div className="flex min-w-0 items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-kelo-text">
+                        {displayName}
+                      </p>
+
+                      {otherMember?.handle && (
+                        <p className="truncate text-xs text-kelo-muted">
+                          @{otherMember.handle}
+                        </p>
                       )}
                     </div>
-                    <p className="truncate text-sm text-kelo-muted">{lastText || "Aucun message"}</p>
-                  </div>
-                </Link>
-              );
-            })}
 
-            {convos.length === 0 && !loading && (
-              <p className="py-10 text-center text-sm text-kelo-muted">Aucune discussion pour l'instant.</p>
-            )}
-            {error && <p className="py-6 text-center text-sm text-kelo-danger">{error}</p>}
-            {loading && <p className="py-6 text-center text-sm text-kelo-muted">Chargement...</p>}
-            <InfiniteScrollSentinel onIntersect={loadMore} disabled={loading || !hasMore} />
-          </div>
-        </main>
+                    {conversation.unreadCount > 0 && (
+                      <span className="flex-shrink-0 rounded-full bg-kelo-gradient px-2.5 py-1 text-xs font-bold text-white">
+                        {conversation.unreadCount}
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="mt-1 truncate text-sm text-kelo-muted">
+                    {lastText || "Aucun message"}
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
+
+          {conversations.length === 0 && !loading && !error && (
+            <div className="flex min-h-[calc(100vh-210px)] items-start justify-center px-6 py-12 sm:items-center">
+              <div className="max-w-md text-center">
+                <div className="text-4xl" aria-hidden="true">
+                  💬
+                </div>
+
+                <h2 className="mt-4 text-lg font-bold text-kelo-text">
+                  Aucune discussion
+                </h2>
+
+                <p className="mt-2 text-sm leading-relaxed text-kelo-muted">
+                  Entrez le handle d’un utilisateur pour démarrer votre
+                  première conversation.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <p className="px-4 py-8 text-center text-sm text-kelo-danger">
+              {error}
+            </p>
+          )}
+
+          {loading && (
+            <p className="px-4 py-6 text-center text-sm text-kelo-muted">
+              Chargement...
+            </p>
+          )}
+
+          <InfiniteScrollSentinel
+            onIntersect={loadMore}
+            disabled={loading || !hasMore}
+          />
+        </div>
+      </main>
     </div>
   );
 }
