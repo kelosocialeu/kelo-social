@@ -15,11 +15,7 @@ export default function LoginPage() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    await login({
-      identifier,
-      password,
-    });
-  };
+    await login({ identifier, password });
 
   return (
     <AuthLayout
