@@ -10,19 +10,29 @@ import { useAuth } from "@/hooks/useAuth";
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+
   const { login, loading, error } = useAuth();
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
 
-    await login({ identifier, password });
+    await login({
+      identifier,
+      password,
+    });
+  };
 
   return (
     <AuthLayout
       title="Connexion"
       tagline="Accédez à votre espace souverain et fédéré sur l’AT Protocol."
     >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-5"
+      >
         <Input
           label="Identifiant / Handle"
           type="text"
@@ -34,7 +44,8 @@ export default function LoginPage() {
         />
 
         <p className="-mt-3 text-xs text-kelo-muted">
-          Kelo Social détecte automatiquement le PDS associé à votre compte.
+          Kelo Social détecte automatiquement le PDS associé à votre
+          compte.
         </p>
 
         <Input
