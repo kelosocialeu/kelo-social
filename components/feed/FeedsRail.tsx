@@ -7,11 +7,12 @@ import {
   Users,
   Plus,
   List,
+  Newspaper,
 } from "lucide-react";
 import {
-  KELO_CURATED_LISTS,
-  getListInfo,
-} from "@/lib/atproto/lists";
+  getPinnedSavedItemDetails,
+  SavedItemDetails,
+} from "@/lib/atproto/feeds";
 import {
   getTrendingTopics,
   TrendingTopic,
@@ -30,84 +31,110 @@ const QUICK_LINKS = [
   },
 ];
 
-interface CuratedListDetails {
-  uri: string;
-  label: string;
-  name?: string;
-  avatar?: string;
-  description?: string;
-  listItemCount?: number;
+function getPinnedItemHref(item: SavedItemDetails): string {
+  if (item.type === "list") {
+    return `/feeds/list?uri=${encodeURIComponent(item.uri)}`;
+  }
+
+  return `/feeds/view?uri=${encodeURIComponent(item.uri)}`;
+}
+
+function getPinnedItemName(item: SavedItemDetails): string {
+  if (item.type === "list") {
+    return item.name;
+  }
+
+  return item.displayName;
+}
+
+function getPinnedItemSubtitle(item: SavedItemDetails): string {
+  if (item.type === "list") {
+    if (typeof item.listItemCount === "number") {
+      return `${item.listItemCount} membre${
+        item.listItemCount > 1 ? "s" : ""
+      }`;
+    }
+
+    return "Liste";
+  }
+
+  if (item.creator?.handle) {
+    return `par @${item.creator.handle}`;
+  }
+
+  return "Fil d’actu";
+}
+
+function getPinnedItemInitial(item: SavedItemDetails): string {
+  const name = getPinnedItemName(item);
+
+  return name?.charAt(0)?.toUpperCase() || "K";
 }
 
 export default function FeedsRail() {
+  const [pinnedItems, setPinnedItems] = useState<
+    SavedItemDetails[]
+  >([]);
+  const [loadingPinned, setLoadingPinned] = useState(true);
+  const [pinnedError, setPinnedError] = useState(false);
+
   const [trends, setTrends] = useState<TrendingTopic[]>([]);
   const [trendsError, setTrendsError] = useState(false);
-
-  const [curatedLists, setCuratedLists] = useState<
-    CuratedListDetails[]
-  >([]);
-  const [loadingLists, setLoadingLists] = useState(true);
-
-  useEffect(() => {
-    getTrendingTopics(5)
-      .then(setTrends)
-      .catch(() => setTrendsError(true));
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadCuratedLists() {
-      setLoadingLists(true);
+    async function loadPinnedItems() {
+      setLoadingPinned(true);
+      setPinnedError(false);
 
       try {
-        const lists = await Promise.all(
-          KELO_CURATED_LISTS.map(async (configuredList) => {
-            try {
-              const listInfo = await getListInfo(
-                configuredList.uri
-              );
+        const items = await getPinnedSavedItemDetails();
 
-              return {
-                uri: configuredList.uri,
-                label: configuredList.label,
-                name:
-                  listInfo?.name ||
-                  configuredList.label,
-                avatar: listInfo?.avatar,
-                description: listInfo?.description,
-                listItemCount: listInfo?.listItemCount,
-              };
-            } catch (error) {
-              console.error(
-                `Impossible de charger la liste ${configuredList.label}`,
-                error
-              );
-
-              return {
-                uri: configuredList.uri,
-                label: configuredList.label,
-                name: configuredList.label,
-              };
-            }
-          })
+        if (!cancelled) {
+          setPinnedItems(items);
+        }
+      } catch (error) {
+        console.error(
+          "Impossible de charger les fils et listes épinglés :",
+          error
         );
 
         if (!cancelled) {
-          setCuratedLists(lists);
+          setPinnedItems([]);
+          setPinnedError(true);
         }
       } finally {
         if (!cancelled) {
-          setLoadingLists(false);
+          setLoadingPinned(false);
         }
       }
     }
 
-    loadCuratedLists();
+    loadPinnedItems();
+
+    const handleFocus = () => {
+      loadPinnedItems();
+    };
+
+    window.addEventListener("focus", handleFocus);
 
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", handleFocus);
     };
+  }, []);
+
+  useEffect(() => {
+    getTrendingTopics(5)
+      .then(setTrends)
+      .catch((error) => {
+        console.error(
+          "Impossible de charger les tendances :",
+          error
+        );
+        setTrendsError(true);
+      });
   }, []);
 
   return (
@@ -129,49 +156,73 @@ export default function FeedsRail() {
           )
         )}
 
-        {loadingLists && (
+        {loadingPinned && (
           <div className="border-b border-kelo-border px-3 py-4 text-center text-xs text-kelo-muted">
-            Chargement des fils...
+            Chargement des éléments épinglés...
           </div>
         )}
 
-        {!loadingLists &&
-          curatedLists.map((list) => (
+        {!loadingPinned &&
+          pinnedItems.map((item) => (
             <Link
-              key={list.uri}
-              href={`/feeds/list?uri=${encodeURIComponent(
-                list.uri
-              )}`}
+              key={`${item.type}-${item.uri}`}
+              href={getPinnedItemHref(item)}
               className="flex items-center gap-3 border-b border-kelo-border px-3 py-3 transition-colors hover:bg-kelo-background"
             >
-              {list.avatar ? (
+              {item.avatar ? (
                 <img
-                  src={list.avatar}
-                  alt={`Image de ${list.name || list.label}`}
+                  src={item.avatar}
+                  alt={`Image de ${getPinnedItemName(item)}`}
                   className="h-9 w-9 flex-shrink-0 rounded-xl object-cover"
                 />
               ) : (
                 <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-kelo-gradient text-xs font-bold text-white">
-                  {(list.name || list.label || "K")
-                    .charAt(0)
-                    .toUpperCase()}
+                  {getPinnedItemInitial(item)}
                 </div>
               )}
 
               <div className="min-w-0 flex-grow">
-                <p className="truncate text-sm font-semibold text-kelo-text">
-                  {list.name || list.label}
-                </p>
-
-                {typeof list.listItemCount === "number" && (
-                  <p className="truncate text-xs text-kelo-muted">
-                    {list.listItemCount} membre
-                    {list.listItemCount > 1 ? "s" : ""}
+                <div className="flex items-center gap-1.5">
+                  <p className="truncate text-sm font-semibold text-kelo-text">
+                    {getPinnedItemName(item)}
                   </p>
-                )}
+
+                  {item.type === "list" ? (
+                    <List className="h-3.5 w-3.5 flex-shrink-0 text-kelo-muted" />
+                  ) : (
+                    <Newspaper className="h-3.5 w-3.5 flex-shrink-0 text-kelo-muted" />
+                  )}
+                </div>
+
+                <p className="truncate text-xs text-kelo-muted">
+                  {getPinnedItemSubtitle(item)}
+                </p>
               </div>
             </Link>
           ))}
+
+        {!loadingPinned &&
+          pinnedItems.length === 0 &&
+          !pinnedError && (
+            <div className="border-b border-kelo-border px-4 py-4 text-center">
+              <p className="text-xs font-semibold text-kelo-text">
+                Aucun fil épinglé
+              </p>
+
+              <p className="mt-1 text-xs text-kelo-muted">
+                Épinglez un fil ou une liste depuis la page Fils
+                d’actu.
+              </p>
+            </div>
+          )}
+
+        {!loadingPinned && pinnedError && (
+          <div className="border-b border-kelo-border px-4 py-4 text-center">
+            <p className="text-xs text-kelo-danger">
+              Impossible de charger les éléments épinglés.
+            </p>
+          </div>
+        )}
 
         <Link
           href="/feeds"
