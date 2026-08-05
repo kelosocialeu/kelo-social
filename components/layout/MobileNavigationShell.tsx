@@ -29,8 +29,9 @@ export default function MobileNavigationShell({
   const [handle, setHandle] = useState("");
 
   const navigationHidden = useHideOnScroll({
-    threshold: 10,
-    minimumScroll: 100,
+    minimumScroll: 80,
+    revealDelay: 300,
+    movementThreshold: 3,
   });
 
   useEffect(() => {
@@ -43,7 +44,9 @@ export default function MobileNavigationShell({
     HIDDEN_ROUTES.some(
       (route) =>
         pathname === route ||
-        pathname.startsWith(`${route}/`)
+        pathname.startsWith(
+          `${route}/`
+        )
     );
 
   const handleCreatePost = () => {
@@ -66,7 +69,9 @@ export default function MobileNavigationShell({
         <MobileBottomNav
           handle={handle}
           hidden={navigationHidden}
-          onCreatePost={handleCreatePost}
+          onCreatePost={
+            handleCreatePost
+          }
         />
       )}
     </>
