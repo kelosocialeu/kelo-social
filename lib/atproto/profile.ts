@@ -20,15 +20,19 @@ export async function getActorProfile(actor: string) {
 }
 
 /**
- * Récupère le fil d’un compte.
+ * Récupère une page du fil d’un compte.
  *
- * On conserve ici l’agent de lecture authentifié lorsque disponible,
- * afin de garder les états propres à l’utilisateur connecté :
+ * On conserve l’agent de lecture authentifié lorsque disponible afin
+ * de garder les états propres à l’utilisateur connecté :
  * likes, reposts, abonnements, masquages, etc.
+ *
+ * Le curseur permet de charger progressivement toutes les publications
+ * du profil avec le scroll infini.
  */
 export async function getActorFeed(
   actor: string,
-  limit = 30
+  limit = 30,
+  cursor?: string
 ) {
   const agent = await getReadAgent();
 
@@ -36,7 +40,11 @@ export async function getActorFeed(
     await agent.api.app.bsky.feed.getAuthorFeed({
       actor,
       limit,
+      cursor,
     });
 
-  return response.data.feed;
+  return {
+    items: response.data.feed,
+    cursor: response.data.cursor,
+  };
 }
