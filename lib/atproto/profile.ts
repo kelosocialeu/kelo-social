@@ -1,18 +1,20 @@
-import { createAppViewAgent } from "@/lib/atproto/appview";
 import { getReadAgent } from "@/lib/atproto/read-agent";
 
 /**
- * Récupère un profil directement depuis l’AppView publique Bluesky.
+ * Récupère le profil avec la session authentifiée lorsqu’elle existe.
  *
- * Cela garantit que les informations enrichies du profil, notamment
- * les certifications et certificateurs de confiance natifs, sont
- * récupérées depuis la même AppView de référence pour tous les PDS.
+ * C’est indispensable pour recevoir les états personnels :
+ * - viewer.following ;
+ * - viewer.followedBy ;
+ * - viewer.blocking ;
+ * - viewer.muted ;
+ * - autres informations liées au compte connecté.
  */
 export async function getActorProfile(actor: string) {
-  const appViewAgent = createAppViewAgent();
+  const agent = await getReadAgent();
 
   const response =
-    await appViewAgent.api.app.bsky.actor.getProfile({
+    await agent.api.app.bsky.actor.getProfile({
       actor,
     });
 
@@ -20,14 +22,8 @@ export async function getActorProfile(actor: string) {
 }
 
 /**
- * Récupère une page du fil d’un compte.
- *
- * On conserve l’agent de lecture authentifié lorsque disponible afin
- * de garder les états propres à l’utilisateur connecté :
- * likes, reposts, abonnements, masquages, etc.
- *
- * Le curseur permet de charger progressivement toutes les publications
- * du profil avec le scroll infini.
+ * Récupère une page du fil d’un compte avec les états personnels
+ * du compte connecté : likes, republications, masquages, etc.
  */
 export async function getActorFeed(
   actor: string,
