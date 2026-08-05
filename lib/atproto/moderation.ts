@@ -2,6 +2,16 @@ import {
   getAuthenticatedAgent,
 } from "@/services/auth.service";
 
+/**
+ * Labeler qui recevra les signalements.
+ *
+ * La valeur peut être modifiée dans les variables
+ * d’environnement de Vercel.
+ */
+const MODERATION_LABELER_DID =
+  process.env.NEXT_PUBLIC_MODERATION_LABELER_DID?.trim() ||
+  "did:plc:ar7c4by46qjdydhdevvrndac";
+
 async function getModAgent() {
   const { agent, session } =
     await getAuthenticatedAgent();
@@ -10,6 +20,23 @@ async function getModAgent() {
     agent,
     myDid: session.did,
   };
+}
+
+/**
+ * Retourne un agent configuré pour transmettre les signalements
+ * au service de modération choisi.
+ *
+ * AT Protocol utilise le proxy de service `atproto_labeler`
+ * pour envoyer un rapport à un Labeler précis.
+ */
+async function getReportingAgent() {
+  const { agent } =
+    await getModAgent();
+
+  return agent.withProxy(
+    "atproto_labeler",
+    MODERATION_LABELER_DID
+  );
 }
 
 function getRkeyFromUri(
@@ -33,14 +60,24 @@ function getRkeyFromUri(
   return rkey;
 }
 
-export async function blockActor(
+function validateDid(
   did: string
-): Promise<void> {
+): void {
   if (!did?.startsWith("did:")) {
     throw new Error(
       "DID du compte invalide."
     );
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                            Blocage et masquage                              */
+/* -------------------------------------------------------------------------- */
+
+export async function blockActor(
+  did: string
+): Promise<void> {
+  validateDid(did);
 
   const { agent, myDid } =
     await getModAgent();
@@ -56,14 +93,27 @@ export async function blockActor(
   );
 }
 
+export async function unblockActor(
+  blockUri: string
+): Promise<void> {
+  const { agent, myDid } =
+    await getModAgent();
+
+  const rkey = getRkeyFromUri(
+    blockUri,
+    "Blocage"
+  );
+
+  await agent.api.app.bsky.graph.block.delete({
+    repo: myDid,
+    rkey,
+  });
+}
+
 export async function muteActor(
   did: string
 ): Promise<void> {
-  if (!did?.startsWith("did:")) {
-    throw new Error(
-      "DID du compte invalide."
-    );
-  }
+  validateDid(did);
 
   const { agent } =
     await getModAgent();
@@ -81,11 +131,7 @@ export async function muteActor(
 export async function unmuteActor(
   did: string
 ): Promise<void> {
-  if (!did?.startsWith("did:")) {
-    throw new Error(
-      "DID du compte invalide."
-    );
-  }
+  validateDid(did);
 
   const { agent } =
     await getModAgent();
@@ -138,26 +184,9 @@ export async function listBlockedAccounts(
   };
 }
 
-/**
- * L’URI du blocage vient de profile.viewer.blocking
- * ou de la réponse de getBlocks().
- */
-export async function unblockActor(
-  blockUri: string
-): Promise<void> {
-  const { agent, myDid } =
-    await getModAgent();
-
-  const rkey = getRkeyFromUri(
-    blockUri,
-    "Blocage"
-  );
-
-  await agent.api.app.bsky.graph.block.delete({
-    repo: myDid,
-    rkey,
-  });
-}
+/* -------------------------------------------------------------------------- */
+/*                                Signalements                                 */
+/* -------------------------------------------------------------------------- */
 
 export type ReportReason =
   | "com.atproto.moderation.defs#reasonSpam"
@@ -177,6 +206,9 @@ function cleanReportDescription(
   return cleaned || undefined;
 }
 
+/**
+ * Signale une publication au Labeler configuré.
+ */
 export async function reportPost(
   uri: string,
   cid: string,
@@ -195,15 +227,14 @@ export async function reportPost(
     );
   }
 
-  const { agent } =
-    await getModAgent();
+  const reportingAgent =
+    await getReportingAgent();
 
-  await agent.api.com.atproto.moderation.createReport(
+  await reportingAgent.api.com.atproto.moderation.createReport(
     {
       reasonType,
-      reason: cleanReportDescription(
-        description
-      ),
+      reason:
+        cleanReportDescription(description),
       subject: {
         $type:
           "com.atproto.repo.strongRef",
@@ -217,26 +248,24 @@ export async function reportPost(
   );
 }
 
+/**
+ * Signale un compte complet au Labeler configuré.
+ */
 export async function reportAccount(
   did: string,
   reasonType: ReportReason,
   description?: string
 ): Promise<void> {
-  if (!did?.startsWith("did:")) {
-    throw new Error(
-      "DID du compte invalide."
-    );
-  }
+  validateDid(did);
 
-  const { agent } =
-    await getModAgent();
+  const reportingAgent =
+    await getReportingAgent();
 
-  await agent.api.com.atproto.moderation.createReport(
+  await reportingAgent.api.com.atproto.moderation.createReport(
     {
       reasonType,
-      reason: cleanReportDescription(
-        description
-      ),
+      reason:
+        cleanReportDescription(description),
       subject: {
         $type:
           "com.atproto.admin.defs#repoRef",
