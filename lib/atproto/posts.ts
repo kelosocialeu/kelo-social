@@ -1,227 +1,259 @@
-import { createAtpAgent } from "@/lib/atproto/client";
+import { RichText } from "@atproto/api";
+
 import {
-  AtprotoDiscoveryError,
-  discoverAccount,
-} from "@/lib/atproto/discovery";
-import { sessionStorage } from "@/lib/session/session-storage";
-import {
-  AtpSession,
-  LoginCredentials,
-  SignupPayload,
-} from "@/types/auth";
+  getAuthenticatedAgent,
+} from "@/services/auth.service";
 
-export class AuthError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "AuthError";
-  }
+export interface StrongRef {
+  uri: string;
+  cid: string;
 }
 
-let cachedAgent: ReturnType<typeof createAtpAgent> | null = null;
-let cachedSessionKey: string | null = null;
-
-function getSessionKey(session: AtpSession): string {
-  return [
-    session.did,
-    session.pdsUrl,
-    session.accessJwt,
-    session.refreshJwt,
-  ].join("|");
+export interface ReplyTarget extends StrongRef {
+  /**
+   * Référence de la publication racine.
+   * Pour une réponse directe, elle peut être identique au parent.
+   */
+  root?: StrongRef;
 }
 
-function clearCachedAgent(): void {
-  cachedAgent = null;
-  cachedSessionKey = null;
-}
-
-/**
- * Authentifie automatiquement un utilisateur auprès de son propre PDS.
- */
-export async function login(
-  credentials: LoginCredentials
-): Promise<AtpSession> {
-  const identifier = credentials.identifier
-    .trim()
-    .replace(/^@/, "")
-    .toLowerCase();
-
-  if (!identifier) {
-    throw new AuthError(
-      "Veuillez saisir votre identifiant AT Protocol."
+function validateStrongRef(
+  ref: StrongRef,
+  label: string
+): void {
+  if (!ref.uri?.startsWith("at://")) {
+    throw new Error(
+      `${label} : URI AT Protocol invalide.`
     );
   }
 
-  if (!credentials.password) {
-    throw new AuthError(
-      "Veuillez saisir votre mot de passe."
+  if (!ref.cid?.trim()) {
+    throw new Error(
+      `${label} : CID manquant.`
     );
   }
-
-  let discoveredAccount;
-
-  try {
-    discoveredAccount = await discoverAccount(identifier);
-  } catch (error) {
-    if (error instanceof AtprotoDiscoveryError) {
-      throw new AuthError(error.message);
-    }
-
-    throw new AuthError(
-      "Impossible de trouver le serveur PDS associé à ce compte."
-    );
-  }
-
-  const agent = createAtpAgent(
-    discoveredAccount.pdsUrl
-  );
-
-  try {
-    await agent.login({
-      identifier: discoveredAccount.identifier,
-      password: credentials.password,
-    });
-  } catch (error) {
-    console.error("AT Protocol login error:", error);
-
-    throw new AuthError(
-      "Échec de la connexion. Vérifiez votre identifiant et votre mot de passe."
-    );
-  }
-
-  if (!agent.session) {
-    throw new AuthError(
-      "La connexion a échoué : aucune session n’a été retournée par le PDS."
-    );
-  }
-
-  const session: AtpSession = {
-    accessJwt: agent.session.accessJwt,
-    refreshJwt: agent.session.refreshJwt,
-    handle: agent.session.handle,
-    did: agent.session.did,
-    pdsUrl: discoveredAccount.pdsUrl,
-  };
-
-  sessionStorage.set(session);
-
-  cachedAgent = agent;
-  cachedSessionKey = getSessionKey(session);
-
-  return session;
 }
 
-/**
- * Déconnecte l'utilisateur et efface la session locale.
- */
-export function logout(): void {
-  clearCachedAgent();
-  sessionStorage.clear();
-}
-
-/**
- * Récupère la session actuellement stockée.
- */
-export function getStoredSession(): AtpSession | null {
-  return sessionStorage.get();
-}
-
-/**
- * Retourne un agent authentifié réutilisable.
- *
- * L’agent n’est reconstruit qu’en cas de changement de session,
- * de PDS ou de jeton. Cela évite de recréer un agent à chaque like,
- * repost, réponse ou changement de page.
- */
-export async function resumeAgentSession(
-  session: AtpSession
+async function buildRichText(
+  text: string,
+  agent: any
 ) {
-  const sessionKey = getSessionKey(session);
+  const cleanText = text.trim();
 
-  if (
-    cachedAgent &&
-    cachedSessionKey === sessionKey
-  ) {
-    return cachedAgent;
-  }
-
-  const agent = createAtpAgent(session.pdsUrl);
-
-  try {
-    await agent.resumeSession({
-      accessJwt: session.accessJwt,
-      refreshJwt: session.refreshJwt,
-      active: true,
-      handle: session.handle,
-      did: session.did,
-    });
-  } catch (error) {
-    console.error(
-      "AT Protocol session resume error:",
-      error
-    );
-
-    clearCachedAgent();
-    sessionStorage.clear();
-
-    throw new AuthError(
-      "Votre session a expiré. Veuillez vous reconnecter."
+  if (!cleanText) {
+    throw new Error(
+      "Le texte de la publication est vide."
     );
   }
 
-  cachedAgent = agent;
-  cachedSessionKey = sessionKey;
-
-  return agent;
-}
-
-/**
- * Retourne directement la session et l’agent authentifié.
- */
-export async function getAuthenticatedAgent() {
-  const session = getStoredSession();
-
-  if (!session) {
-    throw new AuthError(
-      "Vous devez être connecté."
-    );
-  }
-
-  const agent = await resumeAgentSession(session);
-
-  return {
-    agent,
-    session,
-  };
-}
-
-/**
- * Inscrit un nouvel utilisateur au moyen de l'API interne de Kelo Social.
- */
-export async function signup(
-  payload: SignupPayload
-): Promise<void> {
-  const response = await fetch("/api/register", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
+  const richText = new RichText({
+    text: cleanText,
   });
 
-  let data: { error?: string };
+  await richText.detectFacets(agent);
 
-  try {
-    data = (await response.json()) as {
-      error?: string;
-    };
-  } catch {
-    data = {};
-  }
+  return richText;
+}
 
-  if (!response.ok) {
-    throw new AuthError(
-      data.error ||
-        "Erreur lors de l'inscription."
+/**
+ * Publie un nouveau post dans le PDS du compte connecté.
+ */
+export async function createPost(text: string) {
+  const { agent, session } =
+    await getAuthenticatedAgent();
+
+  const richText = await buildRichText(
+    text,
+    agent
+  );
+
+  const result =
+    await agent.api.app.bsky.feed.post.create(
+      {
+        repo: session.did,
+      },
+      {
+        text: richText.text,
+        facets: richText.facets,
+        createdAt: new Date().toISOString(),
+      }
+    );
+
+  return {
+    uri: result.uri,
+    cid: result.cid,
+    text: richText.text,
+    facets: richText.facets,
+  };
+}
+
+/**
+ * Répond réellement à une publication.
+ *
+ * `parent` représente la publication à laquelle l’utilisateur répond.
+ * `root` représente le premier post du fil. Pour une réponse directe,
+ * parent et root sont identiques.
+ */
+export async function replyToPost(
+  text: string,
+  parent: ReplyTarget
+) {
+  validateStrongRef(parent, "Publication parente");
+
+  const root = parent.root || {
+    uri: parent.uri,
+    cid: parent.cid,
+  };
+
+  validateStrongRef(root, "Publication racine");
+
+  const { agent, session } =
+    await getAuthenticatedAgent();
+
+  const richText = await buildRichText(
+    text,
+    agent
+  );
+
+  const result =
+    await agent.api.app.bsky.feed.post.create(
+      {
+        repo: session.did,
+      },
+      {
+        text: richText.text,
+        facets: richText.facets,
+        reply: {
+          root,
+          parent: {
+            uri: parent.uri,
+            cid: parent.cid,
+          },
+        },
+        createdAt: new Date().toISOString(),
+      }
+    );
+
+  return {
+    uri: result.uri,
+    cid: result.cid,
+    text: richText.text,
+    facets: richText.facets,
+    reply: {
+      root,
+      parent: {
+        uri: parent.uri,
+        cid: parent.cid,
+      },
+    },
+  };
+}
+
+/**
+ * Ajoute un like réel dans le PDS de l’utilisateur.
+ *
+ * Retourne l’URI du record de like, utilisée ensuite pour l’annuler.
+ */
+export async function likePost(
+  post: StrongRef
+): Promise<string> {
+  validateStrongRef(post, "Publication");
+
+  const { agent } =
+    await getAuthenticatedAgent();
+
+  const result = await agent.like(
+    post.uri,
+    post.cid
+  );
+
+  return result.uri;
+}
+
+/**
+ * Supprime un like à partir de l’URI du record de like
+ * fournie dans `post.viewer.like`.
+ */
+export async function unlikePost(
+  likeUri: string
+): Promise<void> {
+  if (!likeUri?.startsWith("at://")) {
+    throw new Error(
+      "URI du like invalide."
     );
   }
+
+  const { agent } =
+    await getAuthenticatedAgent();
+
+  await agent.deleteLike(likeUri);
+}
+
+/**
+ * Crée une republication réelle dans le PDS de l’utilisateur.
+ *
+ * Retourne l’URI du record de repost.
+ */
+export async function repostPost(
+  post: StrongRef
+): Promise<string> {
+  validateStrongRef(post, "Publication");
+
+  const { agent } =
+    await getAuthenticatedAgent();
+
+  const result = await agent.repost(
+    post.uri,
+    post.cid
+  );
+
+  return result.uri;
+}
+
+/**
+ * Annule une republication à partir de l’URI contenue
+ * dans `post.viewer.repost`.
+ */
+export async function undoRepost(
+  repostUri: string
+): Promise<void> {
+  if (!repostUri?.startsWith("at://")) {
+    throw new Error(
+      "URI de republication invalide."
+    );
+  }
+
+  const { agent } =
+    await getAuthenticatedAgent();
+
+  await agent.deleteRepost(repostUri);
+}
+
+/**
+ * Supprime une publication appartenant au compte connecté.
+ */
+export async function deleteOwnPost(
+  uri: string
+): Promise<void> {
+  if (!uri?.startsWith("at://")) {
+    throw new Error(
+      "URI de publication invalide."
+    );
+  }
+
+  const { agent, session } =
+    await getAuthenticatedAgent();
+
+  const rkey = uri.split("/").pop();
+
+  if (!rkey) {
+    throw new Error(
+      "Clé de publication introuvable."
+    );
+  }
+
+  await agent.api.app.bsky.feed.post.delete({
+    repo: session.did,
+    rkey,
+  });
 }
