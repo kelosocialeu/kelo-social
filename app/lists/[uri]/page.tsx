@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
-import VerificationBadge from "@/components/ui/VerificationBadge";
+import AccountBadges from "@/components/ui/AccountBadges";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import {
   addListMember,
@@ -264,9 +264,18 @@ export default function ListDetailsPage() {
               </h1>
 
               {list?.creator?.handle && (
-                <p className="truncate text-xs text-kelo-muted sm:text-sm">
-                  par @{list.creator.handle}
-                </p>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-kelo-muted sm:text-sm">
+                  <span className="truncate">
+                    par @{list.creator.handle}
+                  </span>
+
+                  <AccountBadges
+                    actor={list.creator}
+                    identitySize="sm"
+                    certificationSize={15}
+                    gap="xs"
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -391,12 +400,17 @@ export default function ListDetailsPage() {
                                 />
 
                                 <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <p className="truncate text-sm font-bold text-kelo-text">
+                                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                    <p className="max-w-full truncate text-sm font-bold text-kelo-text">
                                       {actor.displayName || actor.handle}
                                     </p>
 
-                                    <VerificationBadge actor={actor} />
+                                    <AccountBadges
+                                      actor={actor}
+                                      identitySize="sm"
+                                      certificationSize={15}
+                                      gap="xs"
+                                    />
                                   </div>
 
                                   <p className="truncate text-xs text-kelo-muted">
@@ -466,13 +480,18 @@ export default function ListDetailsPage() {
                         />
 
                         <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="truncate text-sm font-bold text-kelo-text">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <p className="max-w-full truncate text-sm font-bold text-kelo-text">
                               {item.subject.displayName ||
                                 item.subject.handle}
                             </p>
 
-                            <VerificationBadge actor={item.subject} />
+                            <AccountBadges
+                              actor={item.subject}
+                              identitySize="sm"
+                              certificationSize={15}
+                              gap="xs"
+                            />
                           </div>
 
                           <p className="truncate text-xs text-kelo-muted">
