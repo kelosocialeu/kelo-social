@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import {
+  usePathname,
+  useRouter,
+} from "next/navigation";
 
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
+import { useHideOnScroll } from "@/hooks/useHideOnScroll";
 import { getStoredSession } from "@/services/auth.service";
 
 interface MobileNavigationShellProps {
@@ -24,12 +28,15 @@ export default function MobileNavigationShell({
 
   const [handle, setHandle] = useState("");
 
+  const navigationHidden = useHideOnScroll({
+    threshold: 10,
+    minimumScroll: 100,
+  });
+
   useEffect(() => {
     const session = getStoredSession();
 
-    if (session?.handle) {
-      setHandle(session.handle);
-    }
+    setHandle(session?.handle || "");
   }, [pathname]);
 
   const shouldHideNavigation =
@@ -58,6 +65,7 @@ export default function MobileNavigationShell({
       {!shouldHideNavigation && (
         <MobileBottomNav
           handle={handle}
+          hidden={navigationHidden}
           onCreatePost={handleCreatePost}
         />
       )}
