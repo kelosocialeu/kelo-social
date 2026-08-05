@@ -220,6 +220,7 @@ export default function FeedPage() {
     }
   };
 
+
   const removeAuthorPosts = (authorDid?: string) => {
     if (!authorDid) {
       return;
@@ -348,8 +349,6 @@ export default function FeedPage() {
                       setReplyText("");
                       setActiveReplyUri(null);
                     }}
-                    onLike={() => handleLike(post.uri)}
-                    onRepost={() => handleRepost(post.uri)}
                     onBookmark={() => toggleBookmark(post)}
                     onDelete={() => handleDeletePost(post.uri)}
                     onBlocked={() =>
