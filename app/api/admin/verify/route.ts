@@ -104,6 +104,15 @@ export async function POST(request: Request) {
     return NextResponse.json({
       isAdmin,
     });
+    
+    console.log("========== ADMIN DEBUG ==========");
+console.log("verifiedHandle :", verifiedHandle);
+console.log("verifiedDid :", verifiedDid);
+console.log("ADMIN_HANDLES :", adminHandles);
+console.log("ADMIN_DIDS :", adminDids);
+console.log("isAdmin :", isAdmin);
+console.log("================================");
+    
   } catch (error) {
     console.error(
       "[admin/verify] Erreur de validation de session",
