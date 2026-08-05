@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
 import Button from "@/components/ui/Button";
-import VerificationBadge from "@/components/ui/VerificationBadge";
+import AccountBadges from "@/components/ui/AccountBadges";
 import PostCard from "@/components/feed/PostCard";
 import FollowButton from "@/components/profile/FollowButton";
 import ProfileMoreMenu from "@/components/profile/ProfileMoreMenu";
