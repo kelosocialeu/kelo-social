@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
-import VerificationBadge from "@/components/ui/VerificationBadge";
+import AccountBadges from "@/components/ui/AccountBadges";
 import Composer from "@/components/feed/Composer";
 import PostCard from "@/components/feed/PostCard";
 import FeedsRail from "@/components/feed/FeedsRail";
@@ -112,6 +112,7 @@ export default function FeedPage() {
     items: posts,
     setItems: setPosts,
     loading,
+    loadingMore,
     hasMore,
     error: feedError,
     loadMore,
@@ -434,15 +435,21 @@ export default function FeedPage() {
               )}
 
             {!isSearching && loading && (
-              <p className="py-6 text-center text-sm text-kelo-muted">
-                Chargement...
-              </p>
+              <div className="flex justify-center py-10">
+                <div className="h-12 w-12 animate-spin">
+                  <img
+                    src="https://kelosocial.sirv.com/logo.png"
+                    alt="Chargement"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+              </div>
             )}
 
             {!isSearching && (
               <InfiniteScrollSentinel
                 onIntersect={loadMore}
-                disabled={loading || !hasMore}
+                disabled={loadingMore || !hasMore}
               />
             )}
           </div>
@@ -479,12 +486,17 @@ export default function FeedPage() {
                     />
 
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="truncate text-sm font-bold text-kelo-text">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <p className="max-w-full truncate text-sm font-bold text-kelo-text">
                           {actor.displayName || actor.handle}
                         </p>
 
-                        <VerificationBadge actor={actor} />
+                        <AccountBadges
+                          actor={actor}
+                          identitySize="sm"
+                          certificationSize={15}
+                          gap="xs"
+                        />
                       </div>
 
                       <p className="truncate text-xs text-kelo-muted">
