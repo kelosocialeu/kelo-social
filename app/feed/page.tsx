@@ -220,60 +220,6 @@ export default function FeedPage() {
     }
   };
 
-  const handleLike = (uri: string) => {
-    const updater = (list: any[]) =>
-      list.map((post) => {
-        if (post.uri === uri) {
-          const liked = post.viewer?.like;
-
-          return {
-            ...post,
-            viewer: {
-              ...post.viewer,
-              like: !liked,
-            },
-            likeCount: liked ? post.likeCount - 1 : post.likeCount + 1,
-          };
-        }
-
-        return post;
-      });
-
-    setPosts(updater(posts));
-
-    if (searchPosts) {
-      setSearchPosts(updater(searchPosts));
-    }
-  };
-
-  const handleRepost = (uri: string) => {
-    const updater = (list: any[]) =>
-      list.map((post) => {
-        if (post.uri === uri) {
-          const reposted = post.viewer?.repost;
-
-          return {
-            ...post,
-            viewer: {
-              ...post.viewer,
-              repost: !reposted,
-            },
-            repostCount: reposted
-              ? post.repostCount - 1
-              : post.repostCount + 1,
-          };
-        }
-
-        return post;
-      });
-
-    setPosts(updater(posts));
-
-    if (searchPosts) {
-      setSearchPosts(updater(searchPosts));
-    }
-  };
-
   const removeAuthorPosts = (authorDid?: string) => {
     if (!authorDid) {
       return;
