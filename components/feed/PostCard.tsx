@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  useEffect,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Repeat2 } from "lucide-react";
@@ -10,6 +14,14 @@ import PostText from "@/components/feed/PostText";
 import PostEmbed from "@/components/feed/PostEmbed";
 import PostActions from "@/components/feed/PostActions";
 
+import {
+  likePost,
+  unlikePost,
+  repostPost,
+  undoRepost,
+  replyToPost,
+} from "@/lib/atproto/posts";
+
 interface PostCardProps {
   post: any;
   isMine?: boolean;
@@ -18,9 +30,20 @@ interface PostCardProps {
   replyText?: string;
   onToggleReply?: () => void;
   onReplyTextChange?: (text: string) => void;
+
+  /**
+   * Appelé après l’envoi réel d’une réponse.
+   * Permet à la page parente de fermer son éditeur ou de rafraîchir son fil.
+   */
   onSendReply?: () => void;
+
+  /**
+   * Appelés uniquement après la réussite de l’action AT Protocol.
+   * Les pages existantes peuvent ainsi continuer à synchroniser leur état.
+   */
   onLike?: () => void;
   onRepost?: () => void;
+
   onBookmark?: () => void;
   onDelete?: () => void;
   onBlocked?: () => void;
@@ -33,22 +56,6 @@ interface PostCardProps {
   disableThreadLink?: boolean;
 }
 
-/**
- * Affichage complet d’une publication.
- *
- * Ce composant est réutilisé sur :
- * - le fil d’actualité ;
- * - les profils ;
- * - les publications conservées ;
- * - la recherche ;
- * - le fil de discussion d’une publication.
- *
- * Il affiche désormais :
- * - la vérification d’identité Kelo ID / Kelo Verify ;
- * - la certification native ou Kelo ;
- * - le statut de certificateur de confiance ;
- * - les médias et actions de la publication.
- */
 export default function PostCard({
   post,
   isMine,
@@ -70,6 +77,56 @@ export default function PostCard({
 
   const handle = post.author?.handle;
 
+  const [liked, setLiked] = useState(
+    !!post.viewer?.like
+  );
+
+  const [likeUri, setLikeUri] = useState<
+    string | null
+  >(post.viewer?.like || null);
+
+  const [localLikeCount, setLocalLikeCount] =
+    useState(post.likeCount || 0);
+
+  const [reposted, setReposted] = useState(
+    !!post.viewer?.repost
+  );
+
+  const [repostUri, setRepostUri] = useState<
+    string | null
+  >(post.viewer?.repost || null);
+
+  const [
+    localRepostCount,
+    setLocalRepostCount,
+  ] = useState(post.repostCount || 0);
+
+  const [liking, setLiking] = useState(false);
+  const [reposting, setReposting] =
+    useState(false);
+  const [replying, setReplying] =
+    useState(false);
+
+  useEffect(() => {
+    setLiked(!!post.viewer?.like);
+    setLikeUri(post.viewer?.like || null);
+    setLocalLikeCount(post.likeCount || 0);
+  }, [
+    post.viewer?.like,
+    post.likeCount,
+  ]);
+
+  useEffect(() => {
+    setReposted(!!post.viewer?.repost);
+    setRepostUri(post.viewer?.repost || null);
+    setLocalRepostCount(
+      post.repostCount || 0
+    );
+  }, [
+    post.viewer?.repost,
+    post.repostCount,
+  ]);
+
   const handleCardClick = () => {
     if (
       disableThreadLink ||
@@ -80,15 +137,198 @@ export default function PostCard({
     }
 
     router.push(
-      `/post?uri=${encodeURIComponent(post.uri)}`
+      `/post?uri=${encodeURIComponent(
+        post.uri
+      )}`
     );
+  };
+
+  const handleLikeAction = async () => {
+    if (
+      liking ||
+      !post.uri ||
+      !post.cid
+    ) {
+      return;
+    }
+
+    const previousLiked = liked;
+    const previousLikeUri = likeUri;
+    const previousCount = localLikeCount;
+
+    setLiking(true);
+    setLiked(!previousLiked);
+    setLocalLikeCount(
+      previousLiked
+        ? Math.max(0, previousCount - 1)
+        : previousCount + 1
+    );
+
+    try {
+      if (previousLiked) {
+        if (!previousLikeUri) {
+          throw new Error(
+            "Le record du like est introuvable."
+          );
+        }
+
+        await unlikePost(previousLikeUri);
+        setLikeUri(null);
+      } else {
+        const createdLikeUri =
+          await likePost({
+            uri: post.uri,
+            cid: post.cid,
+          });
+
+        setLikeUri(createdLikeUri);
+      }
+
+      onLike?.();
+    } catch (error) {
+      console.error(
+        "Impossible de modifier le like :",
+        error
+      );
+
+      setLiked(previousLiked);
+      setLikeUri(previousLikeUri);
+      setLocalLikeCount(previousCount);
+
+      alert(
+        "Impossible de modifier ce like pour le moment."
+      );
+    } finally {
+      setLiking(false);
+    }
+  };
+
+  const handleRepostAction =
+    async () => {
+      if (
+        reposting ||
+        !post.uri ||
+        !post.cid
+      ) {
+        return;
+      }
+
+      const previousReposted = reposted;
+      const previousRepostUri = repostUri;
+      const previousCount =
+        localRepostCount;
+
+      setReposting(true);
+      setReposted(!previousReposted);
+      setLocalRepostCount(
+        previousReposted
+          ? Math.max(
+              0,
+              previousCount - 1
+            )
+          : previousCount + 1
+      );
+
+      try {
+        if (previousReposted) {
+          if (!previousRepostUri) {
+            throw new Error(
+              "Le record de republication est introuvable."
+            );
+          }
+
+          await undoRepost(
+            previousRepostUri
+          );
+
+          setRepostUri(null);
+        } else {
+          const createdRepostUri =
+            await repostPost({
+              uri: post.uri,
+              cid: post.cid,
+            });
+
+          setRepostUri(
+            createdRepostUri
+          );
+        }
+
+        onRepost?.();
+      } catch (error) {
+        console.error(
+          "Impossible de modifier la republication :",
+          error
+        );
+
+        setReposted(previousReposted);
+        setRepostUri(previousRepostUri);
+        setLocalRepostCount(
+          previousCount
+        );
+
+        alert(
+          "Impossible de modifier cette republication pour le moment."
+        );
+      } finally {
+        setReposting(false);
+      }
+    };
+
+  const handleReplyAction = async () => {
+    const cleanText = replyText?.trim();
+
+    if (
+      replying ||
+      !cleanText ||
+      !post.uri ||
+      !post.cid
+    ) {
+      return;
+    }
+
+    setReplying(true);
+
+    try {
+      const existingRoot =
+        post.record?.reply?.root;
+
+      await replyToPost(cleanText, {
+        uri: post.uri,
+        cid: post.cid,
+        root:
+          existingRoot?.uri &&
+          existingRoot?.cid
+            ? {
+                uri: existingRoot.uri,
+                cid: existingRoot.cid,
+              }
+            : undefined,
+      });
+
+      onReplyTextChange?.("");
+      onSendReply?.();
+    } catch (error) {
+      console.error(
+        "Impossible d’envoyer la réponse :",
+        error
+      );
+
+      alert(
+        "Impossible d’envoyer cette réponse pour le moment."
+      );
+    } finally {
+      setReplying(false);
+    }
   };
 
   return (
     <article
       onClick={handleCardClick}
       className={`p-4 transition-colors hover:bg-kelo-background/60 ${
-        disableThreadLink ? "" : "cursor-pointer"
+        disableThreadLink
+          ? ""
+          : "cursor-pointer"
       }`}
     >
       {post.repostedBy && (
@@ -132,7 +372,8 @@ export default function PostCard({
                 className="flex min-w-0 flex-wrap items-center gap-2 hover:underline"
               >
                 <span className="max-w-full truncate font-bold text-kelo-text">
-                  {post.author?.displayName ||
+                  {post.author
+                    ?.displayName ||
                     "Utilisateur"}
                 </span>
 
@@ -181,18 +422,26 @@ export default function PostCard({
 
           <PostActions
             post={post}
-            replyCount={post.replyCount || 0}
-            repostCount={post.repostCount || 0}
-            likeCount={post.likeCount || 0}
-            isLiked={!!post.viewer?.like}
-            isReposted={!!post.viewer?.repost}
+            replyCount={
+              post.replyCount || 0
+            }
+            repostCount={
+              localRepostCount
+            }
+            likeCount={localLikeCount}
+            isLiked={liked}
+            isReposted={reposted}
             isBookmarked={isBookmarked}
             onReply={onToggleReply}
-            onRepost={onRepost}
-            onLike={onLike}
+            onRepost={
+              handleRepostAction
+            }
+            onLike={handleLikeAction}
             onBookmark={onBookmark}
             onBlocked={onBlocked}
             onMuted={onMuted}
+            liking={liking}
+            reposting={reposting}
           />
 
           {replyOpen && (
@@ -211,16 +460,24 @@ export default function PostCard({
                   )
                 }
                 placeholder="Votre commentaire..."
-                className="min-w-0 flex-grow rounded-xl bg-kelo-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-kelo-primary"
+                disabled={replying}
+                className="min-w-0 flex-grow rounded-xl bg-kelo-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-kelo-primary disabled:opacity-60"
               />
 
               <button
                 type="button"
-                onClick={onSendReply}
-                disabled={!replyText?.trim()}
+                onClick={
+                  handleReplyAction
+                }
+                disabled={
+                  replying ||
+                  !replyText?.trim()
+                }
                 className="flex-shrink-0 rounded-xl bg-kelo-gradient px-4 py-2 text-xs font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Répondre
+                {replying
+                  ? "Envoi..."
+                  : "Répondre"}
               </button>
             </div>
           )}
