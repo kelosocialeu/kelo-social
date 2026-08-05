@@ -7,6 +7,8 @@ import {
 export interface StrongRef {
   uri: string;
   cid: string;
+  $type?: "com.atproto.repo.strongRef";
+  [key: string]: unknown;
 }
 
 export interface ReplyTarget extends StrongRef {
@@ -100,7 +102,8 @@ export async function replyToPost(
 ) {
   validateStrongRef(parent, "Publication parente");
 
-  const root = parent.root || {
+  const root: StrongRef = parent.root || {
+    $type: "com.atproto.repo.strongRef",
     uri: parent.uri,
     cid: parent.cid,
   };
@@ -126,6 +129,7 @@ export async function replyToPost(
         reply: {
           root,
           parent: {
+            $type: "com.atproto.repo.strongRef",
             uri: parent.uri,
             cid: parent.cid,
           },
@@ -142,6 +146,7 @@ export async function replyToPost(
     reply: {
       root,
       parent: {
+        $type: "com.atproto.repo.strongRef",
         uri: parent.uri,
         cid: parent.cid,
       },
