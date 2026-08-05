@@ -113,6 +113,7 @@ function SearchContent() {
     return () => window.clearTimeout(timeout);
   }, [query]);
 
+
   const handleLogout = () => {
     localStorage.clear();
     window.location.href = "/login";
@@ -235,12 +236,6 @@ function SearchContent() {
                     isBookmarked={isBookmarked(
                       post.uri
                     )}
-                    onLike={() =>
-                      handleLike(post.uri)
-                    }
-                    onRepost={() =>
-                      handleRepost(post.uri)
-                    }
                     onBookmark={() =>
                       toggleBookmark(post)
                     }
