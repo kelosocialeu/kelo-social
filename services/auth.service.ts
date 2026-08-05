@@ -17,14 +17,25 @@ export class AuthError extends Error {
   }
 }
 
+let cachedAgent: ReturnType<typeof createAtpAgent> | null = null;
+let cachedSessionKey: string | null = null;
+
+function getSessionKey(session: AtpSession): string {
+  return [
+    session.did,
+    session.pdsUrl,
+    session.accessJwt,
+    session.refreshJwt,
+  ].join("|");
+}
+
+function clearCachedAgent(): void {
+  cachedAgent = null;
+  cachedSessionKey = null;
+}
+
 /**
  * Authentifie automatiquement un utilisateur auprès de son propre PDS.
- *
- * L'utilisateur ne doit plus sélectionner son PDS :
- * 1. son handle est résolu en DID ;
- * 2. le document DID est récupéré ;
- * 3. l'adresse du PDS est découverte ;
- * 4. la connexion est envoyée au bon PDS.
  */
 export async function login(
   credentials: LoginCredentials
@@ -35,11 +46,15 @@ export async function login(
     .toLowerCase();
 
   if (!identifier) {
-    throw new AuthError("Veuillez saisir votre identifiant AT Protocol.");
+    throw new AuthError(
+      "Veuillez saisir votre identifiant AT Protocol."
+    );
   }
 
   if (!credentials.password) {
-    throw new AuthError("Veuillez saisir votre mot de passe.");
+    throw new AuthError(
+      "Veuillez saisir votre mot de passe."
+    );
   }
 
   let discoveredAccount;
@@ -56,7 +71,9 @@ export async function login(
     );
   }
 
-  const agent = createAtpAgent(discoveredAccount.pdsUrl);
+  const agent = createAtpAgent(
+    discoveredAccount.pdsUrl
+  );
 
   try {
     await agent.login({
@@ -87,6 +104,9 @@ export async function login(
 
   sessionStorage.set(session);
 
+  cachedAgent = agent;
+  cachedSessionKey = getSessionKey(session);
+
   return session;
 }
 
@@ -94,6 +114,7 @@ export async function login(
  * Déconnecte l'utilisateur et efface la session locale.
  */
 export function logout(): void {
+  clearCachedAgent();
   sessionStorage.clear();
 }
 
@@ -105,9 +126,24 @@ export function getStoredSession(): AtpSession | null {
 }
 
 /**
- * Reconstruit un agent authentifié à partir d'une session enregistrée.
+ * Retourne un agent authentifié réutilisable.
+ *
+ * L’agent n’est reconstruit qu’en cas de changement de session,
+ * de PDS ou de jeton. Cela évite de recréer un agent à chaque like,
+ * repost, réponse ou changement de page.
  */
-export async function resumeAgentSession(session: AtpSession) {
+export async function resumeAgentSession(
+  session: AtpSession
+) {
+  const sessionKey = getSessionKey(session);
+
+  if (
+    cachedAgent &&
+    cachedSessionKey === sessionKey
+  ) {
+    return cachedAgent;
+  }
+
   const agent = createAtpAgent(session.pdsUrl);
 
   try {
@@ -119,7 +155,12 @@ export async function resumeAgentSession(session: AtpSession) {
       did: session.did,
     });
   } catch (error) {
-    console.error("AT Protocol session resume error:", error);
+    console.error(
+      "AT Protocol session resume error:",
+      error
+    );
+
+    clearCachedAgent();
     sessionStorage.clear();
 
     throw new AuthError(
@@ -127,13 +168,38 @@ export async function resumeAgentSession(session: AtpSession) {
     );
   }
 
+  cachedAgent = agent;
+  cachedSessionKey = sessionKey;
+
   return agent;
+}
+
+/**
+ * Retourne directement la session et l’agent authentifié.
+ */
+export async function getAuthenticatedAgent() {
+  const session = getStoredSession();
+
+  if (!session) {
+    throw new AuthError(
+      "Vous devez être connecté."
+    );
+  }
+
+  const agent = await resumeAgentSession(session);
+
+  return {
+    agent,
+    session,
+  };
 }
 
 /**
  * Inscrit un nouvel utilisateur au moyen de l'API interne de Kelo Social.
  */
-export async function signup(payload: SignupPayload): Promise<void> {
+export async function signup(
+  payload: SignupPayload
+): Promise<void> {
   const response = await fetch("/api/register", {
     method: "POST",
     headers: {
@@ -145,14 +211,17 @@ export async function signup(payload: SignupPayload): Promise<void> {
   let data: { error?: string };
 
   try {
-    data = (await response.json()) as { error?: string };
+    data = (await response.json()) as {
+      error?: string;
+    };
   } catch {
     data = {};
   }
 
   if (!response.ok) {
     throw new AuthError(
-      data.error || "Erreur lors de l'inscription."
+      data.error ||
+        "Erreur lors de l'inscription."
     );
   }
 }
