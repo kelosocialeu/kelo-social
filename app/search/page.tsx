@@ -113,52 +113,6 @@ function SearchContent() {
     return () => window.clearTimeout(timeout);
   }, [query]);
 
-  const handleLike = (uri: string) => {
-    setPosts((previousPosts) =>
-      previousPosts.map((post) => {
-        if (post.uri !== uri) {
-          return post;
-        }
-
-        const liked = !!post.viewer?.like;
-
-        return {
-          ...post,
-          viewer: {
-            ...post.viewer,
-            like: !liked,
-          },
-          likeCount: liked
-            ? Math.max(0, post.likeCount - 1)
-            : post.likeCount + 1,
-        };
-      })
-    );
-  };
-
-  const handleRepost = (uri: string) => {
-    setPosts((previousPosts) =>
-      previousPosts.map((post) => {
-        if (post.uri !== uri) {
-          return post;
-        }
-
-        const reposted = !!post.viewer?.repost;
-
-        return {
-          ...post,
-          viewer: {
-            ...post.viewer,
-            repost: !reposted,
-          },
-          repostCount: reposted
-            ? Math.max(0, post.repostCount - 1)
-            : post.repostCount + 1,
-        };
-      })
-    );
-  };
-
   const handleLogout = () => {
     localStorage.clear();
     window.location.href = "/login";
