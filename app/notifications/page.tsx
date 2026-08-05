@@ -34,7 +34,9 @@ const REASON_ICONS: Record<string, string> = {
   quote: "🔁",
 };
 
-function getNotificationHref(notification: any): string {
+function getNotificationHref(
+  notification: any
+): string {
   if (notification.reason === "follow") {
     return `/profile/${notification.author?.handle}`;
   }
@@ -98,12 +100,18 @@ export default function NotificationsPage() {
   const {
     items,
     loading,
+    loadingMore,
     hasMore,
     error,
     loadMore,
-  } = useInfiniteFeed(fetchNotificationsPage, [
-    checked,
-  ]);
+  } = useInfiniteFeed(
+    fetchNotificationsPage,
+    [checked],
+    {
+      getItemKey: (notification: any) =>
+        `${notification.uri}-${notification.indexedAt}`,
+    }
+  );
 
   useEffect(() => {
     if (!checked) {
@@ -270,14 +278,18 @@ export default function NotificationsPage() {
           )}
 
           {loading && (
-            <p className="px-4 py-6 text-center text-sm text-kelo-muted">
-              Chargement...
-            </p>
+            <div className="flex justify-center py-10">
+              <img
+                src="https://kelosocial.sirv.com/logo.png"
+                alt="Chargement"
+                className="h-10 w-10 animate-spin object-contain"
+              />
+            </div>
           )}
 
           <InfiniteScrollSentinel
             onIntersect={loadMore}
-            disabled={loading || !hasMore}
+            disabled={loadingMore || !hasMore}
           />
         </div>
       </main>
