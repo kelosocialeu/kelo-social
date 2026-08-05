@@ -3,67 +3,138 @@
 import { useEffect, useRef, useState } from "react";
 
 interface UseHideOnScrollOptions {
-  threshold?: number;
+  /**
+   * Position minimale avant de pouvoir masquer la navigation.
+   */
   minimumScroll?: number;
+
+  /**
+   * Temps d’attente après l’arrêt du défilement
+   * avant de faire revenir la barre.
+   */
+  revealDelay?: number;
+
+  /**
+   * Mouvement minimal nécessaire pour considérer
+   * que l’utilisateur est réellement en train de défiler.
+   */
+  movementThreshold?: number;
 }
 
 export function useHideOnScroll({
-  threshold = 8,
   minimumScroll = 80,
+  revealDelay = 300,
+  movementThreshold = 3,
 }: UseHideOnScrollOptions = {}) {
   const [hidden, setHidden] = useState(false);
+
   const previousScrollY = useRef(0);
-  const ticking = useRef(false);
+  const revealTimeout = useRef<number | null>(null);
+  const frameRequested = useRef(false);
 
   useEffect(() => {
-    previousScrollY.current = window.scrollY;
+    previousScrollY.current = Math.max(
+      window.scrollY,
+      0
+    );
 
-    const updateVisibility = () => {
-      const currentScrollY = Math.max(window.scrollY, 0);
-      const difference =
-        currentScrollY - previousScrollY.current;
+    const clearRevealTimeout = () => {
+      if (revealTimeout.current !== null) {
+        window.clearTimeout(
+          revealTimeout.current
+        );
 
+        revealTimeout.current = null;
+      }
+    };
+
+    const scheduleReveal = () => {
+      clearRevealTimeout();
+
+      revealTimeout.current =
+        window.setTimeout(() => {
+          setHidden(false);
+          revealTimeout.current = null;
+        }, revealDelay);
+    };
+
+    const updateNavigation = () => {
+      const currentScrollY = Math.max(
+        window.scrollY,
+        0
+      );
+
+      const movement = Math.abs(
+        currentScrollY -
+          previousScrollY.current
+      );
+
+      /*
+       * En haut de la page, la navigation doit
+       * toujours rester visible.
+       */
       if (currentScrollY < minimumScroll) {
         setHidden(false);
-        previousScrollY.current = currentScrollY;
-        ticking.current = false;
+        clearRevealTimeout();
+        previousScrollY.current =
+          currentScrollY;
+        frameRequested.current = false;
         return;
       }
 
-      if (Math.abs(difference) >= threshold) {
-        if (difference > 0) {
-          setHidden(true);
-        } else {
-          setHidden(false);
-        }
-
-        previousScrollY.current = currentScrollY;
+      /*
+       * Pendant un vrai déplacement, on cache
+       * temporairement la barre.
+       */
+      if (movement >= movementThreshold) {
+        setHidden(true);
       }
 
-      ticking.current = false;
+      /*
+       * La barre revient automatiquement lorsque
+       * l’utilisateur arrête de faire défiler.
+       */
+      scheduleReveal();
+
+      previousScrollY.current =
+        currentScrollY;
+
+      frameRequested.current = false;
     };
 
     const handleScroll = () => {
-      if (ticking.current) {
+      if (frameRequested.current) {
         return;
       }
 
-      ticking.current = true;
+      frameRequested.current = true;
 
-      window.requestAnimationFrame(updateVisibility);
+      window.requestAnimationFrame(
+        updateNavigation
+      );
     };
 
-    window.addEventListener("scroll", handleScroll, {
-      passive: true,
-    });
+    window.addEventListener(
+      "scroll",
+      handleScroll,
+      {
+        passive: true,
+      }
+    );
 
     return () => {
       window.removeEventListener(
         "scroll",
         handleScroll
       );
+
+      clearRevealTimeout();
     };
-  }, [minimumScroll, threshold]);
+  }, [
+    minimumScroll,
+    revealDelay,
+    movementThreshold,
+  ]);
 
   return hidden;
 }
