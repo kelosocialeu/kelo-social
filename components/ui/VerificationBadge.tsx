@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
@@ -12,7 +12,14 @@ import {
   getVerificationBadge,
   getVerificationIssuers,
   getIssuerProfile,
+  getPublicNativeVerification,
+  VerificationBadgeType,
 } from "@/lib/atproto/verification";
+
+import {
+  CertificationRecord,
+  getKeloCertification,
+} from "@/lib/atproto/certifications";
 
 interface VerificationBadgeProps {
   actor: any;
@@ -35,45 +42,210 @@ export default function VerificationBadge({
   actor,
   size = 16,
 }: VerificationBadgeProps) {
-  const badgeType = getVerificationBadge(actor);
+  const initialNativeBadge =
+    getVerificationBadge(actor);
+
+  const [nativeBadge, setNativeBadge] =
+    useState<VerificationBadgeType>(
+      initialNativeBadge
+    );
+
+  const [nativeActor, setNativeActor] =
+    useState<any>(actor);
+
+  const [keloCertification, setKeloCertification] =
+    useState<CertificationRecord | null>(null);
+
+  const [checking, setChecking] = useState(
+    !initialNativeBadge || !!actor?.did
+  );
 
   const [open, setOpen] = useState(false);
-  const [issuer, setIssuer] = useState<IssuerProfile | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState(false);
 
-  if (!badgeType) return null;
+  const [issuer, setIssuer] =
+    useState<IssuerProfile | null>(null);
+
+  const [loadingIssuer, setLoadingIssuer] =
+    useState(false);
+
+  const [issuerError, setIssuerError] =
+    useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBadgeSources() {
+      const did =
+        typeof actor?.did === "string"
+          ? actor.did
+          : "";
+
+      try {
+        const tasks: Promise<any>[] = [];
+
+        /*
+         * On relit toujours le profil public lorsque l’objet actor peut venir
+         * d’un PDS tiers. Cela permet de détecter correctement les
+         * certificateurs de confiance Bluesky.
+         */
+        tasks.push(
+          getPublicNativeVerification(actor)
+        );
+
+        tasks.push(
+          did
+            ? getKeloCertification(did)
+            : Promise.resolve(null)
+        );
+
+        const [
+          publicVerification,
+          keloRecord,
+        ] = await Promise.all(tasks);
+
+        if (cancelled) {
+          return;
+        }
+
+        if (publicVerification) {
+          const enrichedActor = {
+            ...actor,
+            verification: publicVerification,
+          };
+
+          setNativeActor(enrichedActor);
+          setNativeBadge(
+            getVerificationBadge(enrichedActor)
+          );
+        } else {
+          setNativeActor(actor);
+          setNativeBadge(
+            getVerificationBadge(actor)
+          );
+        }
+
+        setKeloCertification(keloRecord);
+      } catch (error) {
+        console.error(
+          "Impossible de déterminer le badge du compte :",
+          error
+        );
+      } finally {
+        if (!cancelled) {
+          setChecking(false);
+        }
+      }
+    }
+
+    loadBadgeSources();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [actor]);
+
+  /**
+   * Priorité finale :
+   * 1. Certificateur natif Bluesky
+   * 2. Certificateur Kelo
+   * 3. Certification native Bluesky
+   * 4. Certification Kelo
+   */
+  const badgeType = useMemo<
+    VerificationBadgeType
+  >(() => {
+    if (nativeBadge === "trusted-verifier") {
+      return "trusted-verifier";
+    }
+
+    if (
+      keloCertification?.status ===
+      "trusted-verifier"
+    ) {
+      return "trusted-verifier";
+    }
+
+    if (nativeBadge === "verified") {
+      return "verified";
+    }
+
+    if (
+      keloCertification?.status === "certified"
+    ) {
+      return "verified";
+    }
+
+    return null;
+  }, [nativeBadge, keloCertification]);
+
+  if (checking && !badgeType) {
+    return null;
+  }
+
+  if (!badgeType) {
+    return null;
+  }
 
   const handleClick = async (
-    e: React.MouseEvent<HTMLDivElement>
+    event: React.MouseEvent<HTMLDivElement>
   ) => {
-    e.preventDefault();
-    e.stopPropagation();
+    event.preventDefault();
+    event.stopPropagation();
 
     setOpen(true);
 
-    if (badgeType === "verified" && !issuer && !loading) {
-      const issuers = getVerificationIssuers(actor);
-      const issuerDid = issuers[0]?.issuer;
+    if (
+      badgeType === "verified" &&
+      !issuer &&
+      !loadingIssuer
+    ) {
+      const nativeIssuers =
+        getVerificationIssuers(nativeActor);
+
+      const nativeIssuerDid =
+        nativeIssuers[0]?.issuer;
+
+      const keloIssuerDid =
+        keloCertification?.issuerDid;
+
+      const issuerDid =
+        nativeIssuerDid || keloIssuerDid;
 
       if (!issuerDid) {
-        setLoadError(true);
+        /*
+         * Anciennes certifications Kelo sans issuerDid :
+         * on affiche directement @kelosocial.eu.
+         */
+        if (keloCertification) {
+          setIssuer({
+            handle:
+              keloCertification.issuerHandle ||
+              "kelosocial.eu",
+            displayName: "Kelo Social",
+          });
+          return;
+        }
+
+        setIssuerError(true);
         return;
       }
 
-      setLoading(true);
+      setLoadingIssuer(true);
 
       try {
-        const profile = await getIssuerProfile(issuerDid);
+        const profile =
+          await getIssuerProfile(issuerDid);
+
         setIssuer(profile);
       } catch (error) {
         console.error(
           "Erreur récupération certificateur :",
           error
         );
-        setLoadError(true);
+
+        setIssuerError(true);
       } finally {
-        setLoading(false);
+        setLoadingIssuer(false);
       }
     }
   };
@@ -82,41 +254,43 @@ export default function VerificationBadge({
     <>
       <div
         onClick={handleClick}
-        className="inline-flex cursor-pointer"
+        className="relative inline-flex cursor-pointer"
       >
         <Badge
-  status={
-    badgeType === "trusted-verifier"
-      ? "trusted-verifier"
-      : "certified"
-  }
-  size={size}
-/>
+          status={
+            badgeType === "trusted-verifier"
+              ? "trusted-verifier"
+              : "certified"
+          }
+          size={size}
+        />
       </div>
 
       {open && (
         <>
           <div
-            className="fixed inset-0 z-30"
+            className="fixed inset-0 z-30 bg-black/10"
             onClick={() => setOpen(false)}
           />
 
           {badgeType === "verified" ? (
             <div
-              className="absolute left-1/2 top-full z-40 mt-2 w-72 -translate-x-1/2 rounded-2xl border border-kelo-border bg-white p-4 shadow-kelo"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed left-1/2 top-1/2 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-kelo-border bg-white p-5 shadow-kelo"
+              onClick={(event) =>
+                event.stopPropagation()
+              }
             >
               <p className="mb-3 text-sm font-bold text-kelo-text">
                 Compte certifié
               </p>
 
-              {loading && (
+              {loadingIssuer && (
                 <p className="text-sm text-kelo-muted">
                   Chargement...
                 </p>
               )}
 
-              {!loading && issuer && (
+              {!loadingIssuer && issuer && (
                 <>
                   <p className="mb-2 text-xs text-kelo-muted">
                     Certifié par :
@@ -129,32 +303,56 @@ export default function VerificationBadge({
                   >
                     <Avatar
                       src={issuer.avatar}
-                      fallback={issuer.handle[0].toUpperCase()}
+                      fallback={
+                        issuer.handle[0]?.toUpperCase() ||
+                        "K"
+                      }
                       size="sm"
                     />
 
                     <div>
                       <p className="text-sm font-bold text-kelo-text">
-                        {issuer.displayName || issuer.handle}
+                        {issuer.displayName ||
+                          issuer.handle}
                       </p>
+
                       <p className="text-xs text-kelo-muted">
                         @{issuer.handle}
                       </p>
                     </div>
                   </Link>
+
+                  {keloCertification?.issuedAt && (
+                    <p className="mt-3 text-xs text-kelo-muted">
+                      Attribuée le{" "}
+                      {new Date(
+                        keloCertification.issuedAt
+                      ).toLocaleDateString("fr-BE")}
+                    </p>
+                  )}
                 </>
               )}
 
-              {!loading && loadError && (
+              {!loadingIssuer && issuerError && (
                 <p className="text-sm text-kelo-muted">
                   Impossible de déterminer le certificateur.
                 </p>
               )}
+
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="mt-4 w-full rounded-full bg-kelo-background py-2.5 text-sm font-bold text-kelo-text hover:bg-kelo-border/60"
+              >
+                Fermer
+              </button>
             </div>
           ) : (
             <div
-              className="fixed left-1/2 top-1/2 z-40 w-96 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-kelo-border bg-white p-6 shadow-kelo"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed left-1/2 top-1/2 z-40 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-kelo-border bg-white p-6 shadow-kelo"
+              onClick={(event) =>
+                event.stopPropagation()
+              }
             >
               <div className="mb-5 rounded-2xl bg-kelo-background p-5">
                 <div className="flex items-center justify-center gap-3">
@@ -189,29 +387,30 @@ export default function VerificationBadge({
                   <div className="flex flex-col items-center gap-2">
                     <img
                       src={VERIFIED_IMAGE}
-                      alt="Compte vérifié"
+                      alt="Compte certifié"
                       className="h-14 w-14 object-contain"
                     />
 
                     <span className="text-center text-xs font-semibold text-kelo-muted">
                       Compte
                       <br />
-                      vérifié
+                      certifié
                     </span>
                   </div>
                 </div>
               </div>
 
               <h3 className="mb-2 text-center text-base font-extrabold text-kelo-text">
-                {actor?.displayName || actor?.handle} est un certificateur de confiance
+                {actor?.displayName || actor?.handle} est
+                un certificateur de confiance
               </h3>
 
               <p className="mb-5 text-center text-sm text-kelo-muted">
-                Les comptes avec ce badge peuvent certifier d'autres comptes.
-                Les certificateurs de confiance sont sélectionnés par Kelo Social.
+                Ce compte peut certifier d’autres comptes.
               </p>
 
               <button
+                type="button"
                 onClick={() => setOpen(false)}
                 className="w-full rounded-full bg-kelo-background py-2.5 text-sm font-bold text-kelo-text hover:bg-kelo-border/60"
               >
