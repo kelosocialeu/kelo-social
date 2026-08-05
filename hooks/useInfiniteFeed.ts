@@ -21,7 +21,9 @@ interface UseInfiniteFeedOptions {
    * Fonction permettant d’identifier un élément.
    * Évite les doublons entre deux pages.
    */
-  getItemKey?: (item: any) => string | undefined;
+  getItemKey?: (
+    item: any
+  ) => string | undefined;
 }
 
 function defaultGetItemKey(
@@ -38,16 +40,16 @@ function defaultGetItemKey(
 function mergeWithoutDuplicates(
   previousItems: any[],
   newItems: any[],
-  getItemKey: (item: any) => string | undefined
+  getItemKey: (
+    item: any
+  ) => string | undefined
 ): any[] {
   const seen = new Set<string>();
 
-  const merged = [
+  return [
     ...previousItems,
     ...newItems,
-  ];
-
-  return merged.filter((item, index) => {
+  ].filter((item) => {
     const key = getItemKey(item);
 
     if (!key) {
@@ -64,15 +66,15 @@ function mergeWithoutDuplicates(
 }
 
 /**
- * Fil paginé avec préchargement infini.
+ * Gère un fil paginé par curseur.
  *
- * Compatible PC, tablette et mobile.
- *
- * Sépare :
- * - le premier chargement ;
- * - le chargement en arrière-plan ;
- * - le rafraîchissement ;
- * - les erreurs initiales et secondaires.
+ * Compatible avec :
+ * - le feed ;
+ * - les profils ;
+ * - les notifications ;
+ * - les conversations ;
+ * - les fils personnalisés ;
+ * - les listes.
  */
 export function useInfiniteFeed(
   fetcher: FeedFetcher,
@@ -80,33 +82,52 @@ export function useInfiniteFeed(
   options: UseInfiniteFeedOptions = {}
 ) {
   const getItemKey =
-    options.getItemKey || defaultGetItemKey;
+    options.getItemKey ||
+    defaultGetItemKey;
 
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] =
+    useState<any[]>([]);
+
   const [cursor, setCursor] =
-    useState<string | undefined>(undefined);
+    useState<string | undefined>(
+      undefined
+    );
 
-  const [initialLoading, setInitialLoading] =
-    useState(false);
+  const [
+    initialLoading,
+    setInitialLoading,
+  ] = useState(false);
 
-  const [loadingMore, setLoadingMore] =
-    useState(false);
+  const [
+    loadingMore,
+    setLoadingMore,
+  ] = useState(false);
 
-  const [refreshing, setRefreshing] =
-    useState(false);
+  const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
 
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] =
+    useState(true);
+
   const [error, setError] =
     useState<string | null>(null);
 
   const fetcherRef = useRef(fetcher);
+
   const cursorRef = useRef<
     string | undefined
   >(undefined);
 
-  const hasMoreRef = useRef(true);
-  const loadingMoreRef = useRef(false);
-  const requestIdRef = useRef(0);
+  const hasMoreRef =
+    useRef(true);
+
+  const loadingMoreRef =
+    useRef(false);
+
+  const requestIdRef =
+    useRef(0);
 
   fetcherRef.current = fetcher;
 
@@ -121,148 +142,206 @@ export function useInfiniteFeed(
   const applyPage = useCallback(
     (
       page: FeedPage,
-      mode: "replace" | "append"
+      mode:
+        | "replace"
+        | "append"
     ) => {
-      setItems((previousItems) =>
-        mode === "replace"
-          ? mergeWithoutDuplicates(
-              [],
-              page.items || [],
-              getItemKey
-            )
-          : mergeWithoutDuplicates(
-              previousItems,
-              page.items || [],
-              getItemKey
-            )
+      const pageItems =
+        page.items || [];
+
+      setItems(
+        (previousItems) =>
+          mode === "replace"
+            ? mergeWithoutDuplicates(
+                [],
+                pageItems,
+                getItemKey
+              )
+            : mergeWithoutDuplicates(
+                previousItems,
+                pageItems,
+                getItemKey
+              )
       );
 
-      const nextCursor = page.cursor;
+      const nextCursor =
+        page.cursor;
 
       setCursor(nextCursor);
-      cursorRef.current = nextCursor;
+
+      cursorRef.current =
+        nextCursor;
 
       const moreAvailable =
         !!nextCursor &&
-        (page.items?.length || 0) > 0;
+        pageItems.length > 0;
 
-      setHasMore(moreAvailable);
-      hasMoreRef.current = moreAvailable;
+      setHasMore(
+        moreAvailable
+      );
+
+      hasMoreRef.current =
+        moreAvailable;
     },
     [getItemKey]
   );
 
-  const reset = useCallback(async () => {
-    const requestId = ++requestIdRef.current;
+  const reset =
+    useCallback(async () => {
+      const requestId =
+        ++requestIdRef.current;
 
-    setInitialLoading(true);
-    setError(null);
-    setHasMore(true);
-    hasMoreRef.current = true;
+      setInitialLoading(true);
+      setError(null);
+      setHasMore(true);
 
-    try {
-      const page =
-        await fetcherRef.current(undefined);
+      hasMoreRef.current =
+        true;
 
-      if (requestId !== requestIdRef.current) {
-        return;
-      }
+      try {
+        const page =
+          await fetcherRef.current(
+            undefined
+          );
 
-      applyPage(page, "replace");
-    } catch (error) {
-      if (requestId !== requestIdRef.current) {
-        return;
-      }
+        if (
+          requestId !==
+          requestIdRef.current
+        ) {
+          return;
+        }
 
-      console.error(
-        "Erreur de chargement du fil :",
-        error
-      );
+        applyPage(
+          page,
+          "replace"
+        );
+      } catch (error) {
+        if (
+          requestId !==
+          requestIdRef.current
+        ) {
+          return;
+        }
 
-      setError(
-        "Impossible de charger le fil pour le moment."
-      );
-    } finally {
-      if (requestId === requestIdRef.current) {
-        setInitialLoading(false);
-      }
-    }
-  }, [applyPage]);
-
-  const refresh = useCallback(async () => {
-    const requestId = ++requestIdRef.current;
-
-    setRefreshing(true);
-    setError(null);
-
-    try {
-      const page =
-        await fetcherRef.current(undefined);
-
-      if (requestId !== requestIdRef.current) {
-        return;
-      }
-
-      applyPage(page, "replace");
-    } catch (error) {
-      if (requestId !== requestIdRef.current) {
-        return;
-      }
-
-      console.error(
-        "Erreur de rafraîchissement du fil :",
-        error
-      );
-
-      setError(
-        "Impossible d’actualiser le fil."
-      );
-    } finally {
-      if (requestId === requestIdRef.current) {
-        setRefreshing(false);
-      }
-    }
-  }, [applyPage]);
-
-  const loadMore = useCallback(async () => {
-    if (
-      loadingMoreRef.current ||
-      !hasMoreRef.current
-    ) {
-      return;
-    }
-
-    const currentCursor = cursorRef.current;
-
-    if (!currentCursor) {
-      return;
-    }
-
-    loadingMoreRef.current = true;
-    setLoadingMore(true);
-    setError(null);
-
-    try {
-      const page =
-        await fetcherRef.current(
-          currentCursor
+        console.error(
+          "Erreur de chargement du fil :",
+          error
         );
 
-      applyPage(page, "append");
-    } catch (error) {
-      console.error(
-        "Erreur de chargement supplémentaire :",
-        error
-      );
+        setError(
+          "Impossible de charger le fil pour le moment."
+        );
+      } finally {
+        if (
+          requestId ===
+          requestIdRef.current
+        ) {
+          setInitialLoading(
+            false
+          );
+        }
+      }
+    }, [applyPage]);
 
-      setError(
-        "Impossible de charger davantage de publications."
-      );
-    } finally {
-      loadingMoreRef.current = false;
-      setLoadingMore(false);
-    }
-  }, [applyPage]);
+  const refresh =
+    useCallback(async () => {
+      const requestId =
+        ++requestIdRef.current;
+
+      setRefreshing(true);
+      setError(null);
+
+      try {
+        const page =
+          await fetcherRef.current(
+            undefined
+          );
+
+        if (
+          requestId !==
+          requestIdRef.current
+        ) {
+          return;
+        }
+
+        applyPage(
+          page,
+          "replace"
+        );
+      } catch (error) {
+        if (
+          requestId !==
+          requestIdRef.current
+        ) {
+          return;
+        }
+
+        console.error(
+          "Erreur de rafraîchissement du fil :",
+          error
+        );
+
+        setError(
+          "Impossible d’actualiser le fil."
+        );
+      } finally {
+        if (
+          requestId ===
+          requestIdRef.current
+        ) {
+          setRefreshing(false);
+        }
+      }
+    }, [applyPage]);
+
+  const loadMore =
+    useCallback(async () => {
+      if (
+        loadingMoreRef.current ||
+        !hasMoreRef.current
+      ) {
+        return;
+      }
+
+      const currentCursor =
+        cursorRef.current;
+
+      if (!currentCursor) {
+        return;
+      }
+
+      loadingMoreRef.current =
+        true;
+
+      setLoadingMore(true);
+      setError(null);
+
+      try {
+        const page =
+          await fetcherRef.current(
+            currentCursor
+          );
+
+        applyPage(
+          page,
+          "append"
+        );
+      } catch (error) {
+        console.error(
+          "Erreur de chargement supplémentaire :",
+          error
+        );
+
+        setError(
+          "Impossible de charger davantage de publications."
+        );
+      } finally {
+        loadingMoreRef.current =
+          false;
+
+        setLoadingMore(false);
+      }
+    }, [applyPage]);
 
   useEffect(() => {
     reset();
@@ -280,7 +359,7 @@ export function useInfiniteFeed(
 
     /**
      * Compatibilité avec les pages existantes.
-     * `loading` reste vrai uniquement au premier chargement.
+     * `loading` correspond uniquement au premier chargement.
      */
     loading: initialLoading,
 
