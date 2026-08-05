@@ -1,20 +1,12 @@
-import { getReadAgent } from "@/lib/atproto/read-agent";
+import { createAppViewAgent } from "@/lib/atproto/appview";
 
 /**
- * Système de vérification natif du réseau AT Protocol
- * (app.bsky.graph.verification), utilisé par Bluesky et compatible avec
- * n'importe quel PDS qui publie ce type d'enregistrement (bsky.social,
- * eurosky.social, etc.). Contrairement à un système propre à Kelo Social,
- * ça fonctionne automatiquement pour tout le réseau fédéré, sans action
- * de notre part — on ne fait que lire et afficher ce qui existe déjà.
- *
- * Le champ `verification` est déjà inclus dans les objets "author" et
- * "profile" renvoyés par l'AppView pour les comptes vérifiés — il n'y a
- * donc aucun appel réseau supplémentaire nécessaire pour l'afficher dans
- * le fil.
+ * Système de vérification natif AT Protocol / Bluesky.
  */
-
-export type VerificationBadgeType = "verified" | "trusted-verifier" | null;
+export type VerificationBadgeType =
+  | "verified"
+  | "trusted-verifier"
+  | null;
 
 export interface VerificationIssuer {
   issuer: string;
@@ -23,21 +15,138 @@ export interface VerificationIssuer {
   createdAt: string;
 }
 
-export function getVerificationBadge(actor: any): VerificationBadgeType {
-  const v = actor?.verification;
-  if (!v) return null;
-  if (v.trustedVerifierStatus === "valid") return "trusted-verifier";
-  if (v.verifiedStatus === "valid") return "verified";
+interface NativeVerificationCacheEntry {
+  verification: any | null;
+  expiresAt: number;
+}
+
+const CACHE_DURATION = 5 * 60 * 1000;
+
+const nativeVerificationCache = new Map<
+  string,
+  NativeVerificationCacheEntry
+>();
+
+function getActorKey(actor: any): string | null {
+  const did =
+    typeof actor?.did === "string"
+      ? actor.did.trim().toLowerCase()
+      : "";
+
+  if (did) {
+    return did;
+  }
+
+  const handle =
+    typeof actor?.handle === "string"
+      ? actor.handle.trim().toLowerCase()
+      : "";
+
+  return handle || null;
+}
+
+/**
+ * Retourne le badge natif déjà présent sur l’objet actor.
+ *
+ * La priorité est volontairement :
+ * certificateur de confiance > compte certifié.
+ */
+export function getVerificationBadge(
+  actor: any
+): VerificationBadgeType {
+  const verification = actor?.verification;
+
+  if (!verification) {
+    return null;
+  }
+
+  if (
+    verification.trustedVerifierStatus === "valid"
+  ) {
+    return "trusted-verifier";
+  }
+
+  if (verification.verifiedStatus === "valid") {
+    return "verified";
+  }
+
   return null;
 }
 
-export function getVerificationIssuers(actor: any): VerificationIssuer[] {
-  return (actor?.verification?.verifications || []).filter((v: any) => v.isValid);
+/**
+ * Récupère les données de vérification natives depuis l’AppView publique.
+ *
+ * Cette fonction sert lorsque le PDS de l’utilisateur ne renvoie pas les
+ * champs enrichis trustedVerifierStatus / verifiedStatus.
+ */
+export async function getPublicNativeVerification(
+  actor: any
+): Promise<any | null> {
+  const key = getActorKey(actor);
+
+  if (!key) {
+    return null;
+  }
+
+  const cached =
+    nativeVerificationCache.get(key);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.verification;
+  }
+
+  try {
+    const agent = createAppViewAgent();
+
+    const response =
+      await agent.api.app.bsky.actor.getProfile({
+        actor: actor.did || actor.handle,
+      });
+
+    const verification =
+      response.data.verification || null;
+
+    nativeVerificationCache.set(key, {
+      verification,
+      expiresAt: Date.now() + CACHE_DURATION,
+    });
+
+    return verification;
+  } catch (error) {
+    console.error(
+      "Impossible de récupérer la vérification native :",
+      error
+    );
+
+    nativeVerificationCache.set(key, {
+      verification: null,
+      expiresAt: Date.now() + CACHE_DURATION,
+    });
+
+    return null;
+  }
 }
 
-/** Récupère le profil d'un émetteur de certification pour l'afficher dans la fenêtre "certifié par". */
-export async function getIssuerProfile(did: string) {
-  const agent = await getReadAgent();
-  const res = await agent.api.app.bsky.actor.getProfile({ actor: did });
-  return res.data;
+export function getVerificationIssuers(
+  actor: any
+): VerificationIssuer[] {
+  return (
+    actor?.verification?.verifications || []
+  ).filter((verification: any) => verification.isValid);
+}
+
+/**
+ * Récupère le profil d’un émetteur de certification.
+ */
+export async function getIssuerProfile(
+  did: string
+) {
+  const agent = createAppViewAgent();
+
+  const response =
+    await agent.api.app.bsky.actor.getProfile({
+      actor: did,
+    });
+
+  return response.data;
 }
