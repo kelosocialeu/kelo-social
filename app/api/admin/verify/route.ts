@@ -1,47 +1,122 @@
 import { NextResponse } from "next/server";
 import { AtpAgent } from "@atproto/api";
 
+function normalizeHandle(value: string): string {
+  return value.trim().replace(/^@/, "").toLowerCase();
+}
+
 function getAdminHandles(): string[] {
   return (process.env.ADMIN_HANDLES || "")
     .split(",")
-    .map((h) => h.trim().toLowerCase())
+    .map(normalizeHandle)
+    .filter(Boolean);
+}
+
+function getAdminDids(): string[] {
+  return (process.env.ADMIN_DIDS || "")
+    .split(",")
+    .map((did) => did.trim().toLowerCase())
     .filter(Boolean);
 }
 
 export async function POST(request: Request) {
   try {
-    const { accessJwt, refreshJwt, pdsUrl, handle, did } = await request.json();
+    const body = await request.json();
 
-    if (!accessJwt || !pdsUrl || !handle) {
-      return NextResponse.json({ isAdmin: false }, { status: 400 });
+    const accessJwt =
+      typeof body.accessJwt === "string" ? body.accessJwt : "";
+
+    const refreshJwt =
+      typeof body.refreshJwt === "string" ? body.refreshJwt : "";
+
+    const pdsUrl =
+      typeof body.pdsUrl === "string" ? body.pdsUrl.trim() : "";
+
+    const handle =
+      typeof body.handle === "string" ? body.handle.trim() : "";
+
+    const did =
+      typeof body.did === "string" ? body.did.trim() : "";
+
+    if (!accessJwt || !pdsUrl || !handle || !did) {
+      return NextResponse.json(
+        {
+          isAdmin: false,
+          error: "Session incomplète.",
+        },
+        {
+          status: 400,
+        }
+      );
     }
 
-    const agent = new AtpAgent({ service: pdsUrl });
-    await agent.resumeSession({
-      accessJwt,
-      refreshJwt: refreshJwt || "",
-      active: true,
-      handle,
-      did: did || "",
+    const agent = new AtpAgent({
+      service: pdsUrl,
     });
 
-    // resumeSession() n'initialise que l'état local de l'agent : il ne
-    // vérifie rien auprès du serveur. On force ici un vrai appel réseau
-    // vers le PDS d'origine pour valider le token et récupérer le handle
-    // CONFIRMÉ par le serveur — jamais celui envoyé tel quel par le client.
-    const sessionRes = await agent.api.com.atproto.server.getSession();
-    const verifiedHandle = sessionRes.data.handle?.toLowerCase().trim();
+    await agent.resumeSession({
+      accessJwt,
+      refreshJwt,
+      active: true,
+      handle,
+      did,
+    });
 
-    const admins = getAdminHandles();
-    const isAdmin = !!verifiedHandle && admins.includes(verifiedHandle);
+    /*
+     * Appel réel au PDS afin de ne pas faire confiance aux informations
+     * envoyées directement par le navigateur.
+     */
+    const sessionResponse =
+      await agent.api.com.atproto.server.getSession();
+
+    const verifiedHandle = normalizeHandle(
+      sessionResponse.data.handle || ""
+    );
+
+    const verifiedDid = (
+      sessionResponse.data.did || ""
+    )
+      .trim()
+      .toLowerCase();
+
+    const adminHandles = getAdminHandles();
+    const adminDids = getAdminDids();
+
+    const allowedByDid =
+      !!verifiedDid && adminDids.includes(verifiedDid);
+
+    const allowedByHandle =
+      !!verifiedHandle &&
+      adminHandles.includes(verifiedHandle);
+
+    const isAdmin = allowedByDid || allowedByHandle;
 
     if (!isAdmin) {
-      console.warn("[admin/verify] accès refusé", { verifiedHandle, admins, pdsUrl });
+      console.warn("[admin/verify] Accès refusé", {
+        verifiedHandle,
+        verifiedDid,
+        configuredAdminHandles: adminHandles,
+        configuredAdminDids: adminDids,
+        pdsUrl,
+      });
     }
 
-    return NextResponse.json({ isAdmin });
-  } catch (err) {
-    console.error("[admin/verify] erreur de validation de session", err);
-    return NextResponse.json({ isAdmin: false }, { status: 200 });
+    return NextResponse.json({
+      isAdmin,
+    });
+  } catch (error) {
+    console.error(
+      "[admin/verify] Erreur de validation de session",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        isAdmin: false,
+      },
+      {
+        status: 200,
+      }
+    );
   }
 }
