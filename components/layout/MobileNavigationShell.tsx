@@ -7,6 +7,9 @@ import {
 } from "next/navigation";
 
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
+import MobileDrawer from "@/components/layout/MobileDrawer";
+import MobileHeader from "@/components/layout/MobileHeader";
+
 import { useHideOnScroll } from "@/hooks/useHideOnScroll";
 import { getStoredSession } from "@/services/auth.service";
 
@@ -27,6 +30,7 @@ export default function MobileNavigationShell({
   const router = useRouter();
 
   const [handle, setHandle] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const navigationHidden = useHideOnScroll({
     minimumScroll: 80,
@@ -36,21 +40,34 @@ export default function MobileNavigationShell({
 
   useEffect(() => {
     const session = getStoredSession();
-
     setHandle(session?.handle || "");
+    setMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    document.body.style.overflow = menuOpen
+      ? "hidden"
+      : "";
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [menuOpen]);
 
   const shouldHideNavigation =
     HIDDEN_ROUTES.some(
       (route) =>
         pathname === route ||
-        pathname.startsWith(
-          `${route}/`
-        )
+        pathname.startsWith(`${route}/`)
     );
 
   const handleCreatePost = () => {
     router.push("/feed?compose=true");
+  };
+
+  const handleLogout = () => {
+    localStorage.clear();
+    window.location.href = "/login";
   };
 
   return (
@@ -59,20 +76,32 @@ export default function MobileNavigationShell({
         className={
           shouldHideNavigation
             ? ""
-            : "pb-24 md:pb-0"
+            : "pb-24 pt-[calc(56px+env(safe-area-inset-top))] md:pb-0 md:pt-0"
         }
       >
         {children}
       </div>
 
       {!shouldHideNavigation && (
-        <MobileBottomNav
-          handle={handle}
-          hidden={navigationHidden}
-          onCreatePost={
-            handleCreatePost
-          }
-        />
+        <>
+          <MobileHeader
+            onOpenMenu={() => setMenuOpen(true)}
+          />
+
+          <MobileDrawer
+            open={menuOpen}
+            handle={handle}
+            onClose={() => setMenuOpen(false)}
+            onLogout={handleLogout}
+            onCreatePost={handleCreatePost}
+          />
+
+          <MobileBottomNav
+            handle={handle}
+            hidden={navigationHidden || menuOpen}
+            onCreatePost={handleCreatePost}
+          />
+        </>
       )}
     </>
   );
