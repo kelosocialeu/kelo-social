@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
@@ -8,10 +8,12 @@ import Avatar from "@/components/feed/Avatar";
 import Button from "@/components/ui/Button";
 import AccountBadges from "@/components/ui/AccountBadges";
 import PostCard from "@/components/feed/PostCard";
+import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
 import FollowButton from "@/components/profile/FollowButton";
 import ProfileMoreMenu from "@/components/profile/ProfileMoreMenu";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useBookmarks } from "@/hooks/useBookmarks";
+import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
 import { getActorProfile, getActorFeed } from "@/lib/atproto/profile";
 import { deleteOwnPost } from "@/lib/atproto/posts";
 import { getActorLists, ManagedList } from "@/lib/atproto/lists";
@@ -42,7 +44,6 @@ export default function ProfilePage() {
 
   const { checked, handle: myHandle } = useRequireAuth();
   const [profile, setProfile] = useState<any>(null);
-  const [posts, setPosts] = useState<any[]>([]);
   const [lists, setLists] = useState<ManagedList[]>([]);
   const [starterPacks, setStarterPacks] = useState<StarterPackView[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -58,17 +59,24 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!checked || !targetHandle) return;
 
-    async function load() {
+    async function loadProfileData() {
+      setLoadingProfile(true);
+      setLoadError(null);
+
       try {
-        const [profileData, feedData, listData, starterPackData] = await Promise.all([
+        const [profileData, listData, starterPackData] = await Promise.all([
           getActorProfile(targetHandle),
-          getActorFeed(targetHandle, 30),
-          getActorLists(targetHandle, 50).catch(() => ({ items: [], cursor: undefined })),
-          getActorStarterPacks(targetHandle, 50).catch(() => ({ items: [], cursor: undefined })),
+          getActorLists(targetHandle, 50).catch(() => ({
+            items: [],
+            cursor: undefined,
+          })),
+          getActorStarterPacks(targetHandle, 50).catch(() => ({
+            items: [],
+            cursor: undefined,
+          })),
         ]);
 
         setProfile(profileData);
-        setPosts(formatFeed(feedData));
         setLists(listData.items);
         setStarterPacks(starterPackData.items);
       } catch (err) {
@@ -79,8 +87,44 @@ export default function ProfilePage() {
       }
     }
 
-    load();
+    loadProfileData();
   }, [checked, targetHandle]);
+
+  const fetchProfilePosts = useCallback(
+    async (cursor?: string) => {
+      if (!checked || !targetHandle) {
+        return { items: [], cursor: undefined };
+      }
+
+      const response = await getActorFeed(
+        targetHandle,
+        30,
+        cursor
+      );
+
+      return {
+        items: formatFeed(response.items),
+        cursor: response.cursor,
+      };
+    },
+    [checked, targetHandle]
+  );
+
+  const {
+    items: posts,
+    setItems: setPosts,
+    loading: loadingPosts,
+    loadingMore,
+    hasMore,
+    error: postsError,
+    loadMore,
+  } = useInfiniteFeed(
+    fetchProfilePosts,
+    [checked, targetHandle],
+    {
+      getItemKey: (post: any) => post.uri,
+    }
+  );
 
   const handleLogout = () => {
     localStorage.clear();
@@ -276,38 +320,65 @@ export default function ProfilePage() {
 
           {activeTab === "Posts" && (
             <div className="divide-y divide-kelo-border">
-              {displayedPosts.length > 0 ? (
-                displayedPosts.map((post) => (
-                  <PostCard
-                    key={post.uri}
-                    post={post}
-                    isMine={isOwnProfile}
-                    isBookmarked={isBookmarked(post.uri)}
-                    replyOpen={activeReplyUri === post.uri}
-                    replyText={replyText}
-                    onToggleReply={() =>
-                      setActiveReplyUri(
-                        activeReplyUri === post.uri ? null : post.uri
-                      )
-                    }
-                    onReplyTextChange={setReplyText}
-                    onSendReply={() => {
-                      alert("Commentaire publié !");
-                      setReplyText("");
-                      setActiveReplyUri(null);
-                    }}
-                    onLike={() => handleLike(post.uri)}
-                    onRepost={() => handleRepost(post.uri)}
-                    onBookmark={() => toggleBookmark(post)}
-                    onDelete={() => handleDelete(post.uri)}
-                    onBlocked={handleModeration}
-                    onMuted={handleModeration}
+              {displayedPosts.map((post) => (
+                <PostCard
+                  key={post.uri}
+                  post={post}
+                  isMine={isOwnProfile}
+                  isBookmarked={isBookmarked(post.uri)}
+                  replyOpen={activeReplyUri === post.uri}
+                  replyText={replyText}
+                  onToggleReply={() =>
+                    setActiveReplyUri(
+                      activeReplyUri === post.uri ? null : post.uri
+                    )
+                  }
+                  onReplyTextChange={setReplyText}
+                  onSendReply={() => {
+                    alert("Commentaire publié !");
+                    setReplyText("");
+                    setActiveReplyUri(null);
+                  }}
+                  onLike={() => handleLike(post.uri)}
+                  onRepost={() => handleRepost(post.uri)}
+                  onBookmark={() => toggleBookmark(post)}
+                  onDelete={() => handleDelete(post.uri)}
+                  onBlocked={handleModeration}
+                  onMuted={handleModeration}
+                />
+              ))}
+
+              {loadingPosts && (
+                <div className="flex justify-center py-10">
+                  <img
+                    src="https://kelosocial.sirv.com/logo.png"
+                    alt="Chargement"
+                    className="h-10 w-10 animate-spin object-contain"
                   />
-                ))
-              ) : (
-                <p className="py-10 text-center text-sm text-kelo-muted">
-                  Aucune publication pour l&apos;instant.
+                </div>
+              )}
+
+              {!loadingPosts && postsError && (
+                <p className="px-4 py-8 text-center text-sm text-kelo-danger">
+                  {postsError}
                 </p>
+              )}
+
+              {!loadingPosts &&
+                !postsError &&
+                displayedPosts.length === 0 && (
+                  <p className="py-10 text-center text-sm text-kelo-muted">
+                    {postSearchQuery.trim()
+                      ? "Aucune publication ne correspond à cette recherche."
+                      : "Aucune publication pour l’instant."}
+                  </p>
+                )}
+
+              {!postSearchQuery.trim() && (
+                <InfiniteScrollSentinel
+                  onIntersect={loadMore}
+                  disabled={loadingMore || !hasMore}
+                />
               )}
             </div>
           )}
