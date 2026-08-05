@@ -1,29 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getStoredSession } from "@/services/auth.service";
+
+import {
+  useAuthContext,
+} from "@/components/providers/AuthProvider";
 
 /**
- * Protège une page cliente : redirige vers /login si aucune session valide
- * n'est trouvée dans ce navigateur. Tant que la vérification n'est pas
- * terminée (`checked === false`), on n'affiche rien de protégé — ça évite
- * un flash de contenu avant la redirection.
+ * Protège une page cliente sans relire localStorage à chaque navigation.
+ *
+ * La session est chargée une seule fois dans AuthProvider puis réutilisée
+ * par toutes les pages de l’application.
  */
 export function useRequireAuth() {
   const router = useRouter();
-  const [checked, setChecked] = useState(false);
-  const [handle, setHandle] = useState("");
+
+  const {
+    session,
+    checked,
+    handle,
+    did,
+  } = useAuthContext();
 
   useEffect(() => {
-    const session = getStoredSession();
-    if (!session) {
-      router.push("/login");
-      return;
+    if (
+      checked &&
+      !session
+    ) {
+      router.replace("/login");
     }
-    setHandle(session.handle);
-    setChecked(true);
-  }, [router]);
+  }, [
+    checked,
+    session,
+    router,
+  ]);
 
-  return { checked, handle };
+  return {
+    checked,
+    handle,
+    did,
+    session,
+    isAuthenticated: !!session,
+  };
 }
