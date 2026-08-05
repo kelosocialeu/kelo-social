@@ -164,13 +164,23 @@ export async function likePost(
 ): Promise<string> {
   validateStrongRef(post, "Publication");
 
-  const { agent } =
+  const { agent, session } =
     await getAuthenticatedAgent();
 
-  const result = await agent.like(
-    post.uri,
-    post.cid
-  );
+  const result =
+    await agent.api.app.bsky.feed.like.create(
+      {
+        repo: session.did,
+      },
+      {
+        subject: {
+          $type: "com.atproto.repo.strongRef",
+          uri: post.uri,
+          cid: post.cid,
+        },
+        createdAt: new Date().toISOString(),
+      }
+    );
 
   return result.uri;
 }
@@ -188,10 +198,21 @@ export async function unlikePost(
     );
   }
 
-  const { agent } =
+  const { agent, session } =
     await getAuthenticatedAgent();
 
-  await agent.deleteLike(likeUri);
+  const rkey = likeUri.split("/").pop();
+
+  if (!rkey) {
+    throw new Error(
+      "Clé du like introuvable."
+    );
+  }
+
+  await agent.api.app.bsky.feed.like.delete({
+    repo: session.did,
+    rkey,
+  });
 }
 
 /**
@@ -204,13 +225,23 @@ export async function repostPost(
 ): Promise<string> {
   validateStrongRef(post, "Publication");
 
-  const { agent } =
+  const { agent, session } =
     await getAuthenticatedAgent();
 
-  const result = await agent.repost(
-    post.uri,
-    post.cid
-  );
+  const result =
+    await agent.api.app.bsky.feed.repost.create(
+      {
+        repo: session.did,
+      },
+      {
+        subject: {
+          $type: "com.atproto.repo.strongRef",
+          uri: post.uri,
+          cid: post.cid,
+        },
+        createdAt: new Date().toISOString(),
+      }
+    );
 
   return result.uri;
 }
@@ -228,10 +259,21 @@ export async function undoRepost(
     );
   }
 
-  const { agent } =
+  const { agent, session } =
     await getAuthenticatedAgent();
 
-  await agent.deleteRepost(repostUri);
+  const rkey = repostUri.split("/").pop();
+
+  if (!rkey) {
+    throw new Error(
+      "Clé de republication introuvable."
+    );
+  }
+
+  await agent.api.app.bsky.feed.repost.delete({
+    repo: session.did,
+    rkey,
+  });
 }
 
 /**
