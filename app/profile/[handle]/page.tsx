@@ -131,30 +131,6 @@ export default function ProfilePage() {
     window.location.href = "/login";
   };
 
-  const handleLike = (uri: string) => {
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p.uri !== uri) return p;
-        const liked = p.viewer?.like;
-        return { ...p, viewer: { ...p.viewer, like: !liked }, likeCount: liked ? p.likeCount - 1 : p.likeCount + 1 };
-      })
-    );
-  };
-
-  const handleRepost = (uri: string) => {
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p.uri !== uri) return p;
-        const reposted = p.viewer?.repost;
-        return {
-          ...p,
-          viewer: { ...p.viewer, repost: !reposted },
-          repostCount: reposted ? p.repostCount - 1 : p.repostCount + 1,
-        };
-      })
-    );
-  };
-
   const handleDelete = async (uri: string) => {
     if (!confirm("Supprimer définitivement cette publication ?")) return;
     try {
