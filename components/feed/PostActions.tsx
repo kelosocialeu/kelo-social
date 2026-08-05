@@ -223,7 +223,8 @@ export default function PostActions({
   };
 
   const handleReportSubmit = async (
-    reason: ReportReason
+    reason: ReportReason,
+    description?: string
   ) => {
     if (reporting) {
       return;
@@ -242,7 +243,8 @@ export default function PostActions({
       await reportPost(
         post.uri,
         post.cid,
-        reason
+        reason,
+        description
       );
 
       setReportOpen(false);
