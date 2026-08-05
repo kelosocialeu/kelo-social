@@ -3,23 +3,29 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+import AccountBadges from "@/components/ui/AccountBadges";
 import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
+
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
+
 import {
   listConversations,
   getOrCreateConversation,
   resolveHandleToDid,
 } from "@/lib/atproto/chat";
+
 import { getStoredSession } from "@/services/auth.service";
 
 export default function MessagesPage() {
   const { checked, handle } = useRequireAuth();
   const router = useRouter();
+
   const [myDid, setMyDid] = useState<string | null>(null);
   const [newHandle, setNewHandle] = useState("");
   const [starting, setStarting] = useState(false);
@@ -74,7 +80,9 @@ export default function MessagesPage() {
   ) => {
     event.preventDefault();
 
-    if (!newHandle.trim()) {
+    const cleanHandle = newHandle.replace(/^@/, "").trim();
+
+    if (!cleanHandle) {
       return;
     }
 
@@ -82,13 +90,16 @@ export default function MessagesPage() {
     setStartError(null);
 
     try {
-      const cleanHandle = newHandle.replace(/^@/, "").trim();
       const did = await resolveHandleToDid(cleanHandle);
       const conversation = await getOrCreateConversation(did);
 
       router.push(`/messages/${conversation.id}`);
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Impossible de démarrer la conversation :",
+        error
+      );
+
       setStartError(
         "Impossible de trouver ou de créer cette conversation."
       );
@@ -107,7 +118,10 @@ export default function MessagesPage() {
 
   return (
     <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
-      <Sidebar handle={handle} onLogout={handleLogout} />
+      <Sidebar
+        handle={handle}
+        onLogout={handleLogout}
+      />
 
       <main className="min-h-screen min-w-0 flex-1 border-x border-kelo-border bg-white pb-20 shadow-kelo">
         <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 backdrop-blur-md">
@@ -132,7 +146,9 @@ export default function MessagesPage() {
                 type="text"
                 placeholder="Démarrer une discussion avec @handle..."
                 value={newHandle}
-                onChange={(event) => setNewHandle(event.target.value)}
+                onChange={(event) =>
+                  setNewHandle(event.target.value)
+                }
               />
             </div>
 
@@ -160,7 +176,9 @@ export default function MessagesPage() {
                 (member: any) => member.did !== myDid
               ) || conversation.members?.[0];
 
-            const lastText = conversation.lastMessage?.text || "";
+            const lastText =
+              conversation.lastMessage?.text || "";
+
             const displayName =
               otherMember?.displayName ||
               otherMember?.handle ||
@@ -182,11 +200,20 @@ export default function MessagesPage() {
                 />
 
                 <div className="min-w-0 flex-grow">
-                  <div className="flex min-w-0 items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate font-bold text-kelo-text">
-                        {displayName}
-                      </p>
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0 flex-grow">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <p className="max-w-full truncate font-bold text-kelo-text">
+                          {displayName}
+                        </p>
+
+                        <AccountBadges
+                          actor={otherMember}
+                          identitySize="sm"
+                          certificationSize={15}
+                          gap="xs"
+                        />
+                      </div>
 
                       {otherMember?.handle && (
                         <p className="truncate text-xs text-kelo-muted">
@@ -210,24 +237,29 @@ export default function MessagesPage() {
             );
           })}
 
-          {conversations.length === 0 && !loading && !error && (
-            <div className="flex min-h-[calc(100vh-210px)] items-start justify-center px-6 py-12 sm:items-center">
-              <div className="max-w-md text-center">
-                <div className="text-4xl" aria-hidden="true">
-                  💬
+          {conversations.length === 0 &&
+            !loading &&
+            !error && (
+              <div className="flex min-h-[calc(100vh-210px)] items-start justify-center px-6 py-12 sm:items-center">
+                <div className="max-w-md text-center">
+                  <div
+                    className="text-4xl"
+                    aria-hidden="true"
+                  >
+                    💬
+                  </div>
+
+                  <h2 className="mt-4 text-lg font-bold text-kelo-text">
+                    Aucune discussion
+                  </h2>
+
+                  <p className="mt-2 text-sm leading-relaxed text-kelo-muted">
+                    Entrez le handle d’un utilisateur pour démarrer votre
+                    première conversation.
+                  </p>
                 </div>
-
-                <h2 className="mt-4 text-lg font-bold text-kelo-text">
-                  Aucune discussion
-                </h2>
-
-                <p className="mt-2 text-sm leading-relaxed text-kelo-muted">
-                  Entrez le handle d’un utilisateur pour démarrer votre
-                  première conversation.
-                </p>
               </div>
-            </div>
-          )}
+            )}
 
           {error && (
             <p className="px-4 py-8 text-center text-sm text-kelo-danger">
