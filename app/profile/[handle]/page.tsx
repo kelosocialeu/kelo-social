@@ -131,6 +131,7 @@ export default function ProfilePage() {
     window.location.href = "/login";
   };
 
+
   const handleDelete = async (uri: string) => {
     if (!confirm("Supprimer définitivement cette publication ?")) return;
     try {
@@ -311,12 +312,9 @@ export default function ProfilePage() {
                   }
                   onReplyTextChange={setReplyText}
                   onSendReply={() => {
-                    alert("Commentaire publié !");
                     setReplyText("");
                     setActiveReplyUri(null);
                   }}
-                  onLike={() => handleLike(post.uri)}
-                  onRepost={() => handleRepost(post.uri)}
                   onBookmark={() => toggleBookmark(post)}
                   onDelete={() => handleDelete(post.uri)}
                   onBlocked={handleModeration}
