@@ -26,6 +26,11 @@ interface FlattenedThreadPost {
   depth: number;
 }
 
+interface ViewPostThreadNode {
+  post: any;
+  replies?: unknown;
+}
+
 function flattenPost(view: any) {
   return {
     uri: view.uri,
@@ -40,12 +45,22 @@ function flattenPost(view: any) {
   };
 }
 
-function isViewPostThread(node: any): boolean {
+function isViewPostThread(
+  node: unknown
+): node is ViewPostThreadNode {
+  if (
+    !node ||
+    typeof node !== "object"
+  ) {
+    return false;
+  }
+
+  const candidate =
+    node as ViewPostThreadNode;
+
   return (
-    !!node &&
-    typeof node === "object" &&
-    !!node.post &&
-    typeof node.post.uri === "string"
+    !!candidate.post &&
+    typeof candidate.post.uri === "string"
   );
 }
 
@@ -172,8 +187,14 @@ function PostThreadContent() {
 
         setRootPost(flattenPost(thread.post));
 
+        const replies = Array.isArray(
+          thread.replies
+        )
+          ? thread.replies
+          : [];
+
         setThreadReplies(
-          flattenReplies(thread.replies || [], 0)
+          flattenReplies(replies, 0)
         );
       } catch (error) {
         if (cancelled) {
@@ -255,19 +276,7 @@ function PostThreadContent() {
     }
   };
 
-  const handleReplySubmit = (
-    postUri: string
-  ) => {
-    if (!replyText.trim()) {
-      return;
-    }
-
-    /*
-     * L’écriture réelle d’une réponse sera reliée à la fonction AT Protocol
-     * dédiée lorsqu’elle sera disponible.
-     */
-    alert("Commentaire publié !");
-
+  const handleReplySubmit = () => {
     setReplyText("");
     setActiveReplyUri(null);
   };
@@ -363,9 +372,7 @@ function PostThreadContent() {
                     )
                   }
                   onReplyTextChange={setReplyText}
-                  onSendReply={() =>
-                    handleReplySubmit(rootPost.uri)
-                  }
+                  onSendReply={handleReplySubmit}
                   onBookmark={() =>
                     toggleBookmark(rootPost)
                   }
@@ -435,9 +442,7 @@ function PostThreadContent() {
                             onReplyTextChange={
                               setReplyText
                             }
-                            onSendReply={() =>
-                              handleReplySubmit(post.uri)
-                            }
+                            onSendReply={handleReplySubmit}
                             onBookmark={() =>
                               toggleBookmark(post)
                             }
