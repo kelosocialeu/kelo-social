@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
-import VerificationBadge from "@/components/ui/VerificationBadge";
+import AccountBadges from "@/components/ui/AccountBadges";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import {
   getStarterPacks,
@@ -289,11 +289,17 @@ export default function StarterPackDetailsPage() {
                             />
 
                             <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <p className="truncate text-sm font-bold">
+                              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                <p className="max-w-full truncate text-sm font-bold">
                                   {actor.displayName || actor.handle}
                                 </p>
-                                <VerificationBadge actor={actor} />
+
+                                <AccountBadges
+                                  actor={actor}
+                                  identitySize="sm"
+                                  certificationSize={15}
+                                  gap="xs"
+                                />
                               </div>
 
                               <p className="truncate text-xs text-kelo-muted">
@@ -345,10 +351,20 @@ export default function StarterPackDetailsPage() {
                       />
 
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-bold">
-                          {item.subject.displayName ||
-                            item.subject.handle}
-                        </p>
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <p className="max-w-full truncate text-sm font-bold">
+                            {item.subject.displayName ||
+                              item.subject.handle}
+                          </p>
+
+                          <AccountBadges
+                            actor={item.subject}
+                            identitySize="sm"
+                            certificationSize={15}
+                            gap="xs"
+                          />
+                        </div>
+
                         <p className="truncate text-xs text-kelo-muted">
                           @{item.subject.handle}
                         </p>
