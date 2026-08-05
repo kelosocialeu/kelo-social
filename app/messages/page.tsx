@@ -65,10 +65,18 @@ export default function MessagesPage() {
   const {
     items: conversations,
     loading,
+    loadingMore,
     hasMore,
     error,
     loadMore,
-  } = useInfiniteFeed(fetchConversations, [checked]);
+  } = useInfiniteFeed(
+    fetchConversations,
+    [checked],
+    {
+      getItemKey: (conversation: any) =>
+        conversation.id,
+    }
+  );
 
   const handleLogout = () => {
     localStorage.clear();
@@ -268,14 +276,18 @@ export default function MessagesPage() {
           )}
 
           {loading && (
-            <p className="px-4 py-6 text-center text-sm text-kelo-muted">
-              Chargement...
-            </p>
+            <div className="flex justify-center py-10">
+              <img
+                src="https://kelosocial.sirv.com/logo.png"
+                alt="Chargement"
+                className="h-10 w-10 animate-spin object-contain"
+              />
+            </div>
           )}
 
           <InfiniteScrollSentinel
             onIntersect={loadMore}
-            disabled={loading || !hasMore}
+            disabled={loadingMore || !hasMore}
           />
         </div>
       </main>
