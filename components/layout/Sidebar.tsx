@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import Logo from "@/components/ui/Logo";
+import { OPEN_GLOBAL_COMPOSER_EVENT } from "@/components/feed/GlobalPostComposer";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { useUnreadNotifications } from "@/hooks/useUnreadNotifications";
 
@@ -68,6 +69,12 @@ export default function Sidebar({
   const { isAdmin, isTrustedVerifier } = useAdminRole();
   const { count: unreadNotifications } =
     useUnreadNotifications();
+
+  const openComposer = () => {
+    window.dispatchEvent(
+      new Event(OPEN_GLOBAL_COMPOSER_EVENT)
+    );
+  };
 
   return (
     <aside className="sticky top-0 hidden h-screen w-72 flex-shrink-0 flex-col justify-between border-r border-kelo-border bg-white p-6 md:flex">
@@ -167,14 +174,14 @@ export default function Sidebar({
       </div>
 
       <div className="border-t border-kelo-border pt-4">
-        <Link
-          href="/feed"
-          prefetch
+        <button
+          type="button"
+          onClick={openComposer}
           className="mb-4 flex w-full items-center justify-center gap-2 rounded-full bg-kelo-gradient py-3 font-bold text-white"
         >
           <PenSquare className="h-4 w-4" />
-          Nouveau post
-        </Link>
+          Écrire un post
+        </button>
 
         <div className="mb-2 truncate px-1 text-xs text-kelo-muted">
           Connecté :{" "}
