@@ -1,0 +1,30 @@
+{
+  "id": "/",
+  "name": "Kelo Social",
+  "short_name": "Kelo",
+  "description": "Le réseau social européen décentralisé propulsé par AT Protocol",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#faf9f6",
+  "theme_color": "#ffffff",
+  "categories": ["social", "communication"],
+  "icons": [
+    {
+      "src": "https://kelosocial.sirv.com/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://kelosocial.sirv.com/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
