@@ -21,6 +21,7 @@ const HIDDEN_ROUTES = [
   "/login",
   "/signup",
   "/register",
+  "/forgot-password",
 ];
 
 export default function MobileNavigationShell({
@@ -54,7 +55,11 @@ export default function MobileNavigationShell({
     };
   }, [menuOpen]);
 
+  const isConversation =
+    pathname.startsWith("/messages/");
+
   const shouldHideNavigation =
+    isConversation ||
     HIDDEN_ROUTES.some(
       (route) =>
         pathname === route ||
