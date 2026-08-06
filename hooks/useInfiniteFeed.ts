@@ -5,6 +5,7 @@ import {
   SetStateAction,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -26,29 +27,22 @@ interface InfiniteFeedCacheEntry {
 }
 
 interface UseInfiniteFeedOptions {
-  /** Identifie chaque élément et évite les doublons entre les pages. */
   getItemKey?: (
     item: any
   ) => string | undefined;
-
-  /**
-   * Clé stable du cache partagé. Deux pages utilisant la même clé
-   * réutilisent immédiatement les mêmes données.
-   */
   cacheKey?: string;
-
-  /** Durée pendant laquelle le cache est considéré comme frais. */
   staleTimeMs?: number;
+  refreshOnFocus?: boolean;
 }
 
 const DEFAULT_STALE_TIME_MS = 30_000;
 
-const infiniteFeedCache = new Map<
+const cache = new Map<
   string,
   InfiniteFeedCacheEntry
 >();
 
-const pendingInitialRequests = new Map<
+const pendingFirstPages = new Map<
   string,
   Promise<FeedPage>
 >();
@@ -62,6 +56,37 @@ function defaultGetItemKey(
     item?.cid ||
     item?.notification?.uri
   );
+}
+
+function hashString(value: string): string {
+  let hash = 2166136261;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return (hash >>> 0).toString(36);
+}
+
+function serializeDependency(
+  value: unknown
+): string {
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value);
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return typeof value;
+  }
 }
 
 function mergeWithoutDuplicates(
@@ -96,23 +121,15 @@ export function clearInfiniteFeedCache(
   cacheKey?: string
 ): void {
   if (cacheKey) {
-    infiniteFeedCache.delete(cacheKey);
-    pendingInitialRequests.delete(cacheKey);
+    cache.delete(cacheKey);
+    pendingFirstPages.delete(cacheKey);
     return;
   }
 
-  infiniteFeedCache.clear();
-  pendingInitialRequests.clear();
+  cache.clear();
+  pendingFirstPages.clear();
 }
 
-/**
- * Fil paginé avec cache mémoire partagé et actualisation silencieuse.
- *
- * - retour instantané vers une page déjà visitée ;
- * - déduplication des requêtes initiales simultanées ;
- * - conservation du curseur et des pages déjà chargées ;
- * - actualisation en arrière-plan lorsque les données sont anciennes.
- */
 export function useInfiniteFeed(
   fetcher: FeedFetcher,
   deps: any[] = [],
@@ -122,14 +139,30 @@ export function useInfiniteFeed(
     options.getItemKey ||
     defaultGetItemKey;
 
-  const cacheKey = options.cacheKey;
+  const automaticCacheKey = useMemo(
+    () =>
+      `feed:${hashString(
+        fetcher.toString()
+      )}:${deps
+        .map(serializeDependency)
+        .join("|")}`,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    deps
+  );
+
+  const cacheKey =
+    options.cacheKey ||
+    automaticCacheKey;
+
   const staleTimeMs =
     options.staleTimeMs ??
     DEFAULT_STALE_TIME_MS;
 
-  const initialCache = cacheKey
-    ? infiniteFeedCache.get(cacheKey)
-    : undefined;
+  const refreshOnFocus =
+    options.refreshOnFocus ?? true;
+
+  const initialCache =
+    cache.get(cacheKey);
 
   const [items, setItemsState] =
     useState<any[]>(
@@ -142,9 +175,7 @@ export function useInfiniteFeed(
     );
 
   const [initialLoading, setInitialLoading] =
-    useState(
-      !initialCache
-    );
+    useState(!initialCache);
 
   const [loadingMore, setLoadingMore] =
     useState(false);
@@ -161,6 +192,9 @@ export function useInfiniteFeed(
     useState<string | null>(null);
 
   const fetcherRef = useRef(fetcher);
+  const itemsRef = useRef<any[]>(
+    initialCache?.items || []
+  );
   const cursorRef = useRef<
     string | undefined
   >(initialCache?.cursor);
@@ -169,9 +203,6 @@ export function useInfiniteFeed(
   );
   const loadingMoreRef = useRef(false);
   const requestIdRef = useRef(0);
-  const itemsRef = useRef<any[]>(
-    initialCache?.items || []
-  );
 
   fetcherRef.current = fetcher;
 
@@ -181,11 +212,7 @@ export function useInfiniteFeed(
       nextCursor: string | undefined,
       nextHasMore: boolean
     ) => {
-      if (!cacheKey) {
-        return;
-      }
-
-      infiniteFeedCache.set(cacheKey, {
+      cache.set(cacheKey, {
         items: nextItems,
         cursor: nextCursor,
         hasMore: nextHasMore,
@@ -240,35 +267,31 @@ export function useInfiniteFeed(
             );
 
       const nextCursor = page.cursor;
-      const moreAvailable =
+      const nextHasMore =
         !!nextCursor &&
         pageItems.length > 0;
 
       itemsRef.current = nextItems;
       cursorRef.current = nextCursor;
-      hasMoreRef.current = moreAvailable;
+      hasMoreRef.current = nextHasMore;
 
       setItemsState(nextItems);
       setCursor(nextCursor);
-      setHasMore(moreAvailable);
+      setHasMore(nextHasMore);
 
       writeCache(
         nextItems,
         nextCursor,
-        moreAvailable
+        nextHasMore
       );
     },
     [getItemKey, writeCache]
   );
 
-  const fetchInitialPage = useCallback(
+  const fetchFirstPage = useCallback(
     async (): Promise<FeedPage> => {
-      if (!cacheKey) {
-        return fetcherRef.current(undefined);
-      }
-
       const pending =
-        pendingInitialRequests.get(cacheKey);
+        pendingFirstPages.get(cacheKey);
 
       if (pending) {
         return pending;
@@ -277,7 +300,7 @@ export function useInfiniteFeed(
       const request =
         fetcherRef.current(undefined);
 
-      pendingInitialRequests.set(
+      pendingFirstPages.set(
         cacheKey,
         request
       );
@@ -285,70 +308,11 @@ export function useInfiniteFeed(
       try {
         return await request;
       } finally {
-        pendingInitialRequests.delete(cacheKey);
+        pendingFirstPages.delete(cacheKey);
       }
     },
     [cacheKey]
   );
-
-  const reset = useCallback(async () => {
-    const requestId =
-      ++requestIdRef.current;
-
-    const cached = cacheKey
-      ? infiniteFeedCache.get(cacheKey)
-      : undefined;
-
-    const hasCachedItems =
-      !!cached && cached.items.length > 0;
-
-    setInitialLoading(!hasCachedItems);
-    setRefreshing(hasCachedItems);
-    setError(null);
-
-    try {
-      const page = await fetchInitialPage();
-
-      if (
-        requestId !==
-        requestIdRef.current
-      ) {
-        return;
-      }
-
-      applyPage(page, "replace");
-    } catch (loadError) {
-      if (
-        requestId !==
-        requestIdRef.current
-      ) {
-        return;
-      }
-
-      console.error(
-        "Erreur de chargement du fil :",
-        loadError
-      );
-
-      if (!hasCachedItems) {
-        setError(
-          "Impossible de charger le fil pour le moment."
-        );
-      }
-    } finally {
-      if (
-        requestId ===
-        requestIdRef.current
-      ) {
-        setInitialLoading(false);
-        setRefreshing(false);
-      }
-    }
-  }, [
-    applyPage,
-    cacheKey,
-    fetchInitialPage,
-  ]);
 
   const refresh = useCallback(async () => {
     const requestId =
@@ -358,7 +322,7 @@ export function useInfiniteFeed(
     setError(null);
 
     try {
-      const page = await fetchInitialPage();
+      const page = await fetchFirstPage();
 
       if (
         requestId !==
@@ -392,22 +356,31 @@ export function useInfiniteFeed(
         requestIdRef.current
       ) {
         setRefreshing(false);
+        setInitialLoading(false);
       }
     }
-  }, [applyPage, fetchInitialPage]);
+  }, [applyPage, fetchFirstPage]);
+
+  const reset = useCallback(async () => {
+    cache.delete(cacheKey);
+    itemsRef.current = [];
+    cursorRef.current = undefined;
+    hasMoreRef.current = true;
+
+    setItemsState([]);
+    setCursor(undefined);
+    setHasMore(true);
+    setInitialLoading(true);
+
+    await refresh();
+  }, [cacheKey, refresh]);
 
   const loadMore = useCallback(async () => {
     if (
       loadingMoreRef.current ||
-      !hasMoreRef.current
+      !hasMoreRef.current ||
+      !cursorRef.current
     ) {
-      return;
-    }
-
-    const currentCursor =
-      cursorRef.current;
-
-    if (!currentCursor) {
       return;
     }
 
@@ -418,7 +391,7 @@ export function useInfiniteFeed(
     try {
       const page =
         await fetcherRef.current(
-          currentCursor
+          cursorRef.current
         );
 
       applyPage(page, "append");
@@ -438,9 +411,7 @@ export function useInfiniteFeed(
   }, [applyPage]);
 
   useEffect(() => {
-    const cached = cacheKey
-      ? infiniteFeedCache.get(cacheKey)
-      : undefined;
+    const cached = cache.get(cacheKey);
 
     if (cached) {
       itemsRef.current = cached.items;
@@ -452,15 +423,15 @@ export function useInfiniteFeed(
       setHasMore(cached.hasMore);
       setInitialLoading(false);
 
-      const cacheIsFresh =
-        Date.now() - cached.updatedAt <
-        staleTimeMs;
-
-      if (!cacheIsFresh) {
+      if (
+        Date.now() - cached.updatedAt >=
+        staleTimeMs
+      ) {
         refresh();
       }
     } else {
-      reset();
+      setInitialLoading(true);
+      refresh();
     }
 
     return () => {
@@ -470,18 +441,50 @@ export function useInfiniteFeed(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
+  useEffect(() => {
+    if (!refreshOnFocus) {
+      return;
+    }
+
+    const handleFocus = () => {
+      const cached = cache.get(cacheKey);
+
+      if (
+        !cached ||
+        Date.now() - cached.updatedAt >=
+          staleTimeMs
+      ) {
+        refresh();
+      }
+    };
+
+    window.addEventListener(
+      "focus",
+      handleFocus
+    );
+
+    return () => {
+      window.removeEventListener(
+        "focus",
+        handleFocus
+      );
+    };
+  }, [
+    cacheKey,
+    refresh,
+    refreshOnFocus,
+    staleTimeMs,
+  ]);
+
   return {
     items,
     setItems,
-
     loading: initialLoading,
     initialLoading,
     loadingMore,
     refreshing,
-
     hasMore,
     error,
-
     loadMore,
     refresh,
     reset,
