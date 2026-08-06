@@ -13,7 +13,9 @@ import {
   List,
 } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
+import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { useIdentityVerification } from "@/hooks/useIdentityVerification";
 import {
   getSavedFeedItems,
   getFeedGenerators,
@@ -48,6 +50,14 @@ export default function FeedsPage() {
   const [loadingDiscover, setLoadingDiscover] = useState(true);
 
   const [savingKey, setSavingKey] = useState<string | null>(null);
+
+  const {
+    checked: verificationChecked,
+    verified,
+    dialogOpen,
+    requireVerification,
+    closeDialog,
+  } = useIdentityVerification();
 
   const savedFeedUris = useMemo(
     () =>
@@ -181,6 +191,10 @@ export default function FeedsPage() {
     type: "feed" | "list",
     uri: string
   ) => {
+    if (!requireVerification()) {
+      return;
+    }
+
     setSavedItems((previousItems) =>
       previousItems.map((item) =>
         item.type === type && item.value === uri
@@ -219,6 +233,10 @@ export default function FeedsPage() {
     type: "feed" | "list",
     uri: string
   ) => {
+    if (!requireVerification()) {
+      return;
+    }
+
     setSavedItems((previousItems) =>
       previousItems.filter(
         (item) => !(item.type === type && item.value === uri)
@@ -251,6 +269,10 @@ export default function FeedsPage() {
     type: "feed" | "list",
     uri: string
   ) => {
+    if (!requireVerification()) {
+      return;
+    }
+
     const key = `${type}:${uri}`;
     setSavingKey(key);
 
@@ -312,6 +334,21 @@ export default function FeedsPage() {
             </div>
           </div>
         </header>
+
+        {!verified && verificationChecked && (
+          <button
+            type="button"
+            onClick={requireVerification}
+            className="w-full border-b border-kelo-border bg-kelo-background px-4 py-3 text-left text-sm sm:px-5 lg:px-6"
+          >
+            <span className="font-bold text-kelo-text">
+              Vérification requise
+            </span>
+            <span className="ml-2 text-kelo-muted">
+              Vous pouvez consulter les fils et les listes, mais vous devez être vérifié pour les enregistrer, les épingler ou les retirer.
+            </span>
+          </button>
+        )}
 
         <div className="space-y-7 px-4 py-5 sm:px-5 lg:px-6">
           <section>
@@ -695,6 +732,11 @@ export default function FeedsPage() {
           </section>
         </div>
       </main>
+
+      <VerificationRequiredDialog
+        open={dialogOpen}
+        onClose={closeDialog}
+      />
     </div>
   );
 }
