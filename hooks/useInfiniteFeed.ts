@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  Dispatch,
+  SetStateAction,
   useCallback,
   useEffect,
   useRef,
@@ -16,15 +18,40 @@ type FeedFetcher = (
   cursor?: string
 ) => Promise<FeedPage>;
 
+interface InfiniteFeedCacheEntry {
+  items: any[];
+  cursor?: string;
+  hasMore: boolean;
+  updatedAt: number;
+}
+
 interface UseInfiniteFeedOptions {
-  /**
-   * Fonction permettant d’identifier un élément.
-   * Évite les doublons entre deux pages.
-   */
+  /** Identifie chaque élément et évite les doublons entre les pages. */
   getItemKey?: (
     item: any
   ) => string | undefined;
+
+  /**
+   * Clé stable du cache partagé. Deux pages utilisant la même clé
+   * réutilisent immédiatement les mêmes données.
+   */
+  cacheKey?: string;
+
+  /** Durée pendant laquelle le cache est considéré comme frais. */
+  staleTimeMs?: number;
 }
+
+const DEFAULT_STALE_TIME_MS = 30_000;
+
+const infiniteFeedCache = new Map<
+  string,
+  InfiniteFeedCacheEntry
+>();
+
+const pendingInitialRequests = new Map<
+  string,
+  Promise<FeedPage>
+>();
 
 function defaultGetItemKey(
   item: any
@@ -65,16 +92,26 @@ function mergeWithoutDuplicates(
   });
 }
 
+export function clearInfiniteFeedCache(
+  cacheKey?: string
+): void {
+  if (cacheKey) {
+    infiniteFeedCache.delete(cacheKey);
+    pendingInitialRequests.delete(cacheKey);
+    return;
+  }
+
+  infiniteFeedCache.clear();
+  pendingInitialRequests.clear();
+}
+
 /**
- * Gère un fil paginé par curseur.
+ * Fil paginé avec cache mémoire partagé et actualisation silencieuse.
  *
- * Compatible avec :
- * - le feed ;
- * - les profils ;
- * - les notifications ;
- * - les conversations ;
- * - les fils personnalisés ;
- * - les listes.
+ * - retour instantané vers une page déjà visitée ;
+ * - déduplication des requêtes initiales simultanées ;
+ * - conservation du curseur et des pages déjà chargées ;
+ * - actualisation en arrière-plan lorsque les données sont anciennes.
  */
 export function useInfiniteFeed(
   fetcher: FeedFetcher,
@@ -85,266 +122,346 @@ export function useInfiniteFeed(
     options.getItemKey ||
     defaultGetItemKey;
 
-  const [items, setItems] =
-    useState<any[]>([]);
+  const cacheKey = options.cacheKey;
+  const staleTimeMs =
+    options.staleTimeMs ??
+    DEFAULT_STALE_TIME_MS;
+
+  const initialCache = cacheKey
+    ? infiniteFeedCache.get(cacheKey)
+    : undefined;
+
+  const [items, setItemsState] =
+    useState<any[]>(
+      initialCache?.items || []
+    );
 
   const [cursor, setCursor] =
     useState<string | undefined>(
-      undefined
+      initialCache?.cursor
     );
 
-  const [
-    initialLoading,
-    setInitialLoading,
-  ] = useState(false);
+  const [initialLoading, setInitialLoading] =
+    useState(
+      !initialCache
+    );
 
-  const [
-    loadingMore,
-    setLoadingMore,
-  ] = useState(false);
+  const [loadingMore, setLoadingMore] =
+    useState(false);
 
-  const [
-    refreshing,
-    setRefreshing,
-  ] = useState(false);
+  const [refreshing, setRefreshing] =
+    useState(false);
 
   const [hasMore, setHasMore] =
-    useState(true);
+    useState(
+      initialCache?.hasMore ?? true
+    );
 
   const [error, setError] =
     useState<string | null>(null);
 
   const fetcherRef = useRef(fetcher);
-
   const cursorRef = useRef<
     string | undefined
-  >(undefined);
-
-  const hasMoreRef =
-    useRef(true);
-
-  const loadingMoreRef =
-    useRef(false);
-
-  const requestIdRef =
-    useRef(0);
+  >(initialCache?.cursor);
+  const hasMoreRef = useRef(
+    initialCache?.hasMore ?? true
+  );
+  const loadingMoreRef = useRef(false);
+  const requestIdRef = useRef(0);
+  const itemsRef = useRef<any[]>(
+    initialCache?.items || []
+  );
 
   fetcherRef.current = fetcher;
 
-  useEffect(() => {
-    cursorRef.current = cursor;
-  }, [cursor]);
+  const writeCache = useCallback(
+    (
+      nextItems: any[],
+      nextCursor: string | undefined,
+      nextHasMore: boolean
+    ) => {
+      if (!cacheKey) {
+        return;
+      }
 
-  useEffect(() => {
-    hasMoreRef.current = hasMore;
-  }, [hasMore]);
+      infiniteFeedCache.set(cacheKey, {
+        items: nextItems,
+        cursor: nextCursor,
+        hasMore: nextHasMore,
+        updatedAt: Date.now(),
+      });
+    },
+    [cacheKey]
+  );
+
+  const setItems: Dispatch<
+    SetStateAction<any[]>
+  > = useCallback(
+    (action) => {
+      setItemsState((previousItems) => {
+        const nextItems =
+          typeof action === "function"
+            ? action(previousItems)
+            : action;
+
+        itemsRef.current = nextItems;
+
+        writeCache(
+          nextItems,
+          cursorRef.current,
+          hasMoreRef.current
+        );
+
+        return nextItems;
+      });
+    },
+    [writeCache]
+  );
 
   const applyPage = useCallback(
     (
       page: FeedPage,
-      mode:
-        | "replace"
-        | "append"
+      mode: "replace" | "append"
     ) => {
-      const pageItems =
-        page.items || [];
+      const pageItems = page.items || [];
 
-      setItems(
-        (previousItems) =>
-          mode === "replace"
-            ? mergeWithoutDuplicates(
-                [],
-                pageItems,
-                getItemKey
-              )
-            : mergeWithoutDuplicates(
-                previousItems,
-                pageItems,
-                getItemKey
-              )
-      );
+      const nextItems =
+        mode === "replace"
+          ? mergeWithoutDuplicates(
+              [],
+              pageItems,
+              getItemKey
+            )
+          : mergeWithoutDuplicates(
+              itemsRef.current,
+              pageItems,
+              getItemKey
+            );
 
-      const nextCursor =
-        page.cursor;
-
-      setCursor(nextCursor);
-
-      cursorRef.current =
-        nextCursor;
-
+      const nextCursor = page.cursor;
       const moreAvailable =
         !!nextCursor &&
         pageItems.length > 0;
 
-      setHasMore(
+      itemsRef.current = nextItems;
+      cursorRef.current = nextCursor;
+      hasMoreRef.current = moreAvailable;
+
+      setItemsState(nextItems);
+      setCursor(nextCursor);
+      setHasMore(moreAvailable);
+
+      writeCache(
+        nextItems,
+        nextCursor,
         moreAvailable
       );
-
-      hasMoreRef.current =
-        moreAvailable;
     },
-    [getItemKey]
+    [getItemKey, writeCache]
   );
 
-  const reset =
-    useCallback(async () => {
-      const requestId =
-        ++requestIdRef.current;
+  const fetchInitialPage = useCallback(
+    async (): Promise<FeedPage> => {
+      if (!cacheKey) {
+        return fetcherRef.current(undefined);
+      }
 
-      setInitialLoading(true);
-      setError(null);
-      setHasMore(true);
+      const pending =
+        pendingInitialRequests.get(cacheKey);
 
-      hasMoreRef.current =
-        true;
+      if (pending) {
+        return pending;
+      }
+
+      const request =
+        fetcherRef.current(undefined);
+
+      pendingInitialRequests.set(
+        cacheKey,
+        request
+      );
 
       try {
-        const page =
-          await fetcherRef.current(
-            undefined
-          );
-
-        if (
-          requestId !==
-          requestIdRef.current
-        ) {
-          return;
-        }
-
-        applyPage(
-          page,
-          "replace"
-        );
-      } catch (error) {
-        if (
-          requestId !==
-          requestIdRef.current
-        ) {
-          return;
-        }
-
-        console.error(
-          "Erreur de chargement du fil :",
-          error
-        );
-
-        setError(
-          "Impossible de charger le fil pour le moment."
-        );
+        return await request;
       } finally {
-        if (
-          requestId ===
-          requestIdRef.current
-        ) {
-          setInitialLoading(
-            false
-          );
-        }
+        pendingInitialRequests.delete(cacheKey);
       }
-    }, [applyPage]);
+    },
+    [cacheKey]
+  );
 
-  const refresh =
-    useCallback(async () => {
-      const requestId =
-        ++requestIdRef.current;
+  const reset = useCallback(async () => {
+    const requestId =
+      ++requestIdRef.current;
 
-      setRefreshing(true);
-      setError(null);
+    const cached = cacheKey
+      ? infiniteFeedCache.get(cacheKey)
+      : undefined;
 
-      try {
-        const page =
-          await fetcherRef.current(
-            undefined
-          );
+    const hasCachedItems =
+      !!cached && cached.items.length > 0;
 
-        if (
-          requestId !==
-          requestIdRef.current
-        ) {
-          return;
-        }
+    setInitialLoading(!hasCachedItems);
+    setRefreshing(hasCachedItems);
+    setError(null);
 
-        applyPage(
-          page,
-          "replace"
-        );
-      } catch (error) {
-        if (
-          requestId !==
-          requestIdRef.current
-        ) {
-          return;
-        }
+    try {
+      const page = await fetchInitialPage();
 
-        console.error(
-          "Erreur de rafraîchissement du fil :",
-          error
-        );
-
-        setError(
-          "Impossible d’actualiser le fil."
-        );
-      } finally {
-        if (
-          requestId ===
-          requestIdRef.current
-        ) {
-          setRefreshing(false);
-        }
-      }
-    }, [applyPage]);
-
-  const loadMore =
-    useCallback(async () => {
       if (
-        loadingMoreRef.current ||
-        !hasMoreRef.current
+        requestId !==
+        requestIdRef.current
       ) {
         return;
       }
 
-      const currentCursor =
-        cursorRef.current;
-
-      if (!currentCursor) {
+      applyPage(page, "replace");
+    } catch (loadError) {
+      if (
+        requestId !==
+        requestIdRef.current
+      ) {
         return;
       }
 
-      loadingMoreRef.current =
-        true;
+      console.error(
+        "Erreur de chargement du fil :",
+        loadError
+      );
 
-      setLoadingMore(true);
-      setError(null);
-
-      try {
-        const page =
-          await fetcherRef.current(
-            currentCursor
-          );
-
-        applyPage(
-          page,
-          "append"
-        );
-      } catch (error) {
-        console.error(
-          "Erreur de chargement supplémentaire :",
-          error
-        );
-
+      if (!hasCachedItems) {
         setError(
-          "Impossible de charger davantage de publications."
+          "Impossible de charger le fil pour le moment."
         );
-      } finally {
-        loadingMoreRef.current =
-          false;
-
-        setLoadingMore(false);
       }
-    }, [applyPage]);
+    } finally {
+      if (
+        requestId ===
+        requestIdRef.current
+      ) {
+        setInitialLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, [
+    applyPage,
+    cacheKey,
+    fetchInitialPage,
+  ]);
+
+  const refresh = useCallback(async () => {
+    const requestId =
+      ++requestIdRef.current;
+
+    setRefreshing(true);
+    setError(null);
+
+    try {
+      const page = await fetchInitialPage();
+
+      if (
+        requestId !==
+        requestIdRef.current
+      ) {
+        return;
+      }
+
+      applyPage(page, "replace");
+    } catch (refreshError) {
+      if (
+        requestId !==
+        requestIdRef.current
+      ) {
+        return;
+      }
+
+      console.error(
+        "Erreur de rafraîchissement du fil :",
+        refreshError
+      );
+
+      if (itemsRef.current.length === 0) {
+        setError(
+          "Impossible d’actualiser le fil."
+        );
+      }
+    } finally {
+      if (
+        requestId ===
+        requestIdRef.current
+      ) {
+        setRefreshing(false);
+      }
+    }
+  }, [applyPage, fetchInitialPage]);
+
+  const loadMore = useCallback(async () => {
+    if (
+      loadingMoreRef.current ||
+      !hasMoreRef.current
+    ) {
+      return;
+    }
+
+    const currentCursor =
+      cursorRef.current;
+
+    if (!currentCursor) {
+      return;
+    }
+
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    setError(null);
+
+    try {
+      const page =
+        await fetcherRef.current(
+          currentCursor
+        );
+
+      applyPage(page, "append");
+    } catch (loadMoreError) {
+      console.error(
+        "Erreur de chargement supplémentaire :",
+        loadMoreError
+      );
+
+      setError(
+        "Impossible de charger davantage de publications."
+      );
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [applyPage]);
 
   useEffect(() => {
-    reset();
+    const cached = cacheKey
+      ? infiniteFeedCache.get(cacheKey)
+      : undefined;
+
+    if (cached) {
+      itemsRef.current = cached.items;
+      cursorRef.current = cached.cursor;
+      hasMoreRef.current = cached.hasMore;
+
+      setItemsState(cached.items);
+      setCursor(cached.cursor);
+      setHasMore(cached.hasMore);
+      setInitialLoading(false);
+
+      const cacheIsFresh =
+        Date.now() - cached.updatedAt <
+        staleTimeMs;
+
+      if (!cacheIsFresh) {
+        refresh();
+      }
+    } else {
+      reset();
+    }
 
     return () => {
       requestIdRef.current += 1;
@@ -357,12 +474,7 @@ export function useInfiniteFeed(
     items,
     setItems,
 
-    /**
-     * Compatibilité avec les pages existantes.
-     * `loading` correspond uniquement au premier chargement.
-     */
     loading: initialLoading,
-
     initialLoading,
     loadingMore,
     refreshing,
