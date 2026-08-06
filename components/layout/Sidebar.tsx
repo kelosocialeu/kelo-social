@@ -14,11 +14,15 @@ import {
   User,
   Settings,
   ShieldCheck,
+  BadgeCheck,
   PenSquare,
   LogOut,
 } from "lucide-react";
+
 import Logo from "@/components/ui/Logo";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
+import {
+  useAdminRole,
+} from "@/hooks/useAdminRole";
 
 interface SidebarProps {
   handle: string;
@@ -26,26 +30,77 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS = [
-  { href: "/feed", label: "Accueil", icon: Home },
-  { href: "/search", label: "Explorer", icon: Search },
-  { href: "/notifications", label: "Notifications", icon: Bell },
-  { href: "/messages", label: "Discussions", icon: MessageCircle },
-  { href: "/feeds", label: "Fils d'actu", icon: Hash },
-  { href: "/lists", label: "Listes", icon: ListChecks },
-  { href: "/starter-packs", label: "Kits de démarrage", icon: Rocket },
-  { href: "/bookmarks", label: "Conservés", icon: Bookmark },
-  { href: "/profile", label: "Profil", icon: User },
-  { href: "/settings", label: "Paramètres", icon: Settings },
+  {
+    href: "/feed",
+    label: "Accueil",
+    icon: Home,
+  },
+  {
+    href: "/search",
+    label: "Explorer",
+    icon: Search,
+  },
+  {
+    href: "/notifications",
+    label: "Notifications",
+    icon: Bell,
+  },
+  {
+    href: "/messages",
+    label: "Discussions",
+    icon: MessageCircle,
+  },
+  {
+    href: "/feeds",
+    label: "Fils d'actu",
+    icon: Hash,
+  },
+  {
+    href: "/lists",
+    label: "Listes",
+    icon: ListChecks,
+  },
+  {
+    href: "/starter-packs",
+    label: "Kits de démarrage",
+    icon: Rocket,
+  },
+  {
+    href: "/bookmarks",
+    label: "Conservés",
+    icon: Bookmark,
+  },
+  {
+    href: "/profile",
+    label: "Profil",
+    icon: User,
+  },
+  {
+    href: "/settings",
+    label: "Paramètres",
+    icon: Settings,
+  },
 ];
 
-function isRouteActive(pathname: string, href: string): boolean {
-  if (href === "/feed") return pathname === "/feed";
-
-  if (href === "/profile") {
-    return pathname === "/profile" || pathname.startsWith("/profile/");
+function isRouteActive(
+  pathname: string,
+  href: string
+): boolean {
+  if (href === "/feed") {
+    return pathname === "/feed";
   }
 
-  return pathname === href || pathname.startsWith(`${href}/`);
+  if (href === "/profile") {
+    return (
+      pathname === "/profile" ||
+      pathname.startsWith("/profile/")
+    );
+  }
+
+  return (
+    pathname === href ||
+    pathname.startsWith(`${href}/`)
+  );
 }
 
 export default function Sidebar({
@@ -53,44 +108,69 @@ export default function Sidebar({
   onLogout,
 }: SidebarProps) {
   const pathname = usePathname();
-  const { isAdmin } = useIsAdmin();
+
+  const {
+    isAdmin,
+    isTrustedVerifier,
+  } = useAdminRole();
 
   return (
     <aside className="sticky top-0 hidden h-screen w-72 flex-shrink-0 flex-col justify-between border-r border-kelo-border bg-white p-6 md:flex">
       <div className="min-h-0 overflow-y-auto">
         <div className="mb-8 flex items-center gap-2 px-2">
           <Logo className="h-9 w-auto" />
+
           <span className="text-lg font-extrabold text-kelo-text">
             Kelo
           </span>
         </div>
 
         <nav className="flex flex-col gap-1 text-base font-semibold text-kelo-text">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const active = isRouteActive(pathname, href);
+          {NAV_ITEMS.map(
+            ({
+              href,
+              label,
+              icon: Icon,
+            }) => {
+              const active =
+                isRouteActive(
+                  pathname,
+                  href
+                );
 
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-4 rounded-2xl p-3 transition-colors ${
-                  active
-                    ? "bg-kelo-gradient text-white"
-                    : "hover:bg-kelo-background"
-                }`}
-              >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-                <span className="truncate">{label}</span>
-              </Link>
-            );
-          })}
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  aria-current={
+                    active
+                      ? "page"
+                      : undefined
+                  }
+                  className={`flex items-center gap-4 rounded-2xl p-3 transition-colors ${
+                    active
+                      ? "bg-kelo-gradient text-white"
+                      : "hover:bg-kelo-background"
+                  }`}
+                >
+                  <Icon className="h-5 w-5 flex-shrink-0" />
+
+                  <span className="truncate">
+                    {label}
+                  </span>
+                </Link>
+              );
+            }
+          )}
 
           {isAdmin && (
             <Link
               href="/admin"
               className={`flex items-center gap-4 rounded-2xl p-3 ${
-                isRouteActive(pathname, "/admin")
+                isRouteActive(
+                  pathname,
+                  "/admin"
+                )
                   ? "bg-kelo-gradient text-white"
                   : "text-kelo-secondary hover:bg-kelo-background"
               }`}
@@ -99,6 +179,24 @@ export default function Sidebar({
               Panneau Admin
             </Link>
           )}
+
+          {!isAdmin &&
+            isTrustedVerifier && (
+              <Link
+                href="/verifier"
+                className={`flex items-center gap-4 rounded-2xl p-3 ${
+                  isRouteActive(
+                    pathname,
+                    "/verifier"
+                  )
+                    ? "bg-kelo-gradient text-white"
+                    : "text-kelo-secondary hover:bg-kelo-background"
+                }`}
+              >
+                <BadgeCheck className="h-5 w-5" />
+                Panneau certificateur
+              </Link>
+            )}
         </nav>
       </div>
 
