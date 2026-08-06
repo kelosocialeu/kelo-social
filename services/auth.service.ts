@@ -34,6 +34,11 @@ function clearCachedAgent(): void {
   cachedSessionKey = null;
 }
 
+function saveSession(session: AtpSession): void {
+  sessionStorage.set(session);
+  clearCachedAgent();
+}
+
 /**
  * Authentifie automatiquement un utilisateur auprès de son propre PDS.
  */
@@ -104,6 +109,54 @@ export async function login(
 
   sessionStorage.set(session);
 
+  cachedAgent = agent;
+  cachedSessionKey = getSessionKey(session);
+
+  return session;
+}
+
+/**
+ * Enregistre une session AT Protocol déjà authentifiée par Kelo ID.
+ * La session est validée auprès de son PDS avant d’être conservée.
+ */
+export async function loginWithKeloIdSession(
+  session: AtpSession
+): Promise<AtpSession> {
+  if (
+    !session?.accessJwt ||
+    !session?.refreshJwt ||
+    !session?.handle ||
+    !session?.did ||
+    !session?.pdsUrl
+  ) {
+    throw new AuthError("Session Kelo ID incomplète.");
+  }
+
+  const agent = createAtpAgent(session.pdsUrl);
+
+  try {
+    await agent.resumeSession({
+      accessJwt: session.accessJwt,
+      refreshJwt: session.refreshJwt,
+      active: true,
+      handle: session.handle,
+      did: session.did,
+    });
+
+    const response =
+      await agent.api.com.atproto.server.getSession();
+
+    if (response.data.did !== session.did) {
+      throw new Error("Le DID de la session ne correspond pas.");
+    }
+  } catch (error) {
+    console.error("Kelo ID session validation error:", error);
+    throw new AuthError(
+      "La session transmise par Kelo ID n’est plus valide. Reconnectez-vous à Kelo ID."
+    );
+  }
+
+  saveSession(session);
   cachedAgent = agent;
   cachedSessionKey = getSessionKey(session);
 
