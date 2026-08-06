@@ -14,9 +14,8 @@ import {
   X,
 } from "lucide-react";
 
-import Avatar from "@/components/feed/Avatar";
+import CurrentUserAvatar from "@/components/feed/CurrentUserAvatar";
 import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
-import { useAuthContext } from "@/components/providers/AuthProvider";
 import { useIdentityVerification } from "@/hooks/useIdentityVerification";
 import {
   createPost,
@@ -42,7 +41,6 @@ function revokePreviews(urls: string[]) {
 }
 
 export default function GlobalPostComposer() {
-  const { handle } = useAuthContext();
   const {
     checked,
     verified,
@@ -167,6 +165,11 @@ export default function GlobalPostComposer() {
     const start = textarea?.selectionStart ?? text.length;
     const end = textarea?.selectionEnd ?? text.length;
     const nextText = `${text.slice(0, start)}${emoji}${text.slice(end)}`;
+
+    if (characterCount(nextText) > POST_CHARACTER_LIMIT) {
+      return;
+    }
+
     setText(nextText);
     setEmojiOpen(false);
 
@@ -259,15 +262,13 @@ export default function GlobalPostComposer() {
         </header>
 
         <div className="flex gap-3 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-          <Avatar
-            fallback={(handle || "K")[0].toUpperCase()}
-            gradient
-          />
+          <CurrentUserAvatar />
 
           <div className="min-w-0 flex-1">
             <textarea
               ref={textareaRef}
               value={text}
+              maxLength={POST_CHARACTER_LIMIT}
               onChange={(event) => setText(event.target.value)}
               placeholder="Quoi de neuf ?"
               rows={6}
@@ -347,7 +348,8 @@ export default function GlobalPostComposer() {
                   type="button"
                   onClick={() => imageInputRef.current?.click()}
                   className="flex h-10 w-10 items-center justify-center rounded-full text-kelo-primary hover:bg-kelo-background"
-                  title="Ajouter une photo ou un GIF"
+                  title="Ajouter une photo"
+                  aria-label="Ajouter une photo"
                 >
                   <ImageIcon className="h-5 w-5" />
                 </button>
@@ -357,6 +359,7 @@ export default function GlobalPostComposer() {
                   onClick={() => videoInputRef.current?.click()}
                   className="flex h-10 w-10 items-center justify-center rounded-full text-kelo-primary hover:bg-kelo-background"
                   title="Ajouter une vidéo"
+                  aria-label="Ajouter une vidéo"
                 >
                   <Film className="h-5 w-5" />
                 </button>
@@ -366,6 +369,7 @@ export default function GlobalPostComposer() {
                   onClick={() => imageInputRef.current?.click()}
                   className="flex h-10 items-center gap-1 rounded-full px-2 text-xs font-bold text-kelo-primary hover:bg-kelo-background"
                   title="Ajouter un GIF"
+                  aria-label="Ajouter un GIF"
                 >
                   <FileImage className="h-5 w-5" />
                   GIF
@@ -376,6 +380,7 @@ export default function GlobalPostComposer() {
                   onClick={() => setEmojiOpen((value) => !value)}
                   className="flex h-10 w-10 items-center justify-center rounded-full text-kelo-primary hover:bg-kelo-background"
                   title="Ajouter un emoji"
+                  aria-label="Ajouter un emoji"
                 >
                   <Laugh className="h-5 w-5" />
                 </button>
@@ -398,7 +403,11 @@ export default function GlobalPostComposer() {
 
               <span
                 className={`text-sm font-bold ${
-                  overLimit ? "text-kelo-danger" : "text-kelo-muted"
+                  overLimit
+                    ? "text-kelo-danger"
+                    : count >= POST_CHARACTER_LIMIT - 30
+                      ? "text-amber-600"
+                      : "text-kelo-muted"
                 }`}
               >
                 {count}/{POST_CHARACTER_LIMIT}
