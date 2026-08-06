@@ -1,6 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -15,6 +19,7 @@ import VerificationRequiredDialog from "@/components/verification/VerificationRe
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
 import { useIdentityVerification } from "@/hooks/useIdentityVerification";
+import { useVisibleInterval } from "@/hooks/useVisibleInterval";
 
 import {
   listConversations,
@@ -23,6 +28,8 @@ import {
 } from "@/lib/atproto/chat";
 
 import { getStoredSession } from "@/services/auth.service";
+
+const CONVERSATIONS_REFRESH_MS = 15_000;
 
 export default function MessagesPage() {
   const { checked, handle } = useRequireAuth();
@@ -42,24 +49,16 @@ export default function MessagesPage() {
   } = useIdentityVerification();
 
   useEffect(() => {
-    if (!checked) {
-      return;
-    }
+    if (!checked) return;
 
     const session = getStoredSession();
-
-    if (session) {
-      setMyDid(session.did);
-    }
+    if (session) setMyDid(session.did);
   }, [checked]);
 
   const fetchConversations = useCallback(
     async (cursor?: string) => {
       if (!checked) {
-        return {
-          items: [],
-          cursor: undefined,
-        };
+        return { items: [], cursor: undefined };
       }
 
       const response = await listConversations(30, cursor);
@@ -76,16 +75,26 @@ export default function MessagesPage() {
     items: conversations,
     loading,
     loadingMore,
+    refreshing,
     hasMore,
     error,
     loadMore,
+    refresh,
   } = useInfiniteFeed(
     fetchConversations,
     [checked],
     {
+      cacheKey: "messages:conversations",
+      staleTimeMs: 10_000,
       getItemKey: (conversation: any) =>
         conversation.id,
     }
+  );
+
+  useVisibleInterval(
+    refresh,
+    CONVERSATIONS_REFRESH_MS,
+    checked
   );
 
   const handleLogout = () => {
@@ -98,15 +107,10 @@ export default function MessagesPage() {
   ) => {
     event.preventDefault();
 
-    if (!requireVerification()) {
-      return;
-    }
+    if (!requireVerification()) return;
 
     const cleanHandle = newHandle.replace(/^@/, "").trim();
-
-    if (!cleanHandle) {
-      return;
-    }
+    if (!cleanHandle) return;
 
     setStarting(true);
     setStartError(null);
@@ -114,14 +118,12 @@ export default function MessagesPage() {
     try {
       const did = await resolveHandleToDid(cleanHandle);
       const conversation = await getOrCreateConversation(did);
-
       router.push(`/messages/${conversation.id}`);
     } catch (error) {
       console.error(
         "Impossible de démarrer la conversation :",
         error
       );
-
       setStartError(
         "Impossible de trouver ou de créer cette conversation."
       );
@@ -140,21 +142,25 @@ export default function MessagesPage() {
 
   return (
     <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
-      <Sidebar
-        handle={handle}
-        onLogout={handleLogout}
-      />
+      <Sidebar handle={handle} onLogout={handleLogout} />
 
       <main className="min-h-screen min-w-0 flex-1 border-x border-kelo-border bg-white pb-20 shadow-kelo">
         <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 backdrop-blur-md">
-          <div className="px-4 py-4 sm:px-5 lg:px-6">
-            <h1 className="text-xl font-extrabold text-kelo-text sm:text-2xl">
-              Discussions
-            </h1>
+          <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-5 lg:px-6">
+            <div>
+              <h1 className="text-xl font-extrabold text-kelo-text sm:text-2xl">
+                Discussions
+              </h1>
+              <p className="mt-1 text-xs text-kelo-muted sm:text-sm">
+                Retrouvez vos conversations ou démarrez-en une nouvelle.
+              </p>
+            </div>
 
-            <p className="mt-1 text-xs text-kelo-muted sm:text-sm">
-              Retrouvez vos conversations ou démarrez-en une nouvelle.
-            </p>
+            {refreshing && conversations.length > 0 && (
+              <span className="text-xs text-kelo-muted">
+                Actualisation…
+              </span>
+            )}
           </div>
         </div>
 
@@ -184,16 +190,11 @@ export default function MessagesPage() {
                 placeholder="Démarrer une discussion avec @handle..."
                 value={newHandle}
                 onChange={(event) => {
-                  if (!requireVerification()) {
-                    return;
-                  }
-
+                  if (!requireVerification()) return;
                   setNewHandle(event.target.value);
                 }}
                 onFocus={() => {
-                  if (!verified) {
-                    requireVerification();
-                  }
+                  if (!verified) requireVerification();
                 }}
                 readOnly={!verified}
               />
@@ -224,9 +225,7 @@ export default function MessagesPage() {
                 (member: any) => member.did !== myDid
               ) || conversation.members?.[0];
 
-            const lastText =
-              conversation.lastMessage?.text || "";
-
+            const lastText = conversation.lastMessage?.text || "";
             const displayName =
               otherMember?.displayName ||
               otherMember?.handle ||
@@ -240,11 +239,7 @@ export default function MessagesPage() {
               >
                 <Avatar
                   src={otherMember?.avatar}
-                  fallback={
-                    otherMember?.handle
-                      ? otherMember.handle[0].toUpperCase()
-                      : "U"
-                  }
+                  fallback={otherMember?.handle?.[0]?.toUpperCase() || "U"}
                 />
 
                 <div className="min-w-0 flex-grow">
@@ -254,7 +249,6 @@ export default function MessagesPage() {
                         <p className="max-w-full truncate font-bold text-kelo-text">
                           {displayName}
                         </p>
-
                         <AccountBadges
                           actor={otherMember}
                           identitySize="sm"
@@ -285,37 +279,27 @@ export default function MessagesPage() {
             );
           })}
 
-          {conversations.length === 0 &&
-            !loading &&
-            !error && (
-              <div className="flex min-h-[calc(100vh-210px)] items-start justify-center px-6 py-12 sm:items-center">
-                <div className="max-w-md text-center">
-                  <div
-                    className="text-4xl"
-                    aria-hidden="true"
-                  >
-                    💬
-                  </div>
-
-                  <h2 className="mt-4 text-lg font-bold text-kelo-text">
-                    Aucune discussion
-                  </h2>
-
-                  <p className="mt-2 text-sm leading-relaxed text-kelo-muted">
-                    Entrez le handle d’un utilisateur pour démarrer votre
-                    première conversation.
-                  </p>
-                </div>
+          {conversations.length === 0 && !loading && !error && (
+            <div className="flex min-h-[calc(100vh-210px)] items-start justify-center px-6 py-12 sm:items-center">
+              <div className="max-w-md text-center">
+                <div className="text-4xl" aria-hidden="true">💬</div>
+                <h2 className="mt-4 text-lg font-bold text-kelo-text">
+                  Aucune discussion
+                </h2>
+                <p className="mt-2 text-sm leading-relaxed text-kelo-muted">
+                  Entrez le handle d’un utilisateur pour démarrer votre première conversation.
+                </p>
               </div>
-            )}
+            </div>
+          )}
 
-          {error && (
+          {error && conversations.length === 0 && (
             <p className="px-4 py-8 text-center text-sm text-kelo-danger">
               {error}
             </p>
           )}
 
-          {loading && (
+          {loading && conversations.length === 0 && (
             <div className="flex justify-center py-10">
               <img
                 src="https://kelosocial.sirv.com/logo.png"
