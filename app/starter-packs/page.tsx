@@ -13,7 +13,9 @@ import {
 } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import CreateStarterPackModal from "@/components/starter-packs/CreateStarterPackModal";
+import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { useIdentityVerification } from "@/hooks/useIdentityVerification";
 import {
   deleteStarterPack,
   getMyStarterPacks,
@@ -38,6 +40,22 @@ export default function StarterPacksPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [openMenuUri, setOpenMenuUri] = useState<string | null>(null);
   const [deletingUri, setDeletingUri] = useState<string | null>(null);
+
+  const {
+    checked: verificationChecked,
+    verified,
+    dialogOpen,
+    requireVerification,
+    closeDialog,
+  } = useIdentityVerification();
+
+  const openCreateModal = () => {
+    if (!requireVerification()) {
+      return;
+    }
+
+    setModalOpen(true);
+  };
 
   const loadPacks = useCallback(async () => {
     setLoading(true);
@@ -86,6 +104,10 @@ export default function StarterPacksPage() {
   }, [packs, searchQuery]);
 
   const handleDelete = async (pack: StarterPackView) => {
+    if (!requireVerification()) {
+      return;
+    }
+
     if (!confirm(`Supprimer « ${getPackName(pack)} » ?`)) {
       return;
     }
@@ -152,7 +174,7 @@ export default function StarterPacksPage() {
 
               <button
                 type="button"
-                onClick={() => setModalOpen(true)}
+                onClick={openCreateModal}
                 className="inline-flex items-center gap-2 rounded-full bg-kelo-gradient px-4 py-2.5 text-sm font-bold text-white"
               >
                 <Plus className="h-4 w-4" />
@@ -176,6 +198,21 @@ export default function StarterPacksPage() {
               </div>
             </div>
           </header>
+
+          {!verified && verificationChecked && (
+            <button
+              type="button"
+              onClick={requireVerification}
+              className="w-full border-b border-kelo-border bg-kelo-background px-4 py-3 text-left text-sm sm:px-5 lg:px-6"
+            >
+              <span className="font-bold text-kelo-text">
+                Vérification requise
+              </span>
+              <span className="ml-2 text-kelo-muted">
+                Vous pouvez consulter vos kits, mais vous devez être vérifié pour en créer ou en supprimer.
+              </span>
+            </button>
+          )}
 
           {loading && (
             <p className="py-10 text-center text-sm text-kelo-muted">
@@ -294,7 +331,7 @@ export default function StarterPacksPage() {
                   </p>
 
                   <button
-                    onClick={() => setModalOpen(true)}
+                    onClick={openCreateModal}
                     className="mt-5 inline-flex items-center gap-2 rounded-full bg-kelo-gradient px-5 py-3 text-sm font-bold text-white"
                   >
                     <Plus className="h-4 w-4" />
@@ -307,11 +344,16 @@ export default function StarterPacksPage() {
       </div>
 
       <CreateStarterPackModal
-        open={modalOpen}
+        open={modalOpen && verified}
         onClose={() => setModalOpen(false)}
         onCreated={(pack) =>
           setPacks((previous) => [pack, ...previous])
         }
+      />
+
+      <VerificationRequiredDialog
+        open={dialogOpen}
+        onClose={closeDialog}
       />
     </>
   );
