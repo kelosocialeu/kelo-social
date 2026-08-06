@@ -9,28 +9,45 @@ import {
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import MobileDrawer from "@/components/layout/MobileDrawer";
 import MobileHeader from "@/components/layout/MobileHeader";
+import { useAuthContext } from "@/components/providers/AuthProvider";
 
 import { useHideOnScroll } from "@/hooks/useHideOnScroll";
-import { getStoredSession } from "@/services/auth.service";
 
 interface MobileNavigationShellProps {
   children: React.ReactNode;
 }
 
-const HIDDEN_ROUTES = [
+const PUBLIC_ROUTES = [
+  "/",
   "/login",
   "/signup",
   "/register",
   "/forgot-password",
+  "/kelo-id/callback",
 ];
+
+function matchesRoute(
+  pathname: string,
+  route: string
+): boolean {
+  if (route === "/") {
+    return pathname === "/";
+  }
+
+  return (
+    pathname === route ||
+    pathname.startsWith(`${route}/`)
+  );
+}
 
 export default function MobileNavigationShell({
   children,
 }: MobileNavigationShellProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { session, checked, handle, logout } =
+    useAuthContext();
 
-  const [handle, setHandle] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
 
   const navigationHidden = useHideOnScroll({
@@ -40,8 +57,6 @@ export default function MobileNavigationShell({
   });
 
   useEffect(() => {
-    const session = getStoredSession();
-    setHandle(session?.handle || "");
     setMenuOpen(false);
   }, [pathname]);
 
@@ -58,20 +73,23 @@ export default function MobileNavigationShell({
   const isConversation =
     pathname.startsWith("/messages/");
 
-  const shouldHideNavigation =
-    isConversation ||
-    HIDDEN_ROUTES.some(
-      (route) =>
-        pathname === route ||
-        pathname.startsWith(`${route}/`)
+  const isPublicRoute =
+    PUBLIC_ROUTES.some((route) =>
+      matchesRoute(pathname, route)
     );
+
+  const shouldShowNavigation =
+    checked &&
+    !!session &&
+    !isPublicRoute &&
+    !isConversation;
 
   const handleCreatePost = () => {
     router.push("/feed?compose=true");
   };
 
   const handleLogout = () => {
-    localStorage.clear();
+    logout();
     window.location.href = "/login";
   };
 
@@ -79,15 +97,15 @@ export default function MobileNavigationShell({
     <>
       <div
         className={
-          shouldHideNavigation
-            ? ""
-            : "pb-24 pt-[calc(56px+env(safe-area-inset-top))] md:pb-0 md:pt-0"
+          shouldShowNavigation
+            ? "min-h-[100dvh] pb-[calc(6rem+env(safe-area-inset-bottom))] pt-[calc(56px+env(safe-area-inset-top))] md:pb-0 md:pt-0"
+            : "min-h-[100dvh]"
         }
       >
         {children}
       </div>
 
-      {!shouldHideNavigation && (
+      {shouldShowNavigation && (
         <>
           <MobileHeader
             onOpenMenu={() => setMenuOpen(true)}
