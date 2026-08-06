@@ -7,8 +7,10 @@ import { useParams, useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
 import AccountBadges from "@/components/ui/AccountBadges";
+import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
 
 import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { useIdentityVerification } from "@/hooks/useIdentityVerification";
 
 import {
   getConversationMessages,
@@ -31,6 +33,14 @@ export default function ConversationPage() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const {
+    checked: verificationChecked,
+    verified,
+    dialogOpen,
+    requireVerification,
+    closeDialog,
+  } = useIdentityVerification();
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -109,6 +119,10 @@ export default function ConversationPage() {
     event: React.FormEvent<HTMLFormElement>
   ) => {
     event.preventDefault();
+
+    if (!requireVerification()) {
+      return;
+    }
 
     const trimmedText = text.trim();
 
@@ -318,6 +332,19 @@ export default function ConversationPage() {
             <div ref={bottomRef} />
           </div>
 
+          {!verified && verificationChecked && (
+            <button
+              type="button"
+              onClick={requireVerification}
+              className="border-t border-kelo-border bg-kelo-background px-4 py-3 text-left text-sm text-kelo-muted sm:px-5 lg:px-6"
+            >
+              <span className="font-bold text-kelo-text">
+                Vérification requise :
+              </span>{" "}
+              vous pouvez lire cette discussion, mais pas envoyer de message.
+            </button>
+          )}
+
           <form
             onSubmit={handleSend}
             className="sticky bottom-0 border-t border-kelo-border bg-white/95 px-3 py-3 backdrop-blur-md sm:px-5 lg:px-6"
@@ -336,7 +363,7 @@ export default function ConversationPage() {
 
               <button
                 type="submit"
-                disabled={sending || !text.trim()}
+                disabled={sending || !text.trim() || !verified}
                 className="flex-shrink-0 rounded-full bg-kelo-gradient px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6"
               >
                 {sending ? "Envoi..." : "Envoyer"}
@@ -345,6 +372,11 @@ export default function ConversationPage() {
           </form>
         </section>
       </main>
+
+      <VerificationRequiredDialog
+        open={dialogOpen}
+        onClose={closeDialog}
+      />
     </div>
   );
 }
