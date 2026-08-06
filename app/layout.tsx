@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 
 import MobileNavigationShell from "@/components/layout/MobileNavigationShell";
+import BioMentionLinker from "@/components/profile/BioMentionLinker";
 import {
   AuthProvider,
 } from "@/components/providers/AuthProvider";
@@ -29,6 +30,7 @@ export default function RootLayout({
     <html lang="fr">
       <body className="bg-[#faf9f6] font-sans text-gray-900 antialiased">
         <AuthProvider>
+          <BioMentionLinker />
           <MobileNavigationShell>
             {children}
           </MobileNavigationShell>
