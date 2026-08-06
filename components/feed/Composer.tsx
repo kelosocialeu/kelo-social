@@ -12,6 +12,9 @@ import VerificationRequiredDialog from "@/components/verification/VerificationRe
 import {
   searchNetworkActors,
 } from "@/lib/atproto/search";
+import {
+  POST_CHARACTER_LIMIT,
+} from "@/lib/atproto/posts";
 
 import {
   useIdentityVerification,
@@ -44,6 +47,9 @@ export default function Composer({
 
   const [mentionResults, setMentionResults] =
     useState<any[]>([]);
+
+  const characterCount = Array.from(value).length;
+  const overLimit = characterCount > POST_CHARACTER_LIMIT;
 
   const {
     checked,
@@ -151,7 +157,7 @@ export default function Composer({
   ) => {
     event.preventDefault();
 
-    if (!requireVerification()) {
+    if (!requireVerification() || overLimit) {
       return;
     }
 
@@ -249,13 +255,24 @@ export default function Composer({
               </div>
             )}
 
-            <div className="mt-2 flex items-center justify-end border-t border-kelo-border/60 pt-2">
+            <div className="mt-2 flex items-center justify-between border-t border-kelo-border/60 pt-2">
+              <span
+                className={`text-xs font-bold ${
+                  overLimit
+                    ? "text-kelo-danger"
+                    : "text-kelo-muted"
+                }`}
+              >
+                {characterCount}/{POST_CHARACTER_LIMIT}
+              </span>
+
               <button
                 type="submit"
                 disabled={
                   loading ||
                   !value.trim() ||
-                  !verified
+                  !verified ||
+                  overLimit
                 }
                 className="rounded-full bg-kelo-gradient px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
