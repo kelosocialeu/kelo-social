@@ -21,6 +21,7 @@ import {
 
 import Logo from "@/components/ui/Logo";
 import { useAdminRole } from "@/hooks/useAdminRole";
+import { useUnreadNotifications } from "@/hooks/useUnreadNotifications";
 
 interface SidebarProps {
   handle: string;
@@ -65,6 +66,8 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const { isAdmin, isTrustedVerifier } = useAdminRole();
+  const { count: unreadNotifications } =
+    useUnreadNotifications();
 
   return (
     <aside className="sticky top-0 hidden h-screen w-72 flex-shrink-0 flex-col justify-between border-r border-kelo-border bg-white p-6 md:flex">
@@ -93,7 +96,25 @@ export default function Sidebar({
                 }`}
               >
                 <Icon className="h-5 w-5 flex-shrink-0" />
-                <span className="truncate">{label}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {label}
+                </span>
+
+                {href === "/notifications" &&
+                  unreadNotifications > 0 && (
+                    <span
+                      aria-label={`${unreadNotifications} notification(s) non lue(s)`}
+                      className={`flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-xs font-extrabold ${
+                        active
+                          ? "bg-white text-kelo-primary"
+                          : "bg-kelo-gradient text-white"
+                      }`}
+                    >
+                      {unreadNotifications > 99
+                        ? "99+"
+                        : unreadNotifications}
+                    </span>
+                  )}
               </Link>
             );
           })}
