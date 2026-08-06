@@ -55,11 +55,16 @@ export async function POST(request: Request) {
       );
     }
 
-    await publishKeloIdVerification(user);
+    await publishKeloIdVerification({
+      ...user,
+      verificationType: data.verificationType,
+    });
 
     return NextResponse.json({
       success: true,
       verified: true,
+      verificationType:
+        data.verificationType || "human",
     });
   } catch (error) {
     console.error("[kelo-id/code]", error);
