@@ -13,6 +13,7 @@ import AccountBadges from "@/components/ui/AccountBadges";
 import PostText from "@/components/feed/PostText";
 import PostEmbed from "@/components/feed/PostEmbed";
 import PostActions from "@/components/feed/PostActions";
+import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
 
 import {
   likePost,
@@ -21,6 +22,10 @@ import {
   undoRepost,
   replyToPost,
 } from "@/lib/atproto/posts";
+
+import {
+  useIdentityVerification,
+} from "@/hooks/useIdentityVerification";
 
 interface PostCardProps {
   post: any;
@@ -74,6 +79,13 @@ export default function PostCard({
   disableThreadLink,
 }: PostCardProps) {
   const router = useRouter();
+
+  const {
+    verified,
+    dialogOpen,
+    requireVerification,
+    closeDialog,
+  } = useIdentityVerification();
 
   const handle = post.author?.handle;
 
@@ -275,7 +287,19 @@ export default function PostCard({
       }
     };
 
+  const handleReplyToggle = () => {
+    if (!requireVerification()) {
+      return;
+    }
+
+    onToggleReply?.();
+  };
+
   const handleReplyAction = async () => {
+    if (!requireVerification()) {
+      return;
+    }
+
     const cleanText = replyText?.trim();
 
     if (
@@ -432,7 +456,7 @@ export default function PostCard({
             isLiked={liked}
             isReposted={reposted}
             isBookmarked={isBookmarked}
-            onReply={onToggleReply}
+            onReply={handleReplyToggle}
             onRepost={
               handleRepostAction
             }
@@ -483,6 +507,11 @@ export default function PostCard({
           )}
         </div>
       </div>
+
+      <VerificationRequiredDialog
+        open={dialogOpen}
+        onClose={closeDialog}
+      />
     </article>
   );
 }
