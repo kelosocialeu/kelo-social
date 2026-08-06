@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import {
+  clearIdentityVerificationCache,
   getIdentityVerification,
   IdentityVerificationRecord,
 } from "@/lib/atproto/identity-verifications";
@@ -48,6 +49,12 @@ export function useIdentityVerification(): IdentityVerificationState {
     setLoading(true);
 
     try {
+      /*
+       * Le statut doit refléter rapidement une validation manuelle de
+       * l’administrateur. On évite donc de conserver un ancien résultat nul.
+       */
+      clearIdentityVerificationCache(session.did);
+
       const record = await getIdentityVerification(
         session.did
       );
