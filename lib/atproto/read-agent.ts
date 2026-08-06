@@ -1,25 +1,85 @@
-import { createAppViewAgent } from "@/lib/atproto/appview";
-import { getStoredSession, resumeAgentSession } from "@/services/auth.service";
+import { AtpAgent } from "@atproto/api";
+
+import {
+  createAppViewAgent,
+} from "@/lib/atproto/appview";
+
+import {
+  getStoredSession,
+  resumeAgentSession,
+} from "@/services/auth.service";
+
+let cachedAgent: AtpAgent | null = null;
+let cachedSessionDid = "";
+let pendingAgent:
+  | Promise<AtpAgent>
+  | null = null;
+
+export function clearReadAgentCache(): void {
+  cachedAgent = null;
+  cachedSessionDid = "";
+  pendingAgent = null;
+}
 
 /**
- * Agent de lecture partagé par toute l'app (recherche, profils, fils).
- *
- * S'il existe une session valide, on l'utilise : les requêtes passent alors
- * par le PDS de l'utilisateur (proxyées vers l'AppView), ce qui évite les
- * limitations/erreurs de l'AppView public en anonyme sur certains endpoints
- * (recherche notamment).
- *
- * Sans session (ou si elle a expiré), on retombe sur l'AppView public en
- * lecture seule — jamais d'échec bloquant pour l'utilisateur.
+ * Réutilise le même agent de lecture tant que la session ne change pas.
+ * Cela évite de restaurer la session auprès du PDS à chaque requête de
+ * profil, fil, recherche, notification ou conversation.
  */
-export async function getReadAgent() {
+export async function getReadAgent(): Promise<AtpAgent> {
   const session = getStoredSession();
-  if (session) {
-    try {
-      return await resumeAgentSession(session);
-    } catch {
-      // Session invalide/expirée : on retombe sur l'AppView public.
+
+  if (!session) {
+    if (
+      cachedAgent &&
+      cachedSessionDid === "public"
+    ) {
+      return cachedAgent;
     }
+
+    const publicAgent =
+      createAppViewAgent();
+
+    cachedAgent = publicAgent;
+    cachedSessionDid = "public";
+
+    return publicAgent;
   }
-  return createAppViewAgent();
+
+  if (
+    cachedAgent &&
+    cachedSessionDid === session.did
+  ) {
+    return cachedAgent;
+  }
+
+  if (pendingAgent) {
+    return pendingAgent;
+  }
+
+  pendingAgent = resumeAgentSession(session)
+    .then((agent) => {
+      cachedAgent = agent;
+      cachedSessionDid = session.did;
+      return agent;
+    })
+    .catch((error) => {
+      console.warn(
+        "Session de lecture invalide, utilisation de l’AppView publique :",
+        error
+      );
+
+      const publicAgent =
+        createAppViewAgent();
+
+      cachedAgent = publicAgent;
+      cachedSessionDid = "public";
+
+      return publicAgent;
+    })
+    .finally(() => {
+      pendingAgent = null;
+    });
+
+  return pendingAgent;
 }
