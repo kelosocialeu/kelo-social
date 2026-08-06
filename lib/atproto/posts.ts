@@ -3,6 +3,9 @@ import { RichText } from "@atproto/api";
 import {
   getAuthenticatedAgent,
 } from "@/services/auth.service";
+import {
+  requireIdentityVerification,
+} from "@/lib/atproto/verification-guard";
 
 export interface StrongRef {
   uri: string;
@@ -12,10 +15,6 @@ export interface StrongRef {
 }
 
 export interface ReplyTarget extends StrongRef {
-  /**
-   * Référence de la publication racine.
-   * Pour une réponse directe, elle peut être identique au parent.
-   */
   root?: StrongRef;
 }
 
@@ -57,10 +56,9 @@ async function buildRichText(
   return richText;
 }
 
-/**
- * Publie un nouveau post dans le PDS du compte connecté.
- */
 export async function createPost(text: string) {
+  await requireIdentityVerification();
+
   const { agent, session } =
     await getAuthenticatedAgent();
 
@@ -89,17 +87,11 @@ export async function createPost(text: string) {
   };
 }
 
-/**
- * Répond réellement à une publication.
- *
- * `parent` représente la publication à laquelle l’utilisateur répond.
- * `root` représente le premier post du fil. Pour une réponse directe,
- * parent et root sont identiques.
- */
 export async function replyToPost(
   text: string,
   parent: ReplyTarget
 ) {
+  await requireIdentityVerification();
   validateStrongRef(parent, "Publication parente");
 
   const root: StrongRef = parent.root || {
@@ -154,11 +146,7 @@ export async function replyToPost(
   };
 }
 
-/**
- * Ajoute un like réel dans le PDS de l’utilisateur.
- *
- * Retourne l’URI du record de like, utilisée ensuite pour l’annuler.
- */
+/** Likes autorisés même avant vérification. */
 export async function likePost(
   post: StrongRef
 ): Promise<string> {
@@ -185,17 +173,11 @@ export async function likePost(
   return result.uri;
 }
 
-/**
- * Supprime un like à partir de l’URI du record de like
- * fournie dans `post.viewer.like`.
- */
 export async function unlikePost(
   likeUri: string
 ): Promise<void> {
   if (!likeUri?.startsWith("at://")) {
-    throw new Error(
-      "URI du like invalide."
-    );
+    throw new Error("URI du like invalide.");
   }
 
   const { agent, session } =
@@ -204,9 +186,7 @@ export async function unlikePost(
   const rkey = likeUri.split("/").pop();
 
   if (!rkey) {
-    throw new Error(
-      "Clé du like introuvable."
-    );
+    throw new Error("Clé du like introuvable.");
   }
 
   await agent.api.app.bsky.feed.like.delete({
@@ -215,11 +195,7 @@ export async function unlikePost(
   });
 }
 
-/**
- * Crée une republication réelle dans le PDS de l’utilisateur.
- *
- * Retourne l’URI du record de repost.
- */
+/** Republications autorisées même avant vérification. */
 export async function repostPost(
   post: StrongRef
 ): Promise<string> {
@@ -246,10 +222,6 @@ export async function repostPost(
   return result.uri;
 }
 
-/**
- * Annule une republication à partir de l’URI contenue
- * dans `post.viewer.repost`.
- */
 export async function undoRepost(
   repostUri: string
 ): Promise<void> {
@@ -276,12 +248,11 @@ export async function undoRepost(
   });
 }
 
-/**
- * Supprime une publication appartenant au compte connecté.
- */
 export async function deleteOwnPost(
   uri: string
 ): Promise<void> {
+  await requireIdentityVerification();
+
   if (!uri?.startsWith("at://")) {
     throw new Error(
       "URI de publication invalide."
