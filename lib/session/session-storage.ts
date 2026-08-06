@@ -1,6 +1,18 @@
 import { AtpSession } from "@/types/auth";
 
 const STORAGE_KEY = "kelo.session";
+const SESSION_CHANGED_EVENT =
+  "kelo-session-changed";
+
+function notifySessionChanged(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent(SESSION_CHANGED_EVENT)
+  );
+}
 
 /**
  * Abstraction de stockage de session.
@@ -20,38 +32,93 @@ export interface SessionStorage {
   clear(): void;
 }
 
-class LocalStorageSessionStorage implements SessionStorage {
+class LocalStorageSessionStorage
+  implements SessionStorage
+{
   get(): AtpSession | null {
-    if (typeof window === "undefined") return null;
+    if (typeof window === "undefined") {
+      return null;
+    }
+
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      return raw ? (JSON.parse(raw) as AtpSession) : null;
+      const raw =
+        window.localStorage.getItem(
+          STORAGE_KEY
+        );
+
+      return raw
+        ? (JSON.parse(raw) as AtpSession)
+        : null;
     } catch {
       return null;
     }
   }
 
   set(session: AtpSession): void {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(session)
+    );
 
     // Compatibilité TEMPORAIRE avec les pages pas encore migrées
     // (feed, profile, admin) qui lisent encore ces clés individuelles.
-    // À supprimer une fois toutes les pages migrées vers useAuth().
-    window.localStorage.setItem("accessJwt", session.accessJwt);
-    window.localStorage.setItem("refreshJwt", session.refreshJwt);
-    window.localStorage.setItem("userHandle", session.handle);
-    window.localStorage.setItem("userDid", session.did);
-    window.localStorage.setItem("pdsService", session.pdsUrl);
+    // À supprimer une fois toutes les pages migrées vers AuthProvider.
+    window.localStorage.setItem(
+      "accessJwt",
+      session.accessJwt
+    );
+    window.localStorage.setItem(
+      "refreshJwt",
+      session.refreshJwt
+    );
+    window.localStorage.setItem(
+      "userHandle",
+      session.handle
+    );
+    window.localStorage.setItem(
+      "userDid",
+      session.did
+    );
+    window.localStorage.setItem(
+      "pdsService",
+      session.pdsUrl
+    );
+
+    /*
+     * L'événement storage n'est pas envoyé dans l'onglet qui effectue
+     * lui-même la modification. Cet événement personnalisé permet donc
+     * à AuthProvider de récupérer immédiatement la nouvelle session avant
+     * que la page protégée ne décide de rediriger vers /login.
+     */
+    notifySessionChanged();
   }
 
   clear(): void {
-    if (typeof window === "undefined") return;
-    window.localStorage.removeItem(STORAGE_KEY);
-    ["accessJwt", "refreshJwt", "userHandle", "userDid", "pdsService"].forEach((key) =>
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.removeItem(
+      STORAGE_KEY
+    );
+
+    [
+      "accessJwt",
+      "refreshJwt",
+      "userHandle",
+      "userDid",
+      "pdsService",
+    ].forEach((key) =>
       window.localStorage.removeItem(key)
     );
+
+    notifySessionChanged();
   }
 }
 
-export const sessionStorage: SessionStorage = new LocalStorageSessionStorage();
+export const sessionStorage: SessionStorage =
+  new LocalStorageSessionStorage();
