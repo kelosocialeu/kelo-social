@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Heart,
   MessageCircle,
@@ -105,13 +106,13 @@ export default function VerificationRequiredDialog({
             Plus tard
           </button>
 
-          <button
-            type="button"
+          <Link
+            href="/verify-account"
             onClick={onClose}
-            className="w-full rounded-full bg-kelo-gradient px-5 py-3 text-sm font-bold text-white transition hover:opacity-90"
+            className="w-full rounded-full bg-kelo-gradient px-5 py-3 text-center text-sm font-bold text-white transition hover:opacity-90"
           >
-            Vérification bientôt disponible
-          </button>
+            Vérifier mon compte
+          </Link>
         </div>
       </div>
     </div>
