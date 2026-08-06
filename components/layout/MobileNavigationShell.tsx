@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import {
   usePathname,
-  useRouter,
 } from "next/navigation";
 
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import MobileDrawer from "@/components/layout/MobileDrawer";
 import MobileHeader from "@/components/layout/MobileHeader";
+import GlobalPostComposer, {
+  OPEN_GLOBAL_COMPOSER_EVENT,
+} from "@/components/feed/GlobalPostComposer";
 import { useAuthContext } from "@/components/providers/AuthProvider";
 
 import { useHideOnScroll } from "@/hooks/useHideOnScroll";
@@ -44,7 +46,6 @@ export default function MobileNavigationShell({
   children,
 }: MobileNavigationShellProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { session, checked, handle, logout } =
     useAuthContext();
 
@@ -85,7 +86,10 @@ export default function MobileNavigationShell({
     !isConversation;
 
   const handleCreatePost = () => {
-    router.push("/feed?compose=true");
+    setMenuOpen(false);
+    window.dispatchEvent(
+      new Event(OPEN_GLOBAL_COMPOSER_EVENT)
+    );
   };
 
   const handleLogout = () => {
@@ -104,6 +108,10 @@ export default function MobileNavigationShell({
       >
         {children}
       </div>
+
+      {checked && session && !isPublicRoute && (
+        <GlobalPostComposer />
+      )}
 
       {shouldShowNavigation && (
         <>
