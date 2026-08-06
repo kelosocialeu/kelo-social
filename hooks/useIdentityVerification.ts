@@ -26,22 +26,15 @@ interface IdentityVerificationState {
   closeDialog: () => void;
 }
 
-const STATUS_REFRESH_INTERVAL_MS = 30_000;
+const UNVERIFIED_REFRESH_MS = 5_000;
+const VERIFIED_REFRESH_MS = 60_000;
 
 export function useIdentityVerification(): IdentityVerificationState {
   const [verification, setVerification] =
-    useState<IdentityVerificationRecord | null>(
-      null
-    );
-
-  const [checked, setChecked] =
-    useState(false);
-
-  const [loading, setLoading] =
-    useState(false);
-
-  const [dialogOpen, setDialogOpen] =
-    useState(false);
+    useState<IdentityVerificationRecord | null>(null);
+  const [checked, setChecked] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     const session = getStoredSession();
@@ -55,18 +48,15 @@ export function useIdentityVerification(): IdentityVerificationState {
     setLoading(true);
 
     try {
-      const record =
-        await getIdentityVerification(
-          session.did
-        );
-
+      const record = await getIdentityVerification(
+        session.did
+      );
       setVerification(record);
     } catch (error) {
       console.error(
         "Impossible de vérifier le statut d’identité :",
         error
       );
-
       setVerification(null);
     } finally {
       setChecked(true);
@@ -74,29 +64,40 @@ export function useIdentityVerification(): IdentityVerificationState {
     }
   }, []);
 
-  useEffect(() => {
-    refresh();
-
-    const interval =
-      window.setInterval(() => {
-        refresh();
-      }, STATUS_REFRESH_INTERVAL_MS);
-
-    return () =>
-      window.clearInterval(interval);
-  }, [refresh]);
-
   const verified = !!verification;
 
-  const requireVerification =
-    useCallback(() => {
-      if (verified) {
-        return true;
-      }
+  useEffect(() => {
+    void refresh();
 
-      setDialogOpen(true);
-      return false;
-    }, [verified]);
+    const delay = verified
+      ? VERIFIED_REFRESH_MS
+      : UNVERIFIED_REFRESH_MS;
+
+    const runWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void refresh();
+      }
+    };
+
+    const interval = window.setInterval(
+      runWhenVisible,
+      delay
+    );
+
+    window.addEventListener("focus", runWhenVisible);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", runWhenVisible);
+    };
+  }, [refresh, verified]);
+
+  const requireVerification = useCallback(() => {
+    if (verified) return true;
+
+    setDialogOpen(true);
+    return false;
+  }, [verified]);
 
   const closeDialog = useCallback(() => {
     setDialogOpen(false);
