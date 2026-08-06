@@ -15,7 +15,9 @@ import {
 import Sidebar from "@/components/layout/Sidebar";
 import CreateListModal from "@/components/lists/CreateListModal";
 import EditListModal from "@/components/lists/EditListModal";
+import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { useIdentityVerification } from "@/hooks/useIdentityVerification";
 import {
   deleteList,
   getMyLists,
@@ -33,6 +35,31 @@ export default function ListsPage() {
   const [openMenuUri, setOpenMenuUri] = useState<string | null>(null);
   const [deletingUri, setDeletingUri] = useState<string | null>(null);
   const [editingList, setEditingList] = useState<ManagedList | null>(null);
+
+  const {
+    checked: verificationChecked,
+    verified,
+    dialogOpen,
+    requireVerification,
+    closeDialog,
+  } = useIdentityVerification();
+
+  const openCreateModal = () => {
+    if (!requireVerification()) {
+      return;
+    }
+
+    setCreateModalOpen(true);
+  };
+
+  const openEditModal = (list: ManagedList) => {
+    if (!requireVerification()) {
+      return;
+    }
+
+    setEditingList(list);
+    setOpenMenuUri(null);
+  };
 
   const loadLists = useCallback(async () => {
     setLoading(true);
@@ -100,6 +127,10 @@ export default function ListsPage() {
   };
 
   const handleDelete = async (list: ManagedList) => {
+    if (!requireVerification()) {
+      return;
+    }
+
     const confirmed = window.confirm(
       `Supprimer définitivement la liste « ${list.name} » ?`
     );
@@ -173,7 +204,7 @@ export default function ListsPage() {
 
               <button
                 type="button"
-                onClick={() => setCreateModalOpen(true)}
+                onClick={openCreateModal}
                 className="inline-flex flex-shrink-0 items-center gap-2 rounded-full bg-kelo-gradient px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
               >
                 <Plus className="h-4 w-4" />
@@ -204,6 +235,21 @@ export default function ListsPage() {
               </div>
             </div>
           </header>
+
+          {!verified && verificationChecked && (
+            <button
+              type="button"
+              onClick={requireVerification}
+              className="w-full border-b border-kelo-border bg-kelo-background px-4 py-3 text-left text-sm sm:px-5 lg:px-6"
+            >
+              <span className="font-bold text-kelo-text">
+                Vérification requise
+              </span>
+              <span className="ml-2 text-kelo-muted">
+                Vous pouvez consulter vos listes, mais vous devez être vérifié pour en créer, modifier ou supprimer.
+              </span>
+            </button>
+          )}
 
           {loading && (
             <p className="px-4 py-10 text-center text-sm text-kelo-muted">
@@ -306,8 +352,7 @@ export default function ListsPage() {
                           <button
                             type="button"
                             onClick={() => {
-                              setEditingList(list);
-                              setOpenMenuUri(null);
+                              openEditModal(list);
                             }}
                             className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-kelo-text transition hover:bg-kelo-background"
                           >
@@ -371,7 +416,7 @@ export default function ListsPage() {
 
                   <button
                     type="button"
-                    onClick={() => setCreateModalOpen(true)}
+                    onClick={openCreateModal}
                     className="mt-5 inline-flex items-center gap-2 rounded-full bg-kelo-gradient px-5 py-3 text-sm font-bold text-white transition hover:opacity-90"
                   >
                     <Plus className="h-4 w-4" />
@@ -384,16 +429,21 @@ export default function ListsPage() {
       </div>
 
       <CreateListModal
-        open={createModalOpen}
+        open={createModalOpen && verified}
         onClose={() => setCreateModalOpen(false)}
         onCreated={handleCreated}
       />
 
       <EditListModal
-        open={!!editingList}
+        open={!!editingList && verified}
         list={editingList}
         onClose={() => setEditingList(null)}
         onUpdated={handleUpdated}
+      />
+
+      <VerificationRequiredDialog
+        open={dialogOpen}
+        onClose={closeDialog}
       />
     </>
   );
