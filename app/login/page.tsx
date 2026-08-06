@@ -89,7 +89,7 @@ export default function LoginPage() {
         })
       );
       setQrMessage(
-        "Ouvrez Kelo ID sur votre téléphone, scannez ce QR et confirmez que c’est bien vous."
+        "Ouvrez Kelo ID sur votre téléphone et scannez ce QR. La connexion se fera automatiquement."
       );
 
       pollRef.current = window.setInterval(async () => {
@@ -199,6 +199,15 @@ export default function LoginPage() {
             onChange={(event) => setPassword(event.target.value)}
             placeholder="Votre mot de passe"
           />
+
+          <div className="-mt-3 flex justify-end">
+            <Link
+              href="/forgot-password"
+              className="text-sm font-semibold text-kelo-primary transition hover:underline"
+            >
+              Mot de passe oublié ?
+            </Link>
+          </div>
 
           {error && (
             <p
