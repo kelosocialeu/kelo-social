@@ -5,17 +5,27 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  FileImage,
+  Film,
+  Image as ImageIcon,
+  Laugh,
+} from "lucide-react";
 
 import Avatar from "@/components/feed/Avatar";
 import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
-
+import {
+  OPEN_GLOBAL_COMPOSER_EVENT,
+} from "@/components/feed/GlobalPostComposer";
 import {
   searchNetworkActors,
 } from "@/lib/atproto/search";
 import {
+  getActorProfile,
+} from "@/lib/atproto/profile";
+import {
   POST_CHARACTER_LIMIT,
 } from "@/lib/atproto/posts";
-
 import {
   useIdentityVerification,
 } from "@/hooks/useIdentityVerification";
@@ -31,6 +41,10 @@ interface ComposerProps {
   placeholder?: string;
 }
 
+function characterCount(value: string): number {
+  return Array.from(value).length;
+}
+
 export default function Composer({
   handle,
   value,
@@ -42,14 +56,14 @@ export default function Composer({
   const textareaRef =
     useRef<HTMLTextAreaElement>(null);
 
+  const [avatar, setAvatar] =
+    useState<string | undefined>(undefined);
+
   const [mentionQuery, setMentionQuery] =
     useState<string | null>(null);
 
   const [mentionResults, setMentionResults] =
     useState<any[]>([]);
-
-  const characterCount = Array.from(value).length;
-  const overLimit = characterCount > POST_CHARACTER_LIMIT;
 
   const {
     checked,
@@ -58,6 +72,34 @@ export default function Composer({
     requireVerification,
     closeDialog,
   } = useIdentityVerification();
+
+  const count = characterCount(value);
+  const overLimit = count > POST_CHARACTER_LIMIT;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!handle) {
+      setAvatar(undefined);
+      return;
+    }
+
+    getActorProfile(handle)
+      .then((profile) => {
+        if (!cancelled) {
+          setAvatar(profile?.avatar || undefined);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAvatar(undefined);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [handle]);
 
   useEffect(() => {
     if (
@@ -94,28 +136,17 @@ export default function Composer({
       return;
     }
 
-    const newValue =
-      event.target.value;
-
-    const cursorPosition =
-      event.target.selectionStart;
+    const newValue = event.target.value;
+    const cursorPosition = event.target.selectionStart;
 
     onChange(newValue);
 
-    const beforeCursor =
-      newValue.slice(
-        0,
-        cursorPosition
-      );
-
-    const match =
-      beforeCursor.match(
-        /@([a-zA-Z0-9._-]*)$/
-      );
-
-    setMentionQuery(
-      match ? match[1] : null
+    const beforeCursor = newValue.slice(0, cursorPosition);
+    const match = beforeCursor.match(
+      /@([a-zA-Z0-9._-]*)$/
     );
+
+    setMentionQuery(match ? match[1] : null);
   };
 
   const insertMention = (
@@ -125,15 +156,13 @@ export default function Composer({
       return;
     }
 
-    const textarea =
-      textareaRef.current;
+    const textarea = textareaRef.current;
 
     if (!textarea) {
       return;
     }
 
-    const cursorPosition =
-      textarea.selectionStart;
+    const cursorPosition = textarea.selectionStart;
 
     const before = value
       .slice(0, cursorPosition)
@@ -142,14 +171,22 @@ export default function Composer({
         `@${actorHandle} `
       );
 
-    const after =
-      value.slice(cursorPosition);
+    const after = value.slice(cursorPosition);
 
-    onChange(before + after);
+    onChange((before + after).slice(0, POST_CHARACTER_LIMIT));
     setMentionQuery(null);
     setMentionResults([]);
-
     textarea.focus();
+  };
+
+  const openGlobalComposer = () => {
+    if (!requireVerification()) {
+      return;
+    }
+
+    window.dispatchEvent(
+      new Event(OPEN_GLOBAL_COMPOSER_EVENT)
+    );
   };
 
   const handleSubmit = (
@@ -172,15 +209,16 @@ export default function Composer({
       >
         <div className="flex gap-3">
           <Avatar
+            src={avatar}
             fallback={
               handle
                 ? handle[0].toUpperCase()
                 : "K"
             }
-            gradient
+            gradient={!avatar}
           />
 
-          <div className="w-full">
+          <div className="min-w-0 w-full">
             {!verified && checked && (
               <button
                 type="button"
@@ -200,6 +238,7 @@ export default function Composer({
             <textarea
               ref={textareaRef}
               value={value}
+              maxLength={POST_CHARACTER_LIMIT}
               onChange={handleTextChange}
               onFocus={() => {
                 if (!verified) {
@@ -210,7 +249,7 @@ export default function Composer({
               placeholder={
                 verified
                   ? placeholder ||
-                    "Diffusez sur tout l'écosystème PDS... (@ pour mentionner)"
+                    "Quoi de neuf ? (@ pour mentionner)"
                   : "Vérifiez votre compte pour publier..."
               }
               rows={3}
@@ -225,24 +264,19 @@ export default function Composer({
                       key={actor.did}
                       type="button"
                       onClick={() =>
-                        insertMention(
-                          actor.handle
-                        )
+                        insertMention(actor.handle)
                       }
                       className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-kelo-background"
                     >
                       <Avatar
                         src={actor.avatar}
-                        fallback={
-                          actor.handle[0].toUpperCase()
-                        }
+                        fallback={actor.handle[0].toUpperCase()}
                         size="sm"
                       />
 
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold text-kelo-text">
-                          {actor.displayName ||
-                            actor.handle}
+                          {actor.displayName || actor.handle}
                         </p>
 
                         <p className="truncate text-xs text-kelo-muted">
@@ -255,31 +289,78 @@ export default function Composer({
               </div>
             )}
 
-            <div className="mt-2 flex items-center justify-between border-t border-kelo-border/60 pt-2">
-              <span
-                className={`text-xs font-bold ${
-                  overLimit
-                    ? "text-kelo-danger"
-                    : "text-kelo-muted"
-                }`}
-              >
-                {characterCount}/{POST_CHARACTER_LIMIT}
-              </span>
+            <div className="mt-2 flex items-center justify-between gap-3 border-t border-kelo-border/60 pt-2">
+              <div className="flex min-w-0 items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={openGlobalComposer}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-kelo-primary transition hover:bg-white"
+                  title="Ajouter une photo"
+                  aria-label="Ajouter une photo"
+                >
+                  <ImageIcon className="h-5 w-5" />
+                </button>
 
-              <button
-                type="submit"
-                disabled={
-                  loading ||
-                  !value.trim() ||
-                  !verified ||
-                  overLimit
-                }
-                className="rounded-full bg-kelo-gradient px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {loading
-                  ? "Publication..."
-                  : "Diffuser"}
-              </button>
+                <button
+                  type="button"
+                  onClick={openGlobalComposer}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-kelo-primary transition hover:bg-white"
+                  title="Ajouter une vidéo"
+                  aria-label="Ajouter une vidéo"
+                >
+                  <Film className="h-5 w-5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={openGlobalComposer}
+                  className="flex h-9 items-center gap-1 rounded-full px-2 text-xs font-extrabold text-kelo-primary transition hover:bg-white"
+                  title="Ajouter un GIF"
+                  aria-label="Ajouter un GIF"
+                >
+                  <FileImage className="h-5 w-5" />
+                  GIF
+                </button>
+
+                <button
+                  type="button"
+                  onClick={openGlobalComposer}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-kelo-primary transition hover:bg-white"
+                  title="Ajouter un emoji"
+                  aria-label="Ajouter un emoji"
+                >
+                  <Laugh className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="flex flex-shrink-0 items-center gap-3">
+                <span
+                  className={`text-sm font-bold ${
+                    overLimit
+                      ? "text-kelo-danger"
+                      : count >= POST_CHARACTER_LIMIT - 30
+                        ? "text-amber-600"
+                        : "text-kelo-muted"
+                  }`}
+                >
+                  {count}/{POST_CHARACTER_LIMIT}
+                </span>
+
+                <button
+                  type="submit"
+                  disabled={
+                    loading ||
+                    !value.trim() ||
+                    !verified ||
+                    overLimit
+                  }
+                  className="rounded-full bg-kelo-gradient px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {loading
+                    ? "Publication..."
+                    : "Publier"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
