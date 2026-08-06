@@ -15,14 +15,19 @@ function linkifyBio(element: HTMLParagraphElement) {
 
   const text = element.textContent || "";
   const fragment = document.createDocumentFragment();
+  const matches = Array.from(text.matchAll(MENTION_PATTERN));
   let lastIndex = 0;
 
-  for (const match of text.matchAll(MENTION_PATTERN)) {
+  matches.forEach((match) => {
     const fullMatch = match[0];
     const prefix = match[1] || "";
     const handle = match[2];
     const start = match.index ?? 0;
     const mentionStart = start + prefix.length;
+
+    if (!handle) {
+      return;
+    }
 
     if (mentionStart > lastIndex) {
       fragment.append(
@@ -42,7 +47,7 @@ function linkifyBio(element: HTMLParagraphElement) {
 
     fragment.append(link);
     lastIndex = start + fullMatch.length;
-  }
+  });
 
   if (lastIndex === 0) {
     element.dataset.mentionsLinked = "true";
