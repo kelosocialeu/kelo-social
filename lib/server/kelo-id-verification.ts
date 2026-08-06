@@ -2,6 +2,7 @@ import { AtpAgent } from "@atproto/api";
 
 import {
   IDENTITY_VERIFICATION_COLLECTION,
+  IdentityVerificationType,
 } from "@/lib/atproto/identity-verifications";
 
 interface BrowserSession {
@@ -10,6 +11,25 @@ interface BrowserSession {
   handle: string;
   did: string;
   pdsUrl: string;
+}
+
+const ALLOWED_VERIFICATION_TYPES: IdentityVerificationType[] = [
+  "human",
+  "enterprise",
+  "media",
+  "university",
+  "association",
+  "institution",
+];
+
+function normalizeVerificationType(
+  value: unknown
+): IdentityVerificationType {
+  return ALLOWED_VERIFICATION_TYPES.includes(
+    value as IdentityVerificationType
+  )
+    ? (value as IdentityVerificationType)
+    : "human";
 }
 
 function requiredEnv(name: string): string {
@@ -106,8 +126,12 @@ async function getAdminAgent(): Promise<{
 export async function publishKeloIdVerification(input: {
   did: string;
   handle: string;
+  verificationType?: IdentityVerificationType | string;
 }): Promise<void> {
   const admin = await getAdminAgent();
+  const verificationType = normalizeVerificationType(
+    input.verificationType
+  );
 
   await admin.agent.api.com.atproto.repo.putRecord({
     repo: admin.did,
@@ -119,7 +143,7 @@ export async function publishKeloIdVerification(input: {
         IDENTITY_VERIFICATION_COLLECTION,
       subjectDid: input.did,
       subjectHandle: input.handle,
-      verificationType: "human",
+      verificationType,
       source: "kelo-id",
       assignmentMode: "automatic",
       issuedAt: new Date().toISOString(),
