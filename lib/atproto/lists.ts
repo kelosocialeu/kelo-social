@@ -1,4 +1,5 @@
 import { getReadAgent } from "@/lib/atproto/read-agent";
+import { getIdentityVerification } from "@/lib/atproto/identity-verifications";
 import {
   getStoredSession,
   resumeAgentSession,
@@ -40,10 +41,6 @@ export interface ManagedList {
   indexedAt?: string;
 }
 
-/**
- * Listes officielles Kelo Social, toujours visibles dans les espaces
- * éditoriaux de Kelo Social.
- */
 export const KELO_CURATED_LISTS: CuratedList[] = [
   {
     uri: "at://did:plc:imrzw2qx5suox3y5pmcz5z57/app.bsky.graph.list/3mrlf2kjo6i22",
@@ -72,6 +69,16 @@ async function getWriteAgent() {
 
   if (!session) {
     throw new Error("Vous devez être connecté.");
+  }
+
+  const verification = await getIdentityVerification(
+    session.did
+  );
+
+  if (!verification) {
+    throw new Error(
+      "Vous devez être vérifié pour créer ou modifier des listes."
+    );
   }
 
   return {
@@ -111,9 +118,6 @@ function getDidFromUri(uri: string): string {
   return did;
 }
 
-/**
- * Téléverse l’image d’une liste sur le PDS du compte connecté.
- */
 async function uploadListAvatar(
   file: File
 ): Promise<unknown> {
@@ -121,9 +125,7 @@ async function uploadListAvatar(
     throw new Error("Le fichier sélectionné doit être une image.");
   }
 
-  const maximumSize = 1_000_000;
-
-  if (file.size > maximumSize) {
+  if (file.size > 1_000_000) {
     throw new Error(
       "L’image est trop lourde. Utilisez une image de moins de 1 Mo."
     );
@@ -131,7 +133,6 @@ async function uploadListAvatar(
 
   const { agent } = await getWriteAgent();
   const bytes = new Uint8Array(await file.arrayBuffer());
-
   const response = await agent.uploadBlob(bytes, {
     encoding: file.type || "image/jpeg",
   });
@@ -139,30 +140,21 @@ async function uploadListAvatar(
   return response.data.blob;
 }
 
-/**
- * Métadonnées et premiers membres d’une liste.
- */
 export async function getListInfo(uri: string) {
   const agent = await getReadAgent();
-
   const response = await agent.api.app.bsky.graph.getList({
     list: uri,
     limit: 1,
   });
-
   return response.data.list;
 }
 
-/**
- * Publications des membres d’une liste.
- */
 export async function getListFeedPosts(
   uri: string,
   limit = 25,
   cursor?: string
 ) {
   const agent = await getReadAgent();
-
   const response = await agent.api.app.bsky.feed.getListFeed({
     list: uri,
     limit,
@@ -175,9 +167,6 @@ export async function getListFeedPosts(
   };
 }
 
-/**
- * Récupère les listes publiques créées par un compte.
- */
 export async function getActorLists(
   actor: string,
   limit = 50,
@@ -187,7 +176,6 @@ export async function getActorLists(
   cursor?: string;
 }> {
   const agent = await getReadAgent();
-
   const response = await agent.api.app.bsky.graph.getLists({
     actor,
     limit,
@@ -206,9 +194,6 @@ export async function getActorLists(
   };
 }
 
-/**
- * Récupère toutes les listes de curation créées par le compte connecté.
- */
 export async function getMyLists(): Promise<ManagedList[]> {
   const session = getStoredSession();
 
@@ -225,7 +210,6 @@ export async function getMyLists(): Promise<ManagedList[]> {
       50,
       cursor
     );
-
     lists.push(...response.items);
     cursor = response.cursor;
   } while (cursor);
@@ -233,21 +217,12 @@ export async function getMyLists(): Promise<ManagedList[]> {
   return lists;
 }
 
-/**
- * Crée une liste de comptes dans le dépôt AT Protocol de l’utilisateur.
- */
 export async function createList(
   payload: CreateListPayload
-): Promise<{
-  uri: string;
-  cid: string;
-}> {
+): Promise<{ uri: string; cid: string }> {
   const name = payload.name.trim();
 
-  if (!name) {
-    throw new Error("Le nom de la liste est obligatoire.");
-  }
-
+  if (!name) throw new Error("Le nom de la liste est obligatoire.");
   if (name.length > 64) {
     throw new Error(
       "Le nom de la liste ne peut pas dépasser 64 caractères."
@@ -263,7 +238,6 @@ export async function createList(
   }
 
   const { agent, session } = await getWriteAgent();
-
   let avatar: unknown;
 
   if (payload.avatarFile) {
@@ -277,20 +251,14 @@ export async function createList(
     createdAt: new Date().toISOString(),
   };
 
-  if (description) {
-    record.description = description;
-  }
+  if (description) record.description = description;
+  if (avatar) record.avatar = avatar;
 
-  if (avatar) {
-    record.avatar = avatar;
-  }
-
-  const response =
-    await agent.api.com.atproto.repo.createRecord({
-      repo: session.did,
-      collection: LIST_COLLECTION,
-      record,
-    });
+  const response = await agent.api.com.atproto.repo.createRecord({
+    repo: session.did,
+    collection: LIST_COLLECTION,
+    record,
+  });
 
   return {
     uri: response.data.uri,
@@ -298,18 +266,12 @@ export async function createList(
   };
 }
 
-/**
- * Modifie le nom, la description ou l’image d’une liste existante.
- */
 export async function updateList(
   payload: UpdateListPayload
 ): Promise<void> {
   const name = payload.name.trim();
 
-  if (!name) {
-    throw new Error("Le nom de la liste est obligatoire.");
-  }
-
+  if (!name) throw new Error("Le nom de la liste est obligatoire.");
   if (name.length > 64) {
     throw new Error(
       "Le nom de la liste ne peut pas dépasser 64 caractères."
@@ -328,7 +290,6 @@ export async function updateList(
   }
 
   let avatar = payload.currentAvatar;
-
   if (payload.avatarFile) {
     avatar = await uploadListAvatar(payload.avatarFile);
   }
@@ -340,13 +301,8 @@ export async function updateList(
     createdAt: new Date().toISOString(),
   };
 
-  if (description) {
-    record.description = description;
-  }
-
-  if (avatar) {
-    record.avatar = avatar;
-  }
+  if (description) record.description = description;
+  if (avatar) record.avatar = avatar;
 
   await agent.api.com.atproto.repo.putRecord({
     repo: session.did,
@@ -356,12 +312,6 @@ export async function updateList(
   });
 }
 
-/**
- * Supprime une liste créée par le compte connecté.
- *
- * Les records listitem associés doivent être retirés séparément.
- * Une fonction de nettoyage des membres sera ajoutée dans l’étape suivante.
- */
 export async function deleteList(uri: string): Promise<void> {
   const ownerDid = getDidFromUri(uri);
   const rkey = getRkeyFromUri(uri);
@@ -380,16 +330,12 @@ export async function deleteList(uri: string): Promise<void> {
   });
 }
 
-/**
- * Récupère les membres d’une liste avec pagination.
- */
 export async function getListMembers(
   listUri: string,
   limit = 50,
   cursor?: string
 ) {
   const agent = await getReadAgent();
-
   const response = await agent.api.app.bsky.graph.getList({
     list: listUri,
     limit,
@@ -403,16 +349,10 @@ export async function getListMembers(
   };
 }
 
-/**
- * Ajoute un compte à une liste créée par l’utilisateur connecté.
- */
 export async function addListMember(
   listUri: string,
   subjectDid: string
-): Promise<{
-  uri: string;
-  cid: string;
-}> {
+): Promise<{ uri: string; cid: string }> {
   const listOwnerDid = getDidFromUri(listUri);
   const { agent, session } = await getWriteAgent();
 
@@ -422,17 +362,16 @@ export async function addListMember(
     );
   }
 
-  const response =
-    await agent.api.com.atproto.repo.createRecord({
-      repo: session.did,
-      collection: LIST_ITEM_COLLECTION,
-      record: {
-        $type: LIST_ITEM_COLLECTION,
-        subject: subjectDid,
-        list: listUri,
-        createdAt: new Date().toISOString(),
-      },
-    });
+  const response = await agent.api.com.atproto.repo.createRecord({
+    repo: session.did,
+    collection: LIST_ITEM_COLLECTION,
+    record: {
+      $type: LIST_ITEM_COLLECTION,
+      subject: subjectDid,
+      list: listUri,
+      createdAt: new Date().toISOString(),
+    },
+  });
 
   return {
     uri: response.data.uri,
@@ -440,9 +379,6 @@ export async function addListMember(
   };
 }
 
-/**
- * Retire un membre d’une liste à partir de l’URI du record listitem.
- */
 export async function removeListMember(
   listItemUri: string
 ): Promise<void> {
