@@ -7,6 +7,11 @@ import {
   requireIdentityVerification,
 } from "@/lib/atproto/verification-guard";
 
+export const POST_CHARACTER_LIMIT = 300;
+export const MAX_POST_IMAGES = 4;
+export const MAX_POST_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MAX_POST_VIDEO_BYTES = 50 * 1024 * 1024;
+
 export interface StrongRef {
   uri: string;
   cid: string;
@@ -16,6 +21,11 @@ export interface StrongRef {
 
 export interface ReplyTarget extends StrongRef {
   root?: StrongRef;
+}
+
+export interface PostMediaInput {
+  files?: File[];
+  altText?: string;
 }
 
 function validateStrongRef(
@@ -35,37 +45,160 @@ function validateStrongRef(
   }
 }
 
-async function buildRichText(
-  text: string,
-  agent: any
-) {
+function countCharacters(value: string): number {
+  return Array.from(value).length;
+}
+
+function validatePostText(text: string, hasMedia = false): string {
   const cleanText = text.trim();
 
-  if (!cleanText) {
+  if (!cleanText && !hasMedia) {
     throw new Error(
-      "Le texte de la publication est vide."
+      "La publication doit contenir du texte ou un média."
     );
   }
 
+  if (countCharacters(cleanText) > POST_CHARACTER_LIMIT) {
+    throw new Error(
+      `La publication ne peut pas dépasser ${POST_CHARACTER_LIMIT} caractères.`
+    );
+  }
+
+  return cleanText;
+}
+
+async function buildRichText(
+  text: string,
+  agent: any,
+  hasMedia = false
+) {
+  const cleanText = validatePostText(text, hasMedia);
   const richText = new RichText({
     text: cleanText,
   });
 
-  await richText.detectFacets(agent);
+  if (cleanText) {
+    await richText.detectFacets(agent);
+  }
 
   return richText;
 }
 
-export async function createPost(text: string) {
+function normalizeMimeType(value: string): string {
+  return value.split(";", 1)[0].trim().toLowerCase();
+}
+
+async function buildMediaEmbed(
+  agent: any,
+  media?: PostMediaInput
+): Promise<any | undefined> {
+  const files = (media?.files || []).filter(
+    (file) => file instanceof File && file.size > 0
+  );
+
+  if (files.length === 0) {
+    return undefined;
+  }
+
+  const videos = files.filter((file) =>
+    normalizeMimeType(file.type).startsWith("video/")
+  );
+  const images = files.filter((file) =>
+    normalizeMimeType(file.type).startsWith("image/")
+  );
+
+  if (videos.length > 0 && images.length > 0) {
+    throw new Error(
+      "Une publication ne peut pas mélanger une vidéo et des images."
+    );
+  }
+
+  if (videos.length > 1) {
+    throw new Error("Une seule vidéo est autorisée par publication.");
+  }
+
+  if (images.length > MAX_POST_IMAGES) {
+    throw new Error(
+      `${MAX_POST_IMAGES} images maximum par publication.`
+    );
+  }
+
+  if (videos.length === 1) {
+    const video = videos[0];
+    const mimeType = normalizeMimeType(video.type);
+
+    if (
+      !["video/mp4", "video/webm", "video/quicktime"].includes(mimeType) ||
+      video.size > MAX_POST_VIDEO_BYTES
+    ) {
+      throw new Error(
+        "La vidéo doit être au format MP4, WebM ou MOV et ne pas dépasser 50 Mo."
+      );
+    }
+
+    const uploaded = await agent.uploadBlob(
+      new Uint8Array(await video.arrayBuffer()),
+      { encoding: mimeType }
+    );
+
+    return {
+      $type: "app.bsky.embed.video",
+      video: uploaded.data.blob,
+      alt: (media?.altText || "").trim().slice(0, 1000),
+    };
+  }
+
+  const uploadedImages = await Promise.all(
+    images.map(async (image) => {
+      const mimeType = normalizeMimeType(image.type);
+
+      if (
+        ![
+          "image/jpeg",
+          "image/png",
+          "image/webp",
+          "image/gif",
+        ].includes(mimeType) ||
+        image.size > MAX_POST_IMAGE_BYTES
+      ) {
+        throw new Error(
+          "Chaque image ou GIF doit faire moins de 10 Mo et utiliser un format compatible."
+        );
+      }
+
+      const uploaded = await agent.uploadBlob(
+        new Uint8Array(await image.arrayBuffer()),
+        { encoding: mimeType }
+      );
+
+      return {
+        alt: (media?.altText || "").trim().slice(0, 1000),
+        image: uploaded.data.blob,
+      };
+    })
+  );
+
+  return {
+    $type: "app.bsky.embed.images",
+    images: uploadedImages,
+  };
+}
+
+export async function createPost(
+  text: string,
+  media?: PostMediaInput
+) {
   await requireIdentityVerification();
 
   const { agent, session } =
     await getAuthenticatedAgent();
-
+  const hasMedia = Boolean(media?.files?.length);
   const richText = await buildRichText(
     text,
-    agent
+    agent,
+    hasMedia
   );
+  const embed = await buildMediaEmbed(agent, media);
 
   const result =
     await agent.api.app.bsky.feed.post.create(
@@ -75,6 +208,7 @@ export async function createPost(text: string) {
       {
         text: richText.text,
         facets: richText.facets,
+        ...(embed ? { embed } : {}),
         createdAt: new Date().toISOString(),
       }
     );
@@ -84,6 +218,7 @@ export async function createPost(text: string) {
     cid: result.cid,
     text: richText.text,
     facets: richText.facets,
+    embed,
   };
 }
 
