@@ -17,12 +17,17 @@ export async function getNotifications(
   };
 }
 
+/**
+ * Compatible avec la version actuelle de @atproto/api : le compteur est
+ * calculé depuis les notifications récentes plutôt que via un raccourci
+ * absent de certaines versions du SDK.
+ */
 export async function getUnreadNotificationCount(): Promise<number> {
-  const agent = await getReadAgent();
-  const response =
-    await agent.api.app.bsky.notification.getUnreadCount();
+  const response = await getNotifications(50);
 
-  return response.data.count || 0;
+  return response.items.filter(
+    (notification: any) => !notification.isRead
+  ).length;
 }
 
 export async function markNotificationsSeen() {
