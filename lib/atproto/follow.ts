@@ -1,25 +1,55 @@
-import { getStoredSession, resumeAgentSession } from "@/services/auth.service";
+import {
+  getStoredSession,
+  resumeAgentSession,
+} from "@/services/auth.service";
+import {
+  requireIdentityVerification,
+} from "@/lib/atproto/verification-guard";
 
-/**
- * Suit un compte. Retourne l'URI de l'enregistrement "follow" créé — à
- * conserver pour pouvoir le supprimer plus tard (se désabonner).
- */
-export async function followActor(did: string): Promise<string> {
+export async function followActor(
+  did: string
+): Promise<string> {
+  await requireIdentityVerification();
+
   const session = getStoredSession();
-  if (!session) throw new Error("Vous devez être connecté.");
+
+  if (!session) {
+    throw new Error("Vous devez être connecté.");
+  }
+
   const agent = await resumeAgentSession(session);
-  const res = await agent.api.app.bsky.graph.follow.create(
-    { repo: session.did },
-    { subject: did, createdAt: new Date().toISOString() }
-  );
-  return res.uri;
+  const response =
+    await agent.api.app.bsky.graph.follow.create(
+      { repo: session.did },
+      {
+        subject: did,
+        createdAt: new Date().toISOString(),
+      }
+    );
+
+  return response.uri;
 }
 
-export async function unfollowActor(followUri: string): Promise<void> {
+export async function unfollowActor(
+  followUri: string
+): Promise<void> {
+  await requireIdentityVerification();
+
   const session = getStoredSession();
-  if (!session) throw new Error("Vous devez être connecté.");
+
+  if (!session) {
+    throw new Error("Vous devez être connecté.");
+  }
+
   const agent = await resumeAgentSession(session);
   const rkey = followUri.split("/").pop();
-  if (!rkey) throw new Error("URI de suivi invalide.");
-  await agent.api.app.bsky.graph.follow.delete({ repo: session.did, rkey });
+
+  if (!rkey) {
+    throw new Error("URI de suivi invalide.");
+  }
+
+  await agent.api.app.bsky.graph.follow.delete({
+    repo: session.did,
+    rkey,
+  });
 }
