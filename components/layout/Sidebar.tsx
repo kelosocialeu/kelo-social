@@ -1,7 +1,13 @@
 "use client";
 
+import {
+  useEffect,
+} from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import {
+  usePathname,
+  useRouter,
+} from "next/navigation";
 import {
   Home,
   Search,
@@ -108,11 +114,40 @@ export default function Sidebar({
   onLogout,
 }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
 
   const {
     isAdmin,
     isTrustedVerifier,
   } = useAdminRole();
+
+  useEffect(() => {
+    const routes = NAV_ITEMS.map(
+      (item) => item.href
+    );
+
+    if (isAdmin) {
+      routes.push("/admin");
+    } else if (isTrustedVerifier) {
+      routes.push("/verifier");
+    }
+
+    const timeout = window.setTimeout(
+      () => {
+        routes.forEach((route) => {
+          router.prefetch(route);
+        });
+      },
+      250
+    );
+
+    return () =>
+      window.clearTimeout(timeout);
+  }, [
+    isAdmin,
+    isTrustedVerifier,
+    router,
+  ]);
 
   return (
     <aside className="sticky top-0 hidden h-screen w-72 flex-shrink-0 flex-col justify-between border-r border-kelo-border bg-white p-6 md:flex">
@@ -142,10 +177,17 @@ export default function Sidebar({
                 <Link
                   key={href}
                   href={href}
+                  prefetch
                   aria-current={
                     active
                       ? "page"
                       : undefined
+                  }
+                  onMouseEnter={() =>
+                    router.prefetch(href)
+                  }
+                  onFocus={() =>
+                    router.prefetch(href)
                   }
                   className={`flex items-center gap-4 rounded-2xl p-3 transition-colors ${
                     active
@@ -166,6 +208,10 @@ export default function Sidebar({
           {isAdmin && (
             <Link
               href="/admin"
+              prefetch
+              onMouseEnter={() =>
+                router.prefetch("/admin")
+              }
               className={`flex items-center gap-4 rounded-2xl p-3 ${
                 isRouteActive(
                   pathname,
@@ -184,6 +230,12 @@ export default function Sidebar({
             isTrustedVerifier && (
               <Link
                 href="/verifier"
+                prefetch
+                onMouseEnter={() =>
+                  router.prefetch(
+                    "/verifier"
+                  )
+                }
                 className={`flex items-center gap-4 rounded-2xl p-3 ${
                   isRouteActive(
                     pathname,
@@ -203,6 +255,7 @@ export default function Sidebar({
       <div className="border-t border-kelo-border pt-4">
         <Link
           href="/feed"
+          prefetch
           className="mb-4 flex w-full items-center justify-center gap-2 rounded-full bg-kelo-gradient py-3 font-bold text-white"
         >
           <PenSquare className="h-4 w-4" />
