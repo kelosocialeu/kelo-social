@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
 
 import Button from "@/components/ui/Button";
-
+import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
+import {
+  useIdentityVerification,
+} from "@/hooks/useIdentityVerification";
 import {
   followActor,
   unfollowActor,
@@ -22,9 +28,15 @@ export default function FollowButton({
     useState<string | null>(
       initialFollowingUri || null
     );
-
   const [loading, setLoading] =
     useState(false);
+
+  const {
+    verified,
+    dialogOpen,
+    requireVerification,
+    closeDialog,
+  } = useIdentityVerification();
 
   useEffect(() => {
     setFollowingUri(
@@ -33,7 +45,9 @@ export default function FollowButton({
   }, [initialFollowingUri, did]);
 
   const handleClick = async () => {
-    if (loading) {
+    if (loading) return;
+
+    if (!requireVerification()) {
       return;
     }
 
@@ -42,10 +56,6 @@ export default function FollowButton({
 
     setLoading(true);
 
-    /*
-     * Mise à jour optimiste :
-     * le bouton réagit immédiatement.
-     */
     if (previousFollowingUri) {
       setFollowingUri(null);
     }
@@ -74,7 +84,9 @@ export default function FollowButton({
       );
 
       alert(
-        "Impossible de modifier cet abonnement pour le moment."
+        error instanceof Error
+          ? error.message
+          : "Impossible de modifier cet abonnement pour le moment."
       );
     } finally {
       setLoading(false);
@@ -82,21 +94,33 @@ export default function FollowButton({
   };
 
   return (
-    <Button
-      type="button"
-      variant={
-        followingUri
-          ? "secondary"
-          : "primary"
-      }
-      onClick={handleClick}
-      loading={loading}
-      loadingText="Mise à jour..."
-      className="w-auto px-6"
-    >
-      {followingUri
-        ? "Abonné"
-        : "Suivre"}
-    </Button>
+    <>
+      <Button
+        type="button"
+        variant={
+          followingUri
+            ? "secondary"
+            : "primary"
+        }
+        onClick={handleClick}
+        loading={loading}
+        loadingText="Mise à jour..."
+        className="w-auto px-6"
+        title={
+          verified
+            ? undefined
+            : "Vérification requise"
+        }
+      >
+        {followingUri
+          ? "Abonné"
+          : "Suivre"}
+      </Button>
+
+      <VerificationRequiredDialog
+        open={dialogOpen}
+        onClose={closeDialog}
+      />
+    </>
   );
 }
