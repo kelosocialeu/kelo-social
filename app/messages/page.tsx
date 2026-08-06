@@ -10,9 +10,11 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import AccountBadges from "@/components/ui/AccountBadges";
 import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
+import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
 
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
+import { useIdentityVerification } from "@/hooks/useIdentityVerification";
 
 import {
   listConversations,
@@ -30,6 +32,14 @@ export default function MessagesPage() {
   const [newHandle, setNewHandle] = useState("");
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+
+  const {
+    checked: verificationChecked,
+    verified,
+    dialogOpen,
+    requireVerification,
+    closeDialog,
+  } = useIdentityVerification();
 
   useEffect(() => {
     if (!checked) {
@@ -88,6 +98,10 @@ export default function MessagesPage() {
   ) => {
     event.preventDefault();
 
+    if (!requireVerification()) {
+      return;
+    }
+
     const cleanHandle = newHandle.replace(/^@/, "").trim();
 
     if (!cleanHandle) {
@@ -144,6 +158,21 @@ export default function MessagesPage() {
           </div>
         </div>
 
+        {!verified && verificationChecked && (
+          <button
+            type="button"
+            onClick={requireVerification}
+            className="w-full border-b border-kelo-border bg-kelo-background px-4 py-3 text-left text-sm sm:px-5 lg:px-6"
+          >
+            <span className="font-bold text-kelo-text">
+              Vérification requise
+            </span>
+            <span className="ml-2 text-kelo-muted">
+              Vous pouvez lire vos discussions, mais pas en démarrer une nouvelle.
+            </span>
+          </button>
+        )}
+
         <form
           onSubmit={handleStartConversation}
           className="border-b border-kelo-border px-4 py-4 sm:px-5 lg:px-6"
@@ -154,9 +183,19 @@ export default function MessagesPage() {
                 type="text"
                 placeholder="Démarrer une discussion avec @handle..."
                 value={newHandle}
-                onChange={(event) =>
-                  setNewHandle(event.target.value)
-                }
+                onChange={(event) => {
+                  if (!requireVerification()) {
+                    return;
+                  }
+
+                  setNewHandle(event.target.value);
+                }}
+                onFocus={() => {
+                  if (!verified) {
+                    requireVerification();
+                  }
+                }}
+                readOnly={!verified}
               />
             </div>
 
@@ -164,6 +203,7 @@ export default function MessagesPage() {
               type="submit"
               loading={starting}
               loadingText="..."
+              disabled={!verified}
               className="w-full px-6 sm:w-auto"
             >
               Aller
@@ -291,6 +331,11 @@ export default function MessagesPage() {
           />
         </div>
       </main>
+
+      <VerificationRequiredDialog
+        open={dialogOpen}
+        onClose={closeDialog}
+      />
     </div>
   );
 }
