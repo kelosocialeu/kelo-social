@@ -220,7 +220,6 @@ export default function FeedPage() {
     }
   };
 
-
   const removeAuthorPosts = (authorDid?: string) => {
     if (!authorDid) {
       return;
@@ -258,14 +257,14 @@ export default function FeedPage() {
   const displayedPosts = isSearching ? searchPosts ?? [] : posts;
 
   return (
-    <div className="min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
-      <div className="flex min-h-screen w-full">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-kelo-background font-sans text-kelo-text">
+      <div className="flex min-h-screen w-full max-w-full overflow-x-hidden">
         <Sidebar handle={handle} onLogout={handleLogout} />
 
-        <main className="min-h-screen min-w-0 flex-1 border-x border-kelo-border bg-white pb-20 shadow-kelo">
-          <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 backdrop-blur-md">
+        <main className="min-h-screen w-screen max-w-[100vw] min-w-0 flex-none overflow-x-hidden border-x border-kelo-border bg-white pb-20 shadow-kelo md:w-auto md:max-w-none md:flex-1">
+          <div className="sticky top-0 z-10 w-full max-w-full overflow-x-hidden border-b border-kelo-border bg-white/90 backdrop-blur-md">
             <div className="p-4">
-              <h2 className="text-xl font-extrabold text-kelo-text">
+              <h2 className="break-words text-xl font-extrabold text-kelo-text">
                 {isSearching
                   ? `Résultats pour « ${searchQuery} »`
                   : "Fil Fédéré Global"}
@@ -273,7 +272,7 @@ export default function FeedPage() {
             </div>
 
             {!isSearching && (
-              <div className="flex w-full border-t border-kelo-border text-sm">
+              <div className="flex w-full min-w-0 border-t border-kelo-border text-sm">
                 {(
                   [
                     ["pourvous", "🔥 Pour vous"],
@@ -283,7 +282,7 @@ export default function FeedPage() {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`flex-1 py-3 text-center font-bold transition-colors ${
+                    className={`min-w-0 flex-1 py-3 text-center font-bold transition-colors ${
                       activeTab === tab
                         ? "border-b-4 border-kelo-primary text-kelo-text"
                         : "text-kelo-muted hover:bg-kelo-background"
@@ -306,7 +305,7 @@ export default function FeedPage() {
             />
           )}
 
-          <div className="divide-y divide-kelo-border">
+          <div className="w-full max-w-full divide-y divide-kelo-border overflow-x-hidden">
             {searching && isSearching && (
               <p className="py-6 text-center text-sm text-kelo-muted">
                 Recherche en cours...
