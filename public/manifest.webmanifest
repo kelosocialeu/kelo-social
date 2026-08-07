@@ -5,7 +5,7 @@
   "description": "Le réseau social européen décentralisé propulsé par AT Protocol",
   "lang": "fr",
   "dir": "ltr",
-  "start_url": "/",
+  "start_url": "/feed",
   "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
