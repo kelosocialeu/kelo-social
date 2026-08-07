@@ -5,6 +5,7 @@ import type {
 } from "next";
 
 import MobileNavigationShell from "@/components/layout/MobileNavigationShell";
+import MobileOrientationLock from "@/components/layout/MobileOrientationLock";
 import BioMentionLinker from "@/components/profile/BioMentionLinker";
 import {
   AuthProvider,
@@ -69,6 +70,7 @@ export default function RootLayout({
     <html lang="fr">
       <body className="min-h-[100dvh] overflow-x-hidden bg-[#faf9f6] font-sans text-gray-900 antialiased">
         <AuthProvider>
+          <MobileOrientationLock />
           <BioMentionLinker />
           <MobileNavigationShell>
             {children}
