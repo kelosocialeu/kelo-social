@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -11,12 +11,18 @@ import type { AtpSession } from "@/types/auth";
 export default function KeloIdCallbackClient() {
   const searchParams = useSearchParams();
   const { refreshSession } = useAuthContext();
+  const startedRef = useRef(false);
   const [message, setMessage] = useState(
     "Finalisation de la connexion Kelo ID..."
   );
   const [error, setError] = useState("");
 
   useEffect(() => {
+    // Le callback peut être réévalué pendant l'hydratation ou après une mise
+    // à jour du contexte. Une connexion QR ne doit être finalisée qu'une fois.
+    if (startedRef.current) return;
+    startedRef.current = true;
+
     const id = searchParams.get("id") || "";
     const clientState = searchParams.get("clientState") || "";
 
@@ -33,7 +39,10 @@ export default function KeloIdCallbackClient() {
           `/api/kelo-id/login/qr/status?id=${encodeURIComponent(
             id
           )}&clientState=${encodeURIComponent(clientState)}`,
-          { cache: "no-store" }
+          {
+            cache: "no-store",
+            headers: { "x-kelo-callback": "1" },
+          }
         );
         const data = await response.json();
 
@@ -58,9 +67,6 @@ export default function KeloIdCallbackClient() {
         refreshSession();
 
         if (!cancelled) {
-          // Navigation franche : AuthProvider redémarre avec la session qui
-          // vient d'être persistée et aucune ancienne page de callback ne
-          // peut rester affichée dans l'historique mobile.
           window.location.replace("/feed");
         }
       } catch (callbackError) {
@@ -99,7 +105,7 @@ export default function KeloIdCallbackClient() {
             href="/login"
             className="mt-5 inline-block rounded-full bg-kelo-gradient px-6 py-3 font-bold text-white"
           >
-            Retour à la connexion
+            Générer une nouvelle connexion
           </Link>
         </>
       )}
