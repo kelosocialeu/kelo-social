@@ -6,6 +6,7 @@ import type {
 
 import MobileNavigationShell from "@/components/layout/MobileNavigationShell";
 import MobileOrientationLock from "@/components/layout/MobileOrientationLock";
+import DisplayPreferencesBootstrap from "@/components/layout/DisplayPreferencesBootstrap";
 import BioMentionLinker from "@/components/profile/BioMentionLinker";
 import ProfileEditBridge from "@/components/profile/ProfileEditBridge";
 import {
@@ -74,6 +75,7 @@ export default function RootLayout({
     <html lang="fr">
       <body className="min-h-[100dvh] overflow-x-hidden bg-[#faf9f6] font-sans text-gray-900 antialiased">
         <AuthProvider>
+          <DisplayPreferencesBootstrap />
           <MobileOrientationLock />
           <BioMentionLinker />
           <ProfileEditBridge />
