@@ -230,7 +230,7 @@ export default function Composer({
                 </span>
 
                 <span className="mt-1 block text-xs text-kelo-muted">
-                  Vous devez être vérifié pour publier.
+                  Touchez le compositeur ou un outil pour vérifier votre compte.
                 </span>
               </button>
             )}
@@ -245,15 +245,10 @@ export default function Composer({
                   requireVerification();
                 }
               }}
-              readOnly={!verified}
-              placeholder={
-                verified
-                  ? placeholder ||
-                    "Quoi de neuf ? (@ pour mentionner)"
-                  : "Vérifiez votre compte pour publier..."
-              }
+              aria-disabled={!verified}
+              placeholder={placeholder || "Quoi de neuf ?"}
               rows={3}
-              className="w-full resize-none bg-transparent text-base text-kelo-text placeholder-kelo-muted focus:outline-none read-only:cursor-not-allowed read-only:opacity-60"
+              className="w-full resize-none bg-transparent text-base text-kelo-text placeholder-kelo-muted focus:outline-none"
             />
 
             {mentionResults.length > 0 && (
