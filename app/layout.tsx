@@ -30,6 +30,9 @@ export const metadata: Metadata = {
     title: APP_NAME,
     statusBarStyle: "default",
   },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
   formatDetection: {
     telephone: false,
   },
