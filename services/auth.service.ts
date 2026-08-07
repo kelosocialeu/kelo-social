@@ -19,6 +19,7 @@ export class AuthError extends Error {
 
 let cachedAgent: ReturnType<typeof createAtpAgent> | null = null;
 let cachedSessionKey: string | null = null;
+let pendingSessionRefresh: Promise<AtpSession> | null = null;
 
 function getSessionKey(session: AtpSession): string {
   return [
@@ -37,6 +38,85 @@ function clearCachedAgent(): void {
 function saveSession(session: AtpSession): void {
   sessionStorage.set(session);
   clearCachedAgent();
+}
+
+function normalizePdsUrl(value: string): string {
+  return value.trim().replace(/\/$/, "");
+}
+
+async function refreshAtProtocolSession(
+  session: AtpSession
+): Promise<AtpSession> {
+  if (pendingSessionRefresh) {
+    return pendingSessionRefresh;
+  }
+
+  pendingSessionRefresh = (async () => {
+    if (!session.refreshJwt) {
+      throw new AuthError(
+        "Votre session ne peut pas être renouvelée. Veuillez vous reconnecter."
+      );
+    }
+
+    const response = await fetch(
+      `${normalizePdsUrl(session.pdsUrl)}/xrpc/com.atproto.server.refreshSession`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.refreshJwt}`,
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      throw new AuthError(
+        "Votre session a expiré. Veuillez vous reconnecter."
+      );
+    }
+
+    const data = (await response.json()) as Partial<AtpSession> & {
+      accessJwt?: string;
+      refreshJwt?: string;
+      handle?: string;
+      did?: string;
+    };
+
+    if (
+      !data.accessJwt ||
+      !data.refreshJwt ||
+      !data.handle ||
+      !data.did
+    ) {
+      throw new AuthError(
+        "Le PDS a retourné une session incomplète."
+      );
+    }
+
+    if (data.did !== session.did) {
+      throw new AuthError(
+        "La session renouvelée ne correspond pas au compte connecté."
+      );
+    }
+
+    const refreshedSession: AtpSession = {
+      accessJwt: data.accessJwt,
+      refreshJwt: data.refreshJwt,
+      handle: data.handle,
+      did: data.did,
+      pdsUrl: session.pdsUrl,
+    };
+
+    saveSession(refreshedSession);
+    return refreshedSession;
+  })();
+
+  try {
+    return await pendingSessionRefresh;
+  } finally {
+    pendingSessionRefresh = null;
+  }
 }
 
 /**
@@ -180,10 +260,7 @@ export function getStoredSession(): AtpSession | null {
 
 /**
  * Retourne un agent authentifié réutilisable.
- *
- * L’agent n’est reconstruit qu’en cas de changement de session,
- * de PDS ou de jeton. Cela évite de recréer un agent à chaque like,
- * repost, réponse ou changement de page.
+ * Renouvelle silencieusement le jeton d'accès lorsqu'il a expiré.
  */
 export async function resumeAgentSession(
   session: AtpSession
@@ -197,34 +274,54 @@ export async function resumeAgentSession(
     return cachedAgent;
   }
 
-  const agent = createAtpAgent(session.pdsUrl);
+  const resume = async (activeSession: AtpSession) => {
+    const agent = createAtpAgent(activeSession.pdsUrl);
+
+    await agent.resumeSession({
+      accessJwt: activeSession.accessJwt,
+      refreshJwt: activeSession.refreshJwt,
+      active: true,
+      handle: activeSession.handle,
+      did: activeSession.did,
+    });
+
+    await agent.api.com.atproto.server.getSession();
+
+    cachedAgent = agent;
+    cachedSessionKey = getSessionKey(activeSession);
+
+    return agent;
+  };
 
   try {
-    await agent.resumeSession({
-      accessJwt: session.accessJwt,
-      refreshJwt: session.refreshJwt,
-      active: true,
-      handle: session.handle,
-      did: session.did,
-    });
-  } catch (error) {
-    console.error(
-      "AT Protocol session resume error:",
-      error
+    return await resume(session);
+  } catch (firstError) {
+    console.info(
+      "AT Protocol access token expired, refreshing session.",
+      firstError
     );
 
-    clearCachedAgent();
-    sessionStorage.clear();
+    try {
+      const refreshedSession =
+        await refreshAtProtocolSession(session);
 
-    throw new AuthError(
-      "Votre session a expiré. Veuillez vous reconnecter."
-    );
+      return await resume(refreshedSession);
+    } catch (refreshError) {
+      console.error(
+        "AT Protocol session refresh error:",
+        refreshError
+      );
+
+      clearCachedAgent();
+      sessionStorage.clear();
+
+      throw refreshError instanceof AuthError
+        ? refreshError
+        : new AuthError(
+            "Votre session a expiré. Veuillez vous reconnecter."
+          );
+    }
   }
-
-  cachedAgent = agent;
-  cachedSessionKey = sessionKey;
-
-  return agent;
 }
 
 /**
@@ -240,10 +337,11 @@ export async function getAuthenticatedAgent() {
   }
 
   const agent = await resumeAgentSession(session);
+  const currentSession = getStoredSession() || session;
 
   return {
     agent,
-    session,
+    session: currentSession,
   };
 }
 
