@@ -4,6 +4,7 @@ import {
   Bell,
   ChevronRight,
   Eye,
+  Globe2,
   Palette,
   Shield,
   SlidersHorizontal,
@@ -12,6 +13,7 @@ import {
 
 export type SettingsSection =
   | "account"
+  | "identity"
   | "moderation"
   | "appearance"
   | "notifications"
@@ -39,8 +41,14 @@ const GROUPS: Array<{
       {
         key: "account",
         label: "Compte et sécurité",
-        description: "Compte AT Protocol, sessions et sécurité",
+        description: "Email, mot de passe et accès aux applications",
         icon: UserRound,
+      },
+      {
+        key: "identity",
+        label: "Identité et domaine",
+        description: "Handle AT Protocol, DID et domaine personnalisé",
+        icon: Globe2,
       },
       {
         key: "privacy",
@@ -55,8 +63,8 @@ const GROUPS: Array<{
     items: [
       {
         key: "appearance",
-        label: "Apparence",
-        description: "Thème, texte et confort de lecture",
+        label: "Affichage",
+        description: "Thème, taille du texte et animations",
         icon: Palette,
       },
       {
