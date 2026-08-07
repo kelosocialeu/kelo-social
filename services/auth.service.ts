@@ -204,7 +204,7 @@ export async function login(
 
 /**
  * Enregistre une session AT Protocol déjà authentifiée par Kelo ID.
- * La session est validée auprès de son PDS avant d’être conservée.
+ * Elle est vérifiée puis renouvelée automatiquement si nécessaire.
  */
 export async function loginWithKeloIdSession(
   session: AtpSession
@@ -219,35 +219,39 @@ export async function loginWithKeloIdSession(
     throw new AuthError("Session Kelo ID incomplète.");
   }
 
-  const agent = createAtpAgent(session.pdsUrl);
+  // On conserve d'abord la session reçue du backend Kelo Social afin que
+  // le renouvellement silencieux puisse la remplacer sans perdre le QR.
+  saveSession(session);
 
   try {
-    await agent.resumeSession({
-      accessJwt: session.accessJwt,
-      refreshJwt: session.refreshJwt,
-      active: true,
-      handle: session.handle,
-      did: session.did,
-    });
+    await resumeAgentSession(session);
 
-    const response =
-      await agent.api.com.atproto.server.getSession();
+    const currentSession = getStoredSession();
 
-    if (response.data.did !== session.did) {
-      throw new Error("Le DID de la session ne correspond pas.");
+    if (!currentSession) {
+      throw new AuthError(
+        "La session Kelo ID n’a pas pu être enregistrée."
+      );
     }
+
+    if (currentSession.did !== session.did) {
+      throw new AuthError(
+        "La session Kelo ID ne correspond pas au compte confirmé."
+      );
+    }
+
+    return currentSession;
   } catch (error) {
     console.error("Kelo ID session validation error:", error);
+
+    if (error instanceof AuthError) {
+      throw error;
+    }
+
     throw new AuthError(
-      "La session transmise par Kelo ID n’est plus valide. Reconnectez-vous à Kelo ID."
+      "La session transmise par Kelo ID ne peut pas être validée. Scannez un nouveau QR."
     );
   }
-
-  saveSession(session);
-  cachedAgent = agent;
-  cachedSessionKey = getSessionKey(session);
-
-  return session;
 }
 
 /**
@@ -329,8 +333,6 @@ export async function resumeAgentSession(
         throw refreshError;
       }
 
-      // Réseau indisponible, timeout, DNS, etc. : on conserve le refreshJwt
-      // pour pouvoir restaurer la session au prochain accès réseau.
       throw new AuthError(
         "Connexion temporairement impossible avec votre PDS. Votre session est conservée."
       );
@@ -340,8 +342,6 @@ export async function resumeAgentSession(
 
 /**
  * Restaure silencieusement une session persistante au démarrage de la PWA.
- * Si le réseau est momentanément indisponible, le compte reste localement
- * connecté afin de ne pas demander inutilement le mot de passe.
  */
 export async function restoreStoredSession(): Promise<AtpSession | null> {
   const stored = getStoredSession();
