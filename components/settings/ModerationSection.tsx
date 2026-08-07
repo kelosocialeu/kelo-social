@@ -18,6 +18,10 @@ import {
   LabelVisibility,
   MutedWordEntry,
 } from "@/lib/atproto/preferences";
+import {
+  updateCachedContentSafetyPref,
+  type SafetyLabel,
+} from "@/lib/atproto/content-safety";
 import { listMutedAccounts, unmuteActor, listBlockedAccounts, unblockActor } from "@/lib/atproto/moderation";
 
 export default function ModerationSection() {
@@ -66,6 +70,9 @@ export default function ModerationSection() {
 
   const handleLabelChange = async (label: string, visibility: LabelVisibility) => {
     setLabelPrefs((prev) => ({ ...prev, [label]: visibility }));
+    if (["nudity", "sexual", "graphic-media", "spam"].includes(label)) {
+      updateCachedContentSafetyPref(label as SafetyLabel, visibility);
+    }
     try {
       await setContentLabelVisibility(label, visibility);
     } catch (err) {
@@ -120,7 +127,6 @@ export default function ModerationSection() {
 
   return (
     <div className="flex flex-col gap-8 p-6">
-      {/* Contenu sensible */}
       <section>
         <h3 className="mb-3 text-base font-extrabold text-kelo-text">Filtres de contenu</h3>
 
@@ -155,7 +161,6 @@ export default function ModerationSection() {
         </div>
       </section>
 
-      {/* Mots-clés masqués */}
       <section className="border-t border-kelo-border pt-6">
         <h3 className="mb-3 text-base font-extrabold text-kelo-text">Mots-clés et expressions masqués</h3>
         <div className="mb-3 flex gap-2">
@@ -187,7 +192,6 @@ export default function ModerationSection() {
         </div>
       </section>
 
-      {/* Comptes masqués */}
       <section className="border-t border-kelo-border pt-6">
         <h3 className="mb-3 text-base font-extrabold text-kelo-text">Comptes masqués</h3>
         <div className="divide-y divide-kelo-border overflow-hidden rounded-2xl border border-kelo-border">
@@ -212,7 +216,6 @@ export default function ModerationSection() {
         </div>
       </section>
 
-      {/* Comptes bloqués */}
       <section className="border-t border-kelo-border pt-6">
         <h3 className="mb-3 text-base font-extrabold text-kelo-text">Comptes bloqués</h3>
         <div className="divide-y divide-kelo-border overflow-hidden rounded-2xl border border-kelo-border">
