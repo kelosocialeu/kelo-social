@@ -20,6 +20,29 @@ interface LoginChallenge {
   qrPayload: string;
 }
 
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timeout);
+        reject(error);
+      }
+    );
+  });
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { refreshSession } = useAuthContext();
@@ -31,6 +54,7 @@ export default function LoginPage() {
   const [qrLoading, setQrLoading] = useState(false);
   const [qrMessage, setQrMessage] = useState("");
   const pollRef = useRef<number | null>(null);
+  const completingRef = useRef(false);
 
   const { login, loading, error } = useAuth();
 
@@ -56,8 +80,43 @@ export default function LoginPage() {
     });
   };
 
+  async function completeQrLogin(session: AtpSession) {
+    if (completingRef.current) {
+      return;
+    }
+
+    completingRef.current = true;
+    stopPolling();
+    setQrLoading(true);
+    setQrMessage("Connexion confirmée. Ouverture de Kelo Social...");
+
+    try {
+      await withTimeout(
+        loginWithKeloIdSession(session),
+        15_000,
+        "La validation de la session prend trop de temps. Générez un nouveau QR et réessayez."
+      );
+
+      refreshSession();
+
+      // Navigation complète volontaire : elle garantit que toute l'application
+      // redémarre avec la session AT Protocol fraîchement enregistrée.
+      window.location.replace("/feed");
+    } catch (loginError) {
+      console.error("Kelo ID QR session import error:", loginError);
+      completingRef.current = false;
+      setQrLoading(false);
+      setQrMessage(
+        loginError instanceof Error
+          ? loginError.message
+          : "La connexion Kelo ID n’a pas pu être finalisée. Générez un nouveau QR."
+      );
+    }
+  }
+
   async function startKeloIdLogin() {
     stopPolling();
+    completingRef.current = false;
     setQrLoading(true);
     setQrMessage("");
     setChallenge(null);
@@ -93,6 +152,10 @@ export default function LoginPage() {
       );
 
       pollRef.current = window.setInterval(async () => {
+        if (completingRef.current) {
+          return;
+        }
+
         try {
           const statusResponse = await fetch(
             `/api/kelo-id/login/qr/status?id=${encodeURIComponent(nextChallenge.id)}&clientState=${encodeURIComponent(nextChallenge.clientState)}`,
@@ -117,14 +180,18 @@ export default function LoginPage() {
           }
 
           if (statusData.status === "approved" && statusData.session) {
-            stopPolling();
-            setQrMessage("Connexion confirmée. Ouverture de Kelo Social...");
-            await loginWithKeloIdSession(statusData.session as AtpSession);
-            refreshSession();
-            router.replace("/feed");
+            await completeQrLogin(statusData.session as AtpSession);
           }
         } catch (pollError) {
           console.error("Kelo ID login polling error:", pollError);
+
+          if (completingRef.current) {
+            return;
+          }
+
+          setQrMessage(
+            "Impossible de vérifier le QR pour le moment. La connexion sera retentée automatiquement."
+          );
         }
       }, 2_000);
     } catch (startError) {
@@ -134,7 +201,9 @@ export default function LoginPage() {
           : "Connexion Kelo ID impossible."
       );
     } finally {
-      setQrLoading(false);
+      if (!completingRef.current) {
+        setQrLoading(false);
+      }
     }
   }
 
@@ -258,7 +327,7 @@ export default function LoginPage() {
           <Button
             type="button"
             loading={qrLoading}
-            loadingText="Création du QR..."
+            loadingText="Connexion en cours..."
             onClick={startKeloIdLogin}
           >
             {challenge ? "Générer un nouveau QR" : "Générer le QR de connexion"}
