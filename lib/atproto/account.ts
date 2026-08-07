@@ -1,4 +1,5 @@
 import { getStoredSession, resumeAgentSession } from "@/services/auth.service";
+import { sessionStorage } from "@/lib/session/session-storage";
 
 async function getAccountAgent() {
   const session = getStoredSession();
@@ -14,8 +15,24 @@ export async function getSessionInfo() {
 }
 
 export async function updateHandle(newHandle: string): Promise<void> {
-  const { agent } = await getAccountAgent();
-  await agent.api.com.atproto.identity.updateHandle({ handle: newHandle }, { encoding: "application/json" });
+  const cleanHandle = newHandle.trim().replace(/^@/, "").toLowerCase();
+  if (!cleanHandle || cleanHandle.length > 253 || !cleanHandle.includes(".")) {
+    throw new Error("Handle AT Protocol invalide.");
+  }
+
+  const { agent, session } = await getAccountAgent();
+  await agent.api.com.atproto.identity.updateHandle(
+    { handle: cleanHandle },
+    { encoding: "application/json" }
+  );
+
+  // Le DID reste l'identité permanente. Seul le handle change.
+  // On synchronise immédiatement la session locale afin que toutes les
+  // pages de Kelo Social affichent le nouveau handle sans reconnexion.
+  sessionStorage.set({
+    ...session,
+    handle: cleanHandle,
+  });
 }
 
 /**
