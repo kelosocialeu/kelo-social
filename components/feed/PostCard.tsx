@@ -13,6 +13,7 @@ import AccountBadges from "@/components/ui/AccountBadges";
 import PostText from "@/components/feed/PostText";
 import PostEmbed from "@/components/feed/PostEmbed";
 import PostActions from "@/components/feed/PostActions";
+import SensitiveContentGate from "@/components/feed/SensitiveContentGate";
 import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
 
 import {
@@ -35,29 +36,13 @@ interface PostCardProps {
   replyText?: string;
   onToggleReply?: () => void;
   onReplyTextChange?: (text: string) => void;
-
-  /**
-   * Appelé après l’envoi réel d’une réponse.
-   * Permet à la page parente de fermer son éditeur ou de rafraîchir son fil.
-   */
   onSendReply?: () => void;
-
-  /**
-   * Appelés uniquement après la réussite de l’action AT Protocol.
-   * Les pages existantes peuvent ainsi continuer à synchroniser leur état.
-   */
   onLike?: () => void;
   onRepost?: () => void;
-
   onBookmark?: () => void;
   onDelete?: () => void;
   onBlocked?: () => void;
   onMuted?: () => void;
-
-  /**
-   * À utiliser sur la page du fil de publication elle-même
-   * afin d’éviter de naviguer vers la même page.
-   */
   disableThreadLink?: boolean;
 }
 
@@ -81,7 +66,6 @@ export default function PostCard({
   const router = useRouter();
 
   const {
-    verified,
     dialogOpen,
     requireVerification,
     closeDialog,
@@ -89,80 +73,35 @@ export default function PostCard({
 
   const handle = post.author?.handle;
 
-  const [liked, setLiked] = useState(
-    !!post.viewer?.like
-  );
-
-  const [likeUri, setLikeUri] = useState<
-    string | null
-  >(post.viewer?.like || null);
-
-  const [localLikeCount, setLocalLikeCount] =
-    useState(post.likeCount || 0);
-
-  const [reposted, setReposted] = useState(
-    !!post.viewer?.repost
-  );
-
-  const [repostUri, setRepostUri] = useState<
-    string | null
-  >(post.viewer?.repost || null);
-
-  const [
-    localRepostCount,
-    setLocalRepostCount,
-  ] = useState(post.repostCount || 0);
-
+  const [liked, setLiked] = useState(!!post.viewer?.like);
+  const [likeUri, setLikeUri] = useState<string | null>(post.viewer?.like || null);
+  const [localLikeCount, setLocalLikeCount] = useState(post.likeCount || 0);
+  const [reposted, setReposted] = useState(!!post.viewer?.repost);
+  const [repostUri, setRepostUri] = useState<string | null>(post.viewer?.repost || null);
+  const [localRepostCount, setLocalRepostCount] = useState(post.repostCount || 0);
   const [liking, setLiking] = useState(false);
-  const [reposting, setReposting] =
-    useState(false);
-  const [replying, setReplying] =
-    useState(false);
+  const [reposting, setReposting] = useState(false);
+  const [replying, setReplying] = useState(false);
 
   useEffect(() => {
     setLiked(!!post.viewer?.like);
     setLikeUri(post.viewer?.like || null);
     setLocalLikeCount(post.likeCount || 0);
-  }, [
-    post.viewer?.like,
-    post.likeCount,
-  ]);
+  }, [post.viewer?.like, post.likeCount]);
 
   useEffect(() => {
     setReposted(!!post.viewer?.repost);
     setRepostUri(post.viewer?.repost || null);
-    setLocalRepostCount(
-      post.repostCount || 0
-    );
-  }, [
-    post.viewer?.repost,
-    post.repostCount,
-  ]);
+    setLocalRepostCount(post.repostCount || 0);
+  }, [post.viewer?.repost, post.repostCount]);
 
   const handleCardClick = () => {
-    if (
-      disableThreadLink ||
-      !post.uri ||
-      post.uri.startsWith("local-")
-    ) {
-      return;
-    }
-
-    router.push(
-      `/post?uri=${encodeURIComponent(
-        post.uri
-      )}`
-    );
+    if (disableThreadLink || !post.uri || post.uri.startsWith("local-")) return;
+    router.push(`/post?uri=${encodeURIComponent(post.uri)}`);
   };
 
   const handleLikeAction = async () => {
-    if (
-      liking ||
-      !post.uri ||
-      !post.cid
-    ) {
-      return;
-    }
+    if (liking || !post.uri || !post.cid) return;
 
     const previousLiked = liked;
     const previousLikeUri = likeUri;
@@ -170,177 +109,88 @@ export default function PostCard({
 
     setLiking(true);
     setLiked(!previousLiked);
-    setLocalLikeCount(
-      previousLiked
-        ? Math.max(0, previousCount - 1)
-        : previousCount + 1
-    );
+    setLocalLikeCount(previousLiked ? Math.max(0, previousCount - 1) : previousCount + 1);
 
     try {
       if (previousLiked) {
-        if (!previousLikeUri) {
-          throw new Error(
-            "Le record du like est introuvable."
-          );
-        }
-
+        if (!previousLikeUri) throw new Error("Le record du like est introuvable.");
         await unlikePost(previousLikeUri);
         setLikeUri(null);
       } else {
-        const createdLikeUri =
-          await likePost({
-            uri: post.uri,
-            cid: post.cid,
-          });
-
+        const createdLikeUri = await likePost({ uri: post.uri, cid: post.cid });
         setLikeUri(createdLikeUri);
       }
-
       onLike?.();
     } catch (error) {
-      console.error(
-        "Impossible de modifier le like :",
-        error
-      );
-
+      console.error("Impossible de modifier le like :", error);
       setLiked(previousLiked);
       setLikeUri(previousLikeUri);
       setLocalLikeCount(previousCount);
-
-      alert(
-        "Impossible de modifier ce like pour le moment."
-      );
+      alert("Impossible de modifier ce like pour le moment.");
     } finally {
       setLiking(false);
     }
   };
 
-  const handleRepostAction =
-    async () => {
-      if (
-        reposting ||
-        !post.uri ||
-        !post.cid
-      ) {
-        return;
+  const handleRepostAction = async () => {
+    if (reposting || !post.uri || !post.cid) return;
+
+    const previousReposted = reposted;
+    const previousRepostUri = repostUri;
+    const previousCount = localRepostCount;
+
+    setReposting(true);
+    setReposted(!previousReposted);
+    setLocalRepostCount(previousReposted ? Math.max(0, previousCount - 1) : previousCount + 1);
+
+    try {
+      if (previousReposted) {
+        if (!previousRepostUri) throw new Error("Le record de republication est introuvable.");
+        await undoRepost(previousRepostUri);
+        setRepostUri(null);
+      } else {
+        const createdRepostUri = await repostPost({ uri: post.uri, cid: post.cid });
+        setRepostUri(createdRepostUri);
       }
-
-      const previousReposted = reposted;
-      const previousRepostUri = repostUri;
-      const previousCount =
-        localRepostCount;
-
-      setReposting(true);
-      setReposted(!previousReposted);
-      setLocalRepostCount(
-        previousReposted
-          ? Math.max(
-              0,
-              previousCount - 1
-            )
-          : previousCount + 1
-      );
-
-      try {
-        if (previousReposted) {
-          if (!previousRepostUri) {
-            throw new Error(
-              "Le record de republication est introuvable."
-            );
-          }
-
-          await undoRepost(
-            previousRepostUri
-          );
-
-          setRepostUri(null);
-        } else {
-          const createdRepostUri =
-            await repostPost({
-              uri: post.uri,
-              cid: post.cid,
-            });
-
-          setRepostUri(
-            createdRepostUri
-          );
-        }
-
-        onRepost?.();
-      } catch (error) {
-        console.error(
-          "Impossible de modifier la republication :",
-          error
-        );
-
-        setReposted(previousReposted);
-        setRepostUri(previousRepostUri);
-        setLocalRepostCount(
-          previousCount
-        );
-
-        alert(
-          "Impossible de modifier cette republication pour le moment."
-        );
-      } finally {
-        setReposting(false);
-      }
-    };
+      onRepost?.();
+    } catch (error) {
+      console.error("Impossible de modifier la republication :", error);
+      setReposted(previousReposted);
+      setRepostUri(previousRepostUri);
+      setLocalRepostCount(previousCount);
+      alert("Impossible de modifier cette republication pour le moment.");
+    } finally {
+      setReposting(false);
+    }
+  };
 
   const handleReplyToggle = () => {
-    if (!requireVerification()) {
-      return;
-    }
-
+    if (!requireVerification()) return;
     onToggleReply?.();
   };
 
   const handleReplyAction = async () => {
-    if (!requireVerification()) {
-      return;
-    }
-
+    if (!requireVerification()) return;
     const cleanText = replyText?.trim();
-
-    if (
-      replying ||
-      !cleanText ||
-      !post.uri ||
-      !post.cid
-    ) {
-      return;
-    }
+    if (replying || !cleanText || !post.uri || !post.cid) return;
 
     setReplying(true);
 
     try {
-      const existingRoot =
-        post.record?.reply?.root;
-
+      const existingRoot = post.record?.reply?.root;
       await replyToPost(cleanText, {
         uri: post.uri,
         cid: post.cid,
         root:
-          existingRoot?.uri &&
-          existingRoot?.cid
-            ? {
-                uri: existingRoot.uri,
-                cid: existingRoot.cid,
-              }
+          existingRoot?.uri && existingRoot?.cid
+            ? { uri: existingRoot.uri, cid: existingRoot.cid }
             : undefined,
       });
-
       onReplyTextChange?.("");
       onSendReply?.();
     } catch (error) {
-      console.error(
-        "Impossible d’envoyer la réponse :",
-        error
-      );
-
-      alert(
-        "Impossible d’envoyer cette réponse pour le moment."
-      );
+      console.error("Impossible d’envoyer la réponse :", error);
+      alert("Impossible d’envoyer cette réponse pour le moment.");
     } finally {
       setReplying(false);
     }
@@ -350,19 +200,14 @@ export default function PostCard({
     <article
       onClick={handleCardClick}
       className={`p-4 transition-colors hover:bg-kelo-background/60 ${
-        disableThreadLink
-          ? ""
-          : "cursor-pointer"
+        disableThreadLink ? "" : "cursor-pointer"
       }`}
     >
       {post.repostedBy && (
         <div className="mb-2 flex items-center gap-2 pl-10 text-xs font-semibold text-kelo-muted">
           <Repeat2 className="h-3.5 w-3.5" />
-
           <span className="truncate">
-            {post.repostedBy.displayName ||
-              post.repostedBy.handle}{" "}
-            a reposté
+            {post.repostedBy.displayName || post.repostedBy.handle} a reposté
           </span>
         </div>
       )}
@@ -370,18 +215,12 @@ export default function PostCard({
       <div className="flex gap-3">
         <Link
           href={`/profile/${handle}`}
-          onClick={(event) =>
-            event.stopPropagation()
-          }
+          onClick={(event) => event.stopPropagation()}
           className="flex-shrink-0"
         >
           <Avatar
             src={post.author?.avatar}
-            fallback={
-              handle
-                ? handle[0].toUpperCase()
-                : "U"
-            }
+            fallback={handle ? handle[0].toUpperCase() : "U"}
           />
         </Link>
 
@@ -390,26 +229,19 @@ export default function PostCard({
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <Link
                 href={`/profile/${handle}`}
-                onClick={(event) =>
-                  event.stopPropagation()
-                }
+                onClick={(event) => event.stopPropagation()}
                 className="flex min-w-0 flex-wrap items-center gap-2 hover:underline"
               >
                 <span className="max-w-full truncate font-bold text-kelo-text">
-                  {post.author
-                    ?.displayName ||
-                    "Utilisateur"}
+                  {post.author?.displayName || "Utilisateur"}
                 </span>
-
                 <span className="max-w-full truncate text-sm text-kelo-muted">
                   @{handle}
                 </span>
               </Link>
 
               <span
-                onClick={(event) =>
-                  event.stopPropagation()
-                }
+                onClick={(event) => event.stopPropagation()}
                 className="flex flex-shrink-0 items-center"
               >
                 <AccountBadges
@@ -437,29 +269,24 @@ export default function PostCard({
             )}
           </div>
 
-          <PostText
-            text={post.record?.text || ""}
-            facets={post.record?.facets}
-          />
-
-          <PostEmbed embed={post.embed} />
+          <SensitiveContentGate post={post}>
+            <PostText
+              text={post.record?.text || ""}
+              facets={post.record?.facets}
+            />
+            <PostEmbed embed={post.embed} />
+          </SensitiveContentGate>
 
           <PostActions
             post={post}
-            replyCount={
-              post.replyCount || 0
-            }
-            repostCount={
-              localRepostCount
-            }
+            replyCount={post.replyCount || 0}
+            repostCount={localRepostCount}
             likeCount={localLikeCount}
             isLiked={liked}
             isReposted={reposted}
             isBookmarked={isBookmarked}
             onReply={handleReplyToggle}
-            onRepost={
-              handleRepostAction
-            }
+            onRepost={handleRepostAction}
             onLike={handleLikeAction}
             onBookmark={onBookmark}
             onBlocked={onBlocked}
@@ -471,18 +298,12 @@ export default function PostCard({
           {replyOpen && (
             <div
               className="mt-3 flex gap-2 border-t border-kelo-border pt-3"
-              onClick={(event) =>
-                event.stopPropagation()
-              }
+              onClick={(event) => event.stopPropagation()}
             >
               <input
                 type="text"
                 value={replyText}
-                onChange={(event) =>
-                  onReplyTextChange?.(
-                    event.target.value
-                  )
-                }
+                onChange={(event) => onReplyTextChange?.(event.target.value)}
                 placeholder="Votre commentaire..."
                 disabled={replying}
                 className="min-w-0 flex-grow rounded-xl bg-kelo-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-kelo-primary disabled:opacity-60"
@@ -490,18 +311,11 @@ export default function PostCard({
 
               <button
                 type="button"
-                onClick={
-                  handleReplyAction
-                }
-                disabled={
-                  replying ||
-                  !replyText?.trim()
-                }
+                onClick={handleReplyAction}
+                disabled={replying || !replyText?.trim()}
                 className="flex-shrink-0 rounded-xl bg-kelo-gradient px-4 py-2 text-xs font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {replying
-                  ? "Envoi..."
-                  : "Répondre"}
+                {replying ? "Envoi..." : "Répondre"}
               </button>
             </div>
           )}
