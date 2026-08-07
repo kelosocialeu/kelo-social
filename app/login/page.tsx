@@ -98,9 +98,6 @@ export default function LoginPage() {
       );
 
       refreshSession();
-
-      // Navigation complète volontaire : elle garantit que toute l'application
-      // redémarre avec la session AT Protocol fraîchement enregistrée.
       window.location.replace("/feed");
     } catch (loginError) {
       console.error("Kelo ID QR session import error:", loginError);
@@ -207,6 +204,11 @@ export default function LoginPage() {
     }
   }
 
+  function openKeloIdLogin() {
+    setMode("kelo-id");
+    void startKeloIdLogin();
+  }
+
   return (
     <AuthLayout
       title="Connexion"
@@ -294,6 +296,32 @@ export default function LoginPage() {
           >
             Se connecter
           </Button>
+
+          <div className="hidden md:block">
+            <div className="my-1 flex items-center gap-3">
+              <span className="h-px flex-1 bg-kelo-border" />
+              <span className="text-xs font-semibold uppercase tracking-wide text-kelo-muted">
+                ou
+              </span>
+              <span className="h-px flex-1 bg-kelo-border" />
+            </div>
+
+            <button
+              type="button"
+              onClick={openKeloIdLogin}
+              disabled={qrLoading}
+              className="mt-4 flex w-full items-center justify-center gap-3 rounded-full border border-kelo-border bg-white px-5 py-3.5 font-bold text-kelo-text shadow-sm transition hover:border-kelo-primary hover:bg-kelo-background disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <img
+                src="https://kelosocial.sirv.com/logoid.png"
+                alt=""
+                className="h-7 w-7 rounded-lg object-contain"
+              />
+              {qrLoading
+                ? "Préparation de Kelo ID..."
+                : "Se connecter avec Kelo ID"}
+            </button>
+          </div>
         </form>
       ) : (
         <section className="flex flex-col items-center gap-4 text-center">
