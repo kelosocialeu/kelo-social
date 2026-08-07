@@ -10,6 +10,7 @@ import {
   Film,
   Image as ImageIcon,
   Laugh,
+  ShieldAlert,
 } from "lucide-react";
 
 import Avatar from "@/components/feed/Avatar";
@@ -25,6 +26,7 @@ import {
 } from "@/lib/atproto/profile";
 import {
   POST_CHARACTER_LIMIT,
+  type PostContentLabel,
 } from "@/lib/atproto/posts";
 import {
   useIdentityVerification,
@@ -35,7 +37,8 @@ interface ComposerProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: (
-    event: React.FormEvent
+    event: React.FormEvent,
+    contentLabel?: PostContentLabel
   ) => void;
   loading?: boolean;
   placeholder?: string;
@@ -53,17 +56,11 @@ export default function Composer({
   loading = false,
   placeholder,
 }: ComposerProps) {
-  const textareaRef =
-    useRef<HTMLTextAreaElement>(null);
-
-  const [avatar, setAvatar] =
-    useState<string | undefined>(undefined);
-
-  const [mentionQuery, setMentionQuery] =
-    useState<string | null>(null);
-
-  const [mentionResults, setMentionResults] =
-    useState<any[]>([]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [avatar, setAvatar] = useState<string | undefined>(undefined);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionResults, setMentionResults] = useState<any[]>([]);
+  const [contentLabel, setContentLabel] = useState<"" | PostContentLabel>("");
 
   const {
     checked,
@@ -86,14 +83,10 @@ export default function Composer({
 
     getActorProfile(handle)
       .then((profile) => {
-        if (!cancelled) {
-          setAvatar(profile?.avatar || undefined);
-        }
+        if (!cancelled) setAvatar(profile?.avatar || undefined);
       })
       .catch(() => {
-        if (!cancelled) {
-          setAvatar(undefined);
-        }
+        if (!cancelled) setAvatar(undefined);
       });
 
     return () => {
@@ -102,75 +95,47 @@ export default function Composer({
   }, [handle]);
 
   useEffect(() => {
-    if (
-      mentionQuery === null ||
-      mentionQuery.length < 2
-    ) {
+    if (mentionQuery === null || mentionQuery.length < 2) {
       setMentionResults([]);
       return;
     }
 
-    const timeout =
-      window.setTimeout(async () => {
-        try {
-          const actors =
-            await searchNetworkActors(
-              mentionQuery,
-              5
-            );
+    const timeout = window.setTimeout(async () => {
+      try {
+        const actors = await searchNetworkActors(mentionQuery, 5);
+        setMentionResults(actors);
+      } catch {
+        setMentionResults([]);
+      }
+    }, 300);
 
-          setMentionResults(actors);
-        } catch {
-          setMentionResults([]);
-        }
-      }, 300);
-
-    return () =>
-      window.clearTimeout(timeout);
+    return () => window.clearTimeout(timeout);
   }, [mentionQuery]);
 
   const handleTextChange = (
     event: React.ChangeEvent<HTMLTextAreaElement>
   ) => {
-    if (!requireVerification()) {
-      return;
-    }
+    if (!requireVerification()) return;
 
     const newValue = event.target.value;
     const cursorPosition = event.target.selectionStart;
-
     onChange(newValue);
 
     const beforeCursor = newValue.slice(0, cursorPosition);
-    const match = beforeCursor.match(
-      /@([a-zA-Z0-9._-]*)$/
-    );
-
+    const match = beforeCursor.match(/@([a-zA-Z0-9._-]*)$/);
     setMentionQuery(match ? match[1] : null);
   };
 
-  const insertMention = (
-    actorHandle: string
-  ) => {
-    if (!requireVerification()) {
-      return;
-    }
+  const insertMention = (actorHandle: string) => {
+    if (!requireVerification()) return;
 
     const textarea = textareaRef.current;
-
-    if (!textarea) {
-      return;
-    }
+    if (!textarea) return;
 
     const cursorPosition = textarea.selectionStart;
-
     const before = value
       .slice(0, cursorPosition)
-      .replace(
-        /@([a-zA-Z0-9._-]*)$/,
-        `@${actorHandle} `
-      );
-
+      .replace(/@([a-zA-Z0-9._-]*)$/, `@${actorHandle} `);
     const after = value.slice(cursorPosition);
 
     onChange((before + after).slice(0, POST_CHARACTER_LIMIT));
@@ -180,25 +145,16 @@ export default function Composer({
   };
 
   const openGlobalComposer = () => {
-    if (!requireVerification()) {
-      return;
-    }
-
-    window.dispatchEvent(
-      new Event(OPEN_GLOBAL_COMPOSER_EVENT)
-    );
+    if (!requireVerification()) return;
+    window.dispatchEvent(new Event(OPEN_GLOBAL_COMPOSER_EVENT));
   };
 
-  const handleSubmit = (
-    event: React.FormEvent
-  ) => {
+  const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (!requireVerification() || overLimit) {
-      return;
-    }
-
-    onSubmit(event);
+    if (!requireVerification() || overLimit) return;
+    onSubmit(event, contentLabel || undefined);
+    setContentLabel("");
   };
 
   return (
@@ -210,11 +166,7 @@ export default function Composer({
         <div className="flex gap-3">
           <Avatar
             src={avatar}
-            fallback={
-              handle
-                ? handle[0].toUpperCase()
-                : "K"
-            }
+            fallback={handle ? handle[0].toUpperCase() : "K"}
             gradient={!avatar}
           />
 
@@ -225,10 +177,7 @@ export default function Composer({
                 onClick={requireVerification}
                 className="mb-3 w-full rounded-2xl border border-kelo-border bg-white p-3 text-left text-sm transition hover:border-kelo-primary"
               >
-                <span className="font-bold text-kelo-text">
-                  Vérification requise
-                </span>
-
+                <span className="font-bold text-kelo-text">Vérification requise</span>
                 <span className="mt-1 block text-xs text-kelo-muted">
                   Touchez le compositeur ou un outil pour vérifier votre compte.
                 </span>
@@ -241,9 +190,7 @@ export default function Composer({
               maxLength={POST_CHARACTER_LIMIT}
               onChange={handleTextChange}
               onFocus={() => {
-                if (!verified) {
-                  requireVerification();
-                }
+                if (!verified) requireVerification();
               }}
               aria-disabled={!verified}
               placeholder={placeholder || "Quoi de neuf ?"}
@@ -253,77 +200,56 @@ export default function Composer({
 
             {mentionResults.length > 0 && (
               <div className="mb-2 overflow-hidden rounded-2xl border border-kelo-border bg-white shadow-kelo">
-                {mentionResults.map(
-                  (actor: any) => (
-                    <button
-                      key={actor.did}
-                      type="button"
-                      onClick={() =>
-                        insertMention(actor.handle)
-                      }
-                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-kelo-background"
-                    >
-                      <Avatar
-                        src={actor.avatar}
-                        fallback={actor.handle[0].toUpperCase()}
-                        size="sm"
-                      />
-
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-kelo-text">
-                          {actor.displayName || actor.handle}
-                        </p>
-
-                        <p className="truncate text-xs text-kelo-muted">
-                          @{actor.handle}
-                        </p>
-                      </div>
-                    </button>
-                  )
-                )}
+                {mentionResults.map((actor: any) => (
+                  <button
+                    key={actor.did}
+                    type="button"
+                    onClick={() => insertMention(actor.handle)}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-kelo-background"
+                  >
+                    <Avatar
+                      src={actor.avatar}
+                      fallback={actor.handle[0].toUpperCase()}
+                      size="sm"
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-kelo-text">
+                        {actor.displayName || actor.handle}
+                      </p>
+                      <p className="truncate text-xs text-kelo-muted">@{actor.handle}</p>
+                    </div>
+                  </button>
+                ))}
               </div>
             )}
 
+            <div className="mb-2 flex items-center gap-2 rounded-xl border border-kelo-border bg-white px-3 py-2">
+              <ShieldAlert className="h-4 w-4 flex-shrink-0 text-kelo-primary" />
+              <select
+                value={contentLabel}
+                onChange={(event) => setContentLabel(event.target.value as "" | PostContentLabel)}
+                className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-kelo-text focus:outline-none"
+                aria-label="Avertissement de contenu"
+              >
+                <option value="">Aucun avertissement</option>
+                <option value="nudity">Nudité</option>
+                <option value="sexual">Contenu suggestif</option>
+                <option value="graphic-media">Actualité crue / contenu graphique</option>
+              </select>
+            </div>
+
             <div className="mt-2 flex items-center justify-between gap-3 border-t border-kelo-border/60 pt-2">
               <div className="flex min-w-0 items-center gap-0.5">
-                <button
-                  type="button"
-                  onClick={openGlobalComposer}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-kelo-primary transition hover:bg-white"
-                  title="Ajouter une photo"
-                  aria-label="Ajouter une photo"
-                >
+                <button type="button" onClick={openGlobalComposer} className="flex h-9 w-9 items-center justify-center rounded-full text-kelo-primary transition hover:bg-white" title="Ajouter une photo" aria-label="Ajouter une photo">
                   <ImageIcon className="h-5 w-5" />
                 </button>
-
-                <button
-                  type="button"
-                  onClick={openGlobalComposer}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-kelo-primary transition hover:bg-white"
-                  title="Ajouter une vidéo"
-                  aria-label="Ajouter une vidéo"
-                >
+                <button type="button" onClick={openGlobalComposer} className="flex h-9 w-9 items-center justify-center rounded-full text-kelo-primary transition hover:bg-white" title="Ajouter une vidéo" aria-label="Ajouter une vidéo">
                   <Film className="h-5 w-5" />
                 </button>
-
-                <button
-                  type="button"
-                  onClick={openGlobalComposer}
-                  className="flex h-9 items-center gap-1 rounded-full px-2 text-xs font-extrabold text-kelo-primary transition hover:bg-white"
-                  title="Ajouter un GIF"
-                  aria-label="Ajouter un GIF"
-                >
-                  <FileImage className="h-5 w-5" />
-                  GIF
+                <button type="button" onClick={openGlobalComposer} className="flex h-9 items-center gap-1 rounded-full px-2 text-xs font-extrabold text-kelo-primary transition hover:bg-white" title="Ajouter un GIF" aria-label="Ajouter un GIF">
+                  <FileImage className="h-5 w-5" /> GIF
                 </button>
-
-                <button
-                  type="button"
-                  onClick={openGlobalComposer}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-kelo-primary transition hover:bg-white"
-                  title="Ajouter un emoji"
-                  aria-label="Ajouter un emoji"
-                >
+                <button type="button" onClick={openGlobalComposer} className="flex h-9 w-9 items-center justify-center rounded-full text-kelo-primary transition hover:bg-white" title="Ajouter un emoji" aria-label="Ajouter un emoji">
                   <Laugh className="h-5 w-5" />
                 </button>
               </div>
@@ -343,17 +269,10 @@ export default function Composer({
 
                 <button
                   type="submit"
-                  disabled={
-                    loading ||
-                    !value.trim() ||
-                    !verified ||
-                    overLimit
-                  }
+                  disabled={loading || !value.trim() || !verified || overLimit}
                   className="rounded-full bg-kelo-gradient px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {loading
-                    ? "Publication..."
-                    : "Publier"}
+                  {loading ? "Publication..." : "Publier"}
                 </button>
               </div>
             </div>
