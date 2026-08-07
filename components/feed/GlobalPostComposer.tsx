@@ -59,6 +59,7 @@ export default function GlobalPostComposer() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const gifInputRef = useRef<HTMLInputElement>(null);
 
   const count = useMemo(() => characterCount(text), [text]);
   const overLimit = count > POST_CHARACTER_LIMIT;
@@ -135,7 +136,7 @@ export default function GlobalPostComposer() {
     }
 
     if (hasVideo) {
-      setError("Retirez la vidéo avant d’ajouter des images.");
+      setError("Retirez la vidéo avant d’ajouter une image ou un GIF.");
       return;
     }
 
@@ -145,7 +146,7 @@ export default function GlobalPostComposer() {
     );
 
     if (files.length + selectedImages.length > MAX_POST_IMAGES) {
-      setError(`${MAX_POST_IMAGES} images maximum par publication.`);
+      setError(`${MAX_POST_IMAGES} images ou GIF maximum par publication.`);
     }
 
     revokePreviews(previews);
@@ -245,35 +246,36 @@ export default function GlobalPostComposer() {
             Écrire un post
           </h2>
 
-          <button
-            type="button"
-            onClick={publish}
-            disabled={
-              loading ||
-              overLimit ||
-              (!text.trim() && files.length === 0) ||
-              !verified ||
-              !checked
-            }
-            className="rounded-full bg-kelo-gradient px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? "Publication..." : "Publier"}
-          </button>
+          <span className="h-10 w-10" aria-hidden="true" />
         </header>
 
         <div className="flex gap-3 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           <CurrentUserAvatar />
 
           <div className="min-w-0 flex-1">
-            <textarea
-              ref={textareaRef}
-              value={text}
-              maxLength={POST_CHARACTER_LIMIT}
-              onChange={(event) => setText(event.target.value)}
-              placeholder="Quoi de neuf ?"
-              rows={6}
-              className="min-h-36 w-full resize-none bg-transparent text-lg leading-relaxed text-kelo-text placeholder-kelo-muted focus:outline-none"
-            />
+            <div className="flex items-start gap-3">
+              <textarea
+                ref={textareaRef}
+                value={text}
+                maxLength={POST_CHARACTER_LIMIT}
+                onChange={(event) => setText(event.target.value)}
+                placeholder="Quoi de neuf ?"
+                rows={6}
+                className="min-h-36 min-w-0 flex-1 resize-none bg-transparent text-lg leading-relaxed text-kelo-text placeholder-kelo-muted focus:outline-none"
+              />
+
+              <span
+                className={`mt-1 flex-shrink-0 text-sm font-bold ${
+                  overLimit
+                    ? "text-kelo-danger"
+                    : count >= POST_CHARACTER_LIMIT - 30
+                      ? "text-amber-600"
+                      : "text-kelo-muted"
+                }`}
+              >
+                {count}/{POST_CHARACTER_LIMIT}
+              </span>
+            </div>
 
             {previews.length > 0 && (
               <div
@@ -320,12 +322,12 @@ export default function GlobalPostComposer() {
               </p>
             )}
 
-            <div className="relative mt-4 flex items-center justify-between border-t border-kelo-border pt-3">
+            <div className="relative mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-kelo-border pt-3">
               <div className="flex items-center gap-1">
                 <input
                   ref={imageInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  accept="image/jpeg,image/png,image/webp"
                   multiple
                   className="hidden"
                   onChange={(event) => {
@@ -337,6 +339,16 @@ export default function GlobalPostComposer() {
                   ref={videoInputRef}
                   type="file"
                   accept="video/mp4,video/webm,video/quicktime"
+                  className="hidden"
+                  onChange={(event) => {
+                    applyFiles(Array.from(event.target.files || []));
+                    event.target.value = "";
+                  }}
+                />
+                <input
+                  ref={gifInputRef}
+                  type="file"
+                  accept="image/gif"
                   className="hidden"
                   onChange={(event) => {
                     applyFiles(Array.from(event.target.files || []));
@@ -366,7 +378,7 @@ export default function GlobalPostComposer() {
 
                 <button
                   type="button"
-                  onClick={() => imageInputRef.current?.click()}
+                  onClick={() => gifInputRef.current?.click()}
                   className="flex h-10 items-center gap-1 rounded-full px-2 text-xs font-bold text-kelo-primary hover:bg-kelo-background"
                   title="Ajouter un GIF"
                   aria-label="Ajouter un GIF"
@@ -401,17 +413,20 @@ export default function GlobalPostComposer() {
                 )}
               </div>
 
-              <span
-                className={`text-sm font-bold ${
-                  overLimit
-                    ? "text-kelo-danger"
-                    : count >= POST_CHARACTER_LIMIT - 30
-                      ? "text-amber-600"
-                      : "text-kelo-muted"
-                }`}
+              <button
+                type="button"
+                onClick={publish}
+                disabled={
+                  loading ||
+                  overLimit ||
+                  (!text.trim() && files.length === 0) ||
+                  !verified ||
+                  !checked
+                }
+                className="ml-auto rounded-full bg-kelo-gradient px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {count}/{POST_CHARACTER_LIMIT}
-              </span>
+                {loading ? "Publication..." : "Publier"}
+              </button>
             </div>
           </div>
         </div>
