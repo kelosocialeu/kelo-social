@@ -58,17 +58,24 @@ async function refreshAtProtocolSession(
       );
     }
 
-    const response = await fetch(
-      `${normalizePdsUrl(session.pdsUrl)}/xrpc/com.atproto.server.refreshSession`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.refreshJwt}`,
-          Accept: "application/json",
-        },
-        cache: "no-store",
-      }
-    );
+    let response: Response;
+
+    try {
+      response = await fetch(
+        `${normalizePdsUrl(session.pdsUrl)}/xrpc/com.atproto.server.refreshSession`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.refreshJwt}`,
+            Accept: "application/json",
+          },
+          cache: "no-store",
+        }
+      );
+    } catch (error) {
+      console.warn("PDS temporarily unreachable while refreshing session:", error);
+      throw error;
+    }
 
     if (!response.ok) {
       throw new AuthError(
@@ -261,6 +268,9 @@ export function getStoredSession(): AtpSession | null {
 /**
  * Retourne un agent authentifié réutilisable.
  * Renouvelle silencieusement le jeton d'accès lorsqu'il a expiré.
+ *
+ * Une panne réseau ne doit jamais déconnecter l'utilisateur : la session
+ * locale n'est supprimée que lorsque le PDS confirme qu'elle est invalide.
  */
 export async function resumeAgentSession(
   session: AtpSession
@@ -297,7 +307,7 @@ export async function resumeAgentSession(
     return await resume(session);
   } catch (firstError) {
     console.info(
-      "AT Protocol access token expired, refreshing session.",
+      "AT Protocol access token unavailable, attempting session refresh.",
       firstError
     );
 
@@ -313,14 +323,38 @@ export async function resumeAgentSession(
       );
 
       clearCachedAgent();
-      sessionStorage.clear();
 
-      throw refreshError instanceof AuthError
-        ? refreshError
-        : new AuthError(
-            "Votre session a expiré. Veuillez vous reconnecter."
-          );
+      if (refreshError instanceof AuthError) {
+        sessionStorage.clear();
+        throw refreshError;
+      }
+
+      // Réseau indisponible, timeout, DNS, etc. : on conserve le refreshJwt
+      // pour pouvoir restaurer la session au prochain accès réseau.
+      throw new AuthError(
+        "Connexion temporairement impossible avec votre PDS. Votre session est conservée."
+      );
     }
+  }
+}
+
+/**
+ * Restaure silencieusement une session persistante au démarrage de la PWA.
+ * Si le réseau est momentanément indisponible, le compte reste localement
+ * connecté afin de ne pas demander inutilement le mot de passe.
+ */
+export async function restoreStoredSession(): Promise<AtpSession | null> {
+  const stored = getStoredSession();
+
+  if (!stored) {
+    return null;
+  }
+
+  try {
+    await resumeAgentSession(stored);
+    return getStoredSession() || stored;
+  } catch {
+    return getStoredSession();
   }
 }
 
