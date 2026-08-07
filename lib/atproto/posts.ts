@@ -14,6 +14,18 @@ export const MAX_POST_VIDEO_BYTES = 50 * 1024 * 1024;
 
 export type PostContentLabel = "nudity" | "sexual" | "graphic-media";
 
+let pendingPostContentLabel: PostContentLabel | null = null;
+
+export function setNextPostContentLabel(label?: PostContentLabel) {
+  pendingPostContentLabel = label || null;
+}
+
+function consumeNextPostContentLabel(): PostContentLabel[] {
+  const label = pendingPostContentLabel;
+  pendingPostContentLabel = null;
+  return label ? [label] : [];
+}
+
 export interface StrongRef {
   uri: string;
   cid: string;
@@ -36,15 +48,11 @@ function validateStrongRef(
   label: string
 ): void {
   if (!ref.uri?.startsWith("at://")) {
-    throw new Error(
-      `${label} : URI AT Protocol invalide.`
-    );
+    throw new Error(`${label} : URI AT Protocol invalide.`);
   }
 
   if (!ref.cid?.trim()) {
-    throw new Error(
-      `${label} : CID manquant.`
-    );
+    throw new Error(`${label} : CID manquant.`);
   }
 }
 
@@ -56,15 +64,11 @@ function validatePostText(text: string, hasMedia = false): string {
   const cleanText = text.trim();
 
   if (!cleanText && !hasMedia) {
-    throw new Error(
-      "La publication doit contenir du texte ou un média."
-    );
+    throw new Error("La publication doit contenir du texte ou un média.");
   }
 
   if (countCharacters(cleanText) > POST_CHARACTER_LIMIT) {
-    throw new Error(
-      `La publication ne peut pas dépasser ${POST_CHARACTER_LIMIT} caractères.`
-    );
+    throw new Error(`La publication ne peut pas dépasser ${POST_CHARACTER_LIMIT} caractères.`);
   }
 
   return cleanText;
@@ -73,9 +77,7 @@ function validatePostText(text: string, hasMedia = false): string {
 function buildSelfLabels(labels?: PostContentLabel[]) {
   const values = Array.from(new Set(labels || [])).map((val) => ({ val }));
 
-  if (values.length === 0) {
-    return undefined;
-  }
+  if (values.length === 0) return undefined;
 
   return {
     $type: "com.atproto.label.defs#selfLabels" as const,
@@ -83,20 +85,11 @@ function buildSelfLabels(labels?: PostContentLabel[]) {
   };
 }
 
-async function buildRichText(
-  text: string,
-  agent: any,
-  hasMedia = false
-) {
+async function buildRichText(text: string, agent: any, hasMedia = false) {
   const cleanText = validatePostText(text, hasMedia);
-  const richText = new RichText({
-    text: cleanText,
-  });
+  const richText = new RichText({ text: cleanText });
 
-  if (cleanText) {
-    await richText.detectFacets(agent);
-  }
-
+  if (cleanText) await richText.detectFacets(agent);
   return richText;
 }
 
@@ -112,9 +105,7 @@ async function buildMediaEmbed(
     (file) => file instanceof File && file.size > 0
   );
 
-  if (files.length === 0) {
-    return undefined;
-  }
+  if (files.length === 0) return undefined;
 
   const videos = files.filter((file) =>
     normalizeMimeType(file.type).startsWith("video/")
@@ -124,9 +115,7 @@ async function buildMediaEmbed(
   );
 
   if (videos.length > 0 && images.length > 0) {
-    throw new Error(
-      "Une publication ne peut pas mélanger une vidéo et des images."
-    );
+    throw new Error("Une publication ne peut pas mélanger une vidéo et des images.");
   }
 
   if (videos.length > 1) {
@@ -134,9 +123,7 @@ async function buildMediaEmbed(
   }
 
   if (images.length > MAX_POST_IMAGES) {
-    throw new Error(
-      `${MAX_POST_IMAGES} images maximum par publication.`
-    );
+    throw new Error(`${MAX_POST_IMAGES} images maximum par publication.`);
   }
 
   if (videos.length === 1) {
@@ -147,9 +134,7 @@ async function buildMediaEmbed(
       !["video/mp4", "video/webm", "video/quicktime"].includes(mimeType) ||
       video.size > MAX_POST_VIDEO_BYTES
     ) {
-      throw new Error(
-        "La vidéo doit être au format MP4, WebM ou MOV et ne pas dépasser 50 Mo."
-      );
+      throw new Error("La vidéo doit être au format MP4, WebM ou MOV et ne pas dépasser 50 Mo.");
     }
 
     const uploaded = await agent.uploadBlob(
@@ -169,17 +154,10 @@ async function buildMediaEmbed(
       const mimeType = normalizeMimeType(image.type);
 
       if (
-        ![
-          "image/jpeg",
-          "image/png",
-          "image/webp",
-          "image/gif",
-        ].includes(mimeType) ||
+        !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mimeType) ||
         image.size > MAX_POST_IMAGE_BYTES
       ) {
-        throw new Error(
-          "Chaque image ou GIF doit faire moins de 10 Mo et utiliser un format compatible."
-        );
+        throw new Error("Chaque image ou GIF doit faire moins de 10 Mo et utiliser un format compatible.");
       }
 
       const uploaded = await agent.uploadBlob(
@@ -206,30 +184,26 @@ export async function createPost(
 ) {
   await requireIdentityVerification();
 
-  const { agent, session } =
-    await getAuthenticatedAgent();
+  const { agent, session } = await getAuthenticatedAgent();
   const hasMedia = Boolean(media?.files?.length);
-  const richText = await buildRichText(
-    text,
-    agent,
-    hasMedia
-  );
+  const richText = await buildRichText(text, agent, hasMedia);
   const embed = await buildMediaEmbed(agent, media);
-  const labels = buildSelfLabels(media?.labels);
+  const explicitLabels = media?.labels;
+  const effectiveLabels = explicitLabels !== undefined
+    ? explicitLabels
+    : consumeNextPostContentLabel();
+  const labels = buildSelfLabels(effectiveLabels);
 
-  const result =
-    await agent.api.app.bsky.feed.post.create(
-      {
-        repo: session.did,
-      },
-      {
-        text: richText.text,
-        facets: richText.facets,
-        ...(embed ? { embed } : {}),
-        ...(labels ? { labels } : {}),
-        createdAt: new Date().toISOString(),
-      }
-    );
+  const result = await agent.api.app.bsky.feed.post.create(
+    { repo: session.did },
+    {
+      text: richText.text,
+      facets: richText.facets,
+      ...(embed ? { embed } : {}),
+      ...(labels ? { labels } : {}),
+      createdAt: new Date().toISOString(),
+    }
+  );
 
   return {
     uri: result.uri,
@@ -256,33 +230,25 @@ export async function replyToPost(
 
   validateStrongRef(root, "Publication racine");
 
-  const { agent, session } =
-    await getAuthenticatedAgent();
+  const { agent, session } = await getAuthenticatedAgent();
+  const richText = await buildRichText(text, agent);
 
-  const richText = await buildRichText(
-    text,
-    agent
-  );
-
-  const result =
-    await agent.api.app.bsky.feed.post.create(
-      {
-        repo: session.did,
-      },
-      {
-        text: richText.text,
-        facets: richText.facets,
-        reply: {
-          root,
-          parent: {
-            $type: "com.atproto.repo.strongRef",
-            uri: parent.uri,
-            cid: parent.cid,
-          },
+  const result = await agent.api.app.bsky.feed.post.create(
+    { repo: session.did },
+    {
+      text: richText.text,
+      facets: richText.facets,
+      reply: {
+        root,
+        parent: {
+          $type: "com.atproto.repo.strongRef",
+          uri: parent.uri,
+          cid: parent.cid,
         },
-        createdAt: new Date().toISOString(),
-      }
-    );
+      },
+      createdAt: new Date().toISOString(),
+    }
+  );
 
   return {
     uri: result.uri,
@@ -300,48 +266,35 @@ export async function replyToPost(
   };
 }
 
-/** Likes autorisés même avant vérification. */
-export async function likePost(
-  post: StrongRef
-): Promise<string> {
+export async function likePost(post: StrongRef): Promise<string> {
   validateStrongRef(post, "Publication");
 
-  const { agent, session } =
-    await getAuthenticatedAgent();
+  const { agent, session } = await getAuthenticatedAgent();
 
-  const result =
-    await agent.api.app.bsky.feed.like.create(
-      {
-        repo: session.did,
+  const result = await agent.api.app.bsky.feed.like.create(
+    { repo: session.did },
+    {
+      subject: {
+        $type: "com.atproto.repo.strongRef",
+        uri: post.uri,
+        cid: post.cid,
       },
-      {
-        subject: {
-          $type: "com.atproto.repo.strongRef",
-          uri: post.uri,
-          cid: post.cid,
-        },
-        createdAt: new Date().toISOString(),
-      }
-    );
+      createdAt: new Date().toISOString(),
+    }
+  );
 
   return result.uri;
 }
 
-export async function unlikePost(
-  likeUri: string
-): Promise<void> {
+export async function unlikePost(likeUri: string): Promise<void> {
   if (!likeUri?.startsWith("at://")) {
     throw new Error("URI du like invalide.");
   }
 
-  const { agent, session } =
-    await getAuthenticatedAgent();
-
+  const { agent, session } = await getAuthenticatedAgent();
   const rkey = likeUri.split("/").pop();
 
-  if (!rkey) {
-    throw new Error("Clé du like introuvable.");
-  }
+  if (!rkey) throw new Error("Clé du like introuvable.");
 
   await agent.api.app.bsky.feed.like.delete({
     repo: session.did,
@@ -349,52 +302,35 @@ export async function unlikePost(
   });
 }
 
-/** Republications autorisées même avant vérification. */
-export async function repostPost(
-  post: StrongRef
-): Promise<string> {
+export async function repostPost(post: StrongRef): Promise<string> {
   validateStrongRef(post, "Publication");
 
-  const { agent, session } =
-    await getAuthenticatedAgent();
+  const { agent, session } = await getAuthenticatedAgent();
 
-  const result =
-    await agent.api.app.bsky.feed.repost.create(
-      {
-        repo: session.did,
+  const result = await agent.api.app.bsky.feed.repost.create(
+    { repo: session.did },
+    {
+      subject: {
+        $type: "com.atproto.repo.strongRef",
+        uri: post.uri,
+        cid: post.cid,
       },
-      {
-        subject: {
-          $type: "com.atproto.repo.strongRef",
-          uri: post.uri,
-          cid: post.cid,
-        },
-        createdAt: new Date().toISOString(),
-      }
-    );
+      createdAt: new Date().toISOString(),
+    }
+  );
 
   return result.uri;
 }
 
-export async function undoRepost(
-  repostUri: string
-): Promise<void> {
+export async function undoRepost(repostUri: string): Promise<void> {
   if (!repostUri?.startsWith("at://")) {
-    throw new Error(
-      "URI de republication invalide."
-    );
+    throw new Error("URI de republication invalide.");
   }
 
-  const { agent, session } =
-    await getAuthenticatedAgent();
-
+  const { agent, session } = await getAuthenticatedAgent();
   const rkey = repostUri.split("/").pop();
 
-  if (!rkey) {
-    throw new Error(
-      "Clé de republication introuvable."
-    );
-  }
+  if (!rkey) throw new Error("Clé de republication introuvable.");
 
   await agent.api.app.bsky.feed.repost.delete({
     repo: session.did,
@@ -402,27 +338,17 @@ export async function undoRepost(
   });
 }
 
-export async function deleteOwnPost(
-  uri: string
-): Promise<void> {
+export async function deleteOwnPost(uri: string): Promise<void> {
   await requireIdentityVerification();
 
   if (!uri?.startsWith("at://")) {
-    throw new Error(
-      "URI de publication invalide."
-    );
+    throw new Error("URI de publication invalide.");
   }
 
-  const { agent, session } =
-    await getAuthenticatedAgent();
-
+  const { agent, session } = await getAuthenticatedAgent();
   const rkey = uri.split("/").pop();
 
-  if (!rkey) {
-    throw new Error(
-      "Clé de publication introuvable."
-    );
-  }
+  if (!rkey) throw new Error("Clé de publication introuvable.");
 
   await agent.api.app.bsky.feed.post.delete({
     repo: session.did,
