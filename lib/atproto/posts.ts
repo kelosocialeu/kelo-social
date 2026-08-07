@@ -12,6 +12,8 @@ export const MAX_POST_IMAGES = 4;
 export const MAX_POST_IMAGE_BYTES = 10 * 1024 * 1024;
 export const MAX_POST_VIDEO_BYTES = 50 * 1024 * 1024;
 
+export type PostContentLabel = "nudity" | "sexual" | "graphic-media";
+
 export interface StrongRef {
   uri: string;
   cid: string;
@@ -26,6 +28,7 @@ export interface ReplyTarget extends StrongRef {
 export interface PostMediaInput {
   files?: File[];
   altText?: string;
+  labels?: PostContentLabel[];
 }
 
 function validateStrongRef(
@@ -65,6 +68,19 @@ function validatePostText(text: string, hasMedia = false): string {
   }
 
   return cleanText;
+}
+
+function buildSelfLabels(labels?: PostContentLabel[]) {
+  const values = Array.from(new Set(labels || [])).map((val) => ({ val }));
+
+  if (values.length === 0) {
+    return undefined;
+  }
+
+  return {
+    $type: "com.atproto.label.defs#selfLabels" as const,
+    values,
+  };
 }
 
 async function buildRichText(
@@ -199,6 +215,7 @@ export async function createPost(
     hasMedia
   );
   const embed = await buildMediaEmbed(agent, media);
+  const labels = buildSelfLabels(media?.labels);
 
   const result =
     await agent.api.app.bsky.feed.post.create(
@@ -209,6 +226,7 @@ export async function createPost(
         text: richText.text,
         facets: richText.facets,
         ...(embed ? { embed } : {}),
+        ...(labels ? { labels } : {}),
         createdAt: new Date().toISOString(),
       }
     );
@@ -219,6 +237,7 @@ export async function createPost(
     text: richText.text,
     facets: richText.facets,
     embed,
+    labels,
   };
 }
 
