@@ -7,6 +7,7 @@ import type {
 import MobileNavigationShell from "@/components/layout/MobileNavigationShell";
 import MobileOrientationLock from "@/components/layout/MobileOrientationLock";
 import BioMentionLinker from "@/components/profile/BioMentionLinker";
+import ProfileEditBridge from "@/components/profile/ProfileEditBridge";
 import {
   AuthProvider,
 } from "@/components/providers/AuthProvider";
@@ -75,6 +76,7 @@ export default function RootLayout({
         <AuthProvider>
           <MobileOrientationLock />
           <BioMentionLinker />
+          <ProfileEditBridge />
           <MobileNavigationShell>
             {children}
           </MobileNavigationShell>
