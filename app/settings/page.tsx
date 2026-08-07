@@ -8,6 +8,8 @@ import SettingsNav, {
   SettingsSection,
 } from "@/components/settings/SettingsNav";
 import AccountSection from "@/components/settings/AccountSection";
+import IdentitySection from "@/components/settings/IdentitySection";
+import DisplaySection from "@/components/settings/DisplaySection";
 import ModerationSection from "@/components/settings/ModerationSection";
 import PrivacySection from "@/components/settings/PrivacySection";
 import ComingSoonSection from "@/components/settings/ComingSoonSection";
@@ -15,9 +17,10 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 
 const SECTION_TITLES: Record<SettingsSection, string> = {
   account: "Compte et sécurité",
+  identity: "Identité et domaine",
   moderation: "Modération",
   privacy: "Confidentialité",
-  appearance: "Apparence",
+  appearance: "Affichage",
   notifications: "Notifications et flux",
 };
 
@@ -90,22 +93,10 @@ export default function SettingsPage() {
 
             <div className="settings-bluesky-section">
               {section === "account" && <AccountSection />}
-              {section === "moderation" && (
-                <ModerationSection />
-              )}
+              {section === "identity" && <IdentitySection />}
+              {section === "appearance" && <DisplaySection />}
+              {section === "moderation" && <ModerationSection />}
               {section === "privacy" && <PrivacySection />}
-
-              {section === "appearance" && (
-                <ComingSoonSection
-                  title="Apparence"
-                  items={[
-                    "Mode sombre, clair ou automatique",
-                    "Taille du texte",
-                    "Réduction des animations",
-                    "Descriptions automatiques des images",
-                  ]}
-                />
-              )}
 
               {section === "notifications" && (
                 <ComingSoonSection
