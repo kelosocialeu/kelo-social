@@ -10,6 +10,7 @@ import {
 
 import {
   getStoredSession,
+  restoreStoredSession,
   logout as logoutService,
 } from "@/services/auth.service";
 
@@ -39,9 +40,7 @@ export function AuthProvider({
     useState(false);
 
   const refreshSession = () => {
-    const storedSession =
-      getStoredSession();
-
+    const storedSession = getStoredSession();
     setSession(storedSession);
     setChecked(true);
   };
@@ -53,7 +52,29 @@ export function AuthProvider({
   };
 
   useEffect(() => {
-    refreshSession();
+    let cancelled = false;
+
+    // On restaure immédiatement la copie locale pour éviter tout flash vers
+    // /login au redémarrage d'une PWA installée.
+    const localSession = getStoredSession();
+    setSession(localSession);
+
+    if (!localSession) {
+      setChecked(true);
+    } else {
+      // Puis on renouvelle/valide silencieusement auprès du PDS.
+      restoreStoredSession()
+        .then((restored) => {
+          if (cancelled) return;
+          setSession(restored);
+          setChecked(true);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setSession(getStoredSession());
+          setChecked(true);
+        });
+    }
 
     const handleStorage = () => {
       refreshSession();
@@ -70,6 +91,8 @@ export function AuthProvider({
     );
 
     return () => {
+      cancelled = true;
+
       window.removeEventListener(
         "storage",
         handleStorage
