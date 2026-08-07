@@ -26,6 +26,7 @@ import {
 } from "@/lib/atproto/profile";
 import {
   POST_CHARACTER_LIMIT,
+  setNextPostContentLabel,
   type PostContentLabel,
 } from "@/lib/atproto/posts";
 import {
@@ -153,6 +154,8 @@ export default function Composer({
     event.preventDefault();
 
     if (!requireVerification() || overLimit) return;
+
+    setNextPostContentLabel(contentLabel || undefined);
     onSubmit(event, contentLabel || undefined);
     setContentLabel("");
   };
