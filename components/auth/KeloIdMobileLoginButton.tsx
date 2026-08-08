@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
+const PENDING_LOGIN_KEY = "kelo-id.pending-login";
+
 export default function KeloIdMobileLoginButton() {
   const pathname = usePathname();
   const [eligible, setEligible] = useState(false);
@@ -24,6 +26,7 @@ export default function KeloIdMobileLoginButton() {
     try {
       const response = await fetch("/api/kelo-id/login/qr/create", {
         method: "POST",
+        cache: "no-store",
       });
       const data = await response.json();
 
@@ -36,12 +39,27 @@ export default function KeloIdMobileLoginButton() {
       callback.searchParams.set("id", data.id);
       callback.searchParams.set("clientState", data.clientState);
 
+      // Conserver le challenge côté navigateur permet au callback mobile de
+      // récupérer le bon flux même si le navigateur ou Kelo ID retire des
+      // paramètres pendant la redirection.
+      window.sessionStorage.setItem(
+        PENDING_LOGIN_KEY,
+        JSON.stringify({
+          id: data.id,
+          clientState: data.clientState,
+          createdAt: Date.now(),
+        })
+      );
+
       const authorize = new URL("/authorize", keloIdUrl);
       authorize.searchParams.set("challenge", data.id);
       authorize.searchParams.set("returnTo", callback.toString());
 
-      window.location.assign(authorize.toString());
+      // replace évite de revenir sur une ancienne URL /authorize avec un
+      // challenge déjà consommé lorsque l'utilisateur utilise Retour.
+      window.location.replace(authorize.toString());
     } catch (loginError) {
+      window.sessionStorage.removeItem(PENDING_LOGIN_KEY);
       setError(
         loginError instanceof Error
           ? loginError.message
