@@ -18,7 +18,7 @@ import {
 
 import {
   CertificationRecord,
-  getKeloCertification,
+  listCertifications,
 } from "@/lib/atproto/certifications";
 
 interface VerificationBadgeProps {
@@ -40,23 +40,23 @@ const CERTIFIER_IMAGE =
 const VERIFIED_IMAGE =
   "https://kelosocial.sirv.com/ChatGPT%20Image%2025%20juil.%202026%2C%2022_56_32.png";
 
+function normalizeDid(value: string): string {
+  return value.trim().toLowerCase();
+}
+
 export default function VerificationBadge({
   actor,
   size = 16,
 }: VerificationBadgeProps) {
-  const initialNativeBadge =
-    getVerificationBadge(actor);
+  const initialNativeBadge = getVerificationBadge(actor);
 
   const [nativeBadge, setNativeBadge] =
-    useState<VerificationBadgeType>(
-      initialNativeBadge
-    );
+    useState<VerificationBadgeType>(initialNativeBadge);
 
-  const [nativeActor, setNativeActor] =
-    useState<any>(actor);
+  const [nativeActor, setNativeActor] = useState<any>(actor);
 
-  const [keloCertification, setKeloCertification] =
-    useState<CertificationRecord | null>(null);
+  const [keloCertifications, setKeloCertifications] =
+    useState<CertificationRecord[]>([]);
 
   const [checking, setChecking] = useState(
     !initialNativeBadge || !!actor?.did
@@ -83,26 +83,15 @@ export default function VerificationBadge({
           : "";
 
       try {
-        const tasks: Promise<any>[] = [];
+        const [publicVerification, allKeloRecords] =
+          await Promise.all([
+            getPublicNativeVerification(actor),
+            did
+              ? listCertifications()
+              : Promise.resolve([] as CertificationRecord[]),
+          ]);
 
-        tasks.push(
-          getPublicNativeVerification(actor)
-        );
-
-        tasks.push(
-          did
-            ? getKeloCertification(did)
-            : Promise.resolve(null)
-        );
-
-        const [
-          publicVerification,
-          keloRecord,
-        ] = await Promise.all(tasks);
-
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
         if (publicVerification) {
           const enrichedActor = {
@@ -111,26 +100,26 @@ export default function VerificationBadge({
           };
 
           setNativeActor(enrichedActor);
-          setNativeBadge(
-            getVerificationBadge(enrichedActor)
-          );
+          setNativeBadge(getVerificationBadge(enrichedActor));
         } else {
           setNativeActor(actor);
-          setNativeBadge(
-            getVerificationBadge(actor)
-          );
+          setNativeBadge(getVerificationBadge(actor));
         }
 
-        setKeloCertification(keloRecord);
+        const normalizedSubjectDid = normalizeDid(did);
+        const matchingRecords = allKeloRecords.filter(
+          (record) =>
+            normalizeDid(record.subjectDid) === normalizedSubjectDid
+        );
+
+        setKeloCertifications(matchingRecords);
       } catch (error) {
         console.error(
           "Impossible de déterminer le badge du compte :",
           error
         );
       } finally {
-        if (!cancelled) {
-          setChecking(false);
-        }
+        if (!cancelled) setChecking(false);
       }
     }
 
@@ -141,16 +130,20 @@ export default function VerificationBadge({
     };
   }, [actor]);
 
-  const badgeType = useMemo<
-    VerificationBadgeType
-  >(() => {
+  useEffect(() => {
+    setIssuers([]);
+    setIssuerError(false);
+  }, [actor?.did]);
+
+  const badgeType = useMemo<VerificationBadgeType>(() => {
     if (nativeBadge === "trusted-verifier") {
       return "trusted-verifier";
     }
 
     if (
-      keloCertification?.status ===
-      "trusted-verifier"
+      keloCertifications.some(
+        (record) => record.status === "trusted-verifier"
+      )
     ) {
       return "trusted-verifier";
     }
@@ -160,21 +153,18 @@ export default function VerificationBadge({
     }
 
     if (
-      keloCertification?.status === "certified"
+      keloCertifications.some(
+        (record) => record.status === "certified"
+      )
     ) {
       return "verified";
     }
 
     return null;
-  }, [nativeBadge, keloCertification]);
+  }, [nativeBadge, keloCertifications]);
 
-  if (checking && !badgeType) {
-    return null;
-  }
-
-  if (!badgeType) {
-    return null;
-  }
+  if (checking && !badgeType) return null;
+  if (!badgeType) return null;
 
   const handleClick = async (
     event: React.MouseEvent<HTMLDivElement>
@@ -193,8 +183,7 @@ export default function VerificationBadge({
       setIssuerError(false);
 
       try {
-        const nativeIssuers =
-          getVerificationIssuers(nativeActor);
+        const nativeIssuers = getVerificationIssuers(nativeActor);
 
         const issuerEntries: Array<{
           did?: string;
@@ -206,16 +195,18 @@ export default function VerificationBadge({
           source: "native" as const,
         }));
 
-        if (keloCertification) {
+        for (const certification of keloCertifications) {
+          if (certification.status !== "certified") continue;
+
           issuerEntries.push({
-            did: keloCertification.issuerDid,
+            did: certification.issuerDid,
             handle:
-              keloCertification.issuerHandle ||
-              (!keloCertification.issuerDid
+              certification.issuerHandle ||
+              (!certification.issuerDid
                 ? "kelosocial.eu"
                 : undefined),
             displayName:
-              !keloCertification.issuerDid
+              !certification.issuerDid
                 ? "Kelo Social"
                 : undefined,
             source: "kelo",
@@ -242,8 +233,7 @@ export default function VerificationBadge({
           uniqueEntries.map(async (entry) => {
             if (entry.did) {
               try {
-                const profile =
-                  await getIssuerProfile(entry.did);
+                const profile = await getIssuerProfile(entry.did);
 
                 return {
                   did: entry.did,
@@ -317,9 +307,7 @@ export default function VerificationBadge({
           {badgeType === "verified" ? (
             <div
               className="fixed left-1/2 top-1/2 z-40 max-h-[80vh] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-kelo-border bg-white p-5 shadow-kelo"
-              onClick={(event) =>
-                event.stopPropagation()
-              }
+              onClick={(event) => event.stopPropagation()}
             >
               <p className="mb-3 text-sm font-bold text-kelo-text">
                 Compte certifié
@@ -350,16 +338,14 @@ export default function VerificationBadge({
                         <Avatar
                           src={issuer.avatar}
                           fallback={
-                            issuer.handle[0]?.toUpperCase() ||
-                            "K"
+                            issuer.handle[0]?.toUpperCase() || "K"
                           }
                           size="sm"
                         />
 
                         <div className="min-w-0">
                           <p className="truncate text-sm font-bold text-kelo-text">
-                            {issuer.displayName ||
-                              issuer.handle}
+                            {issuer.displayName || issuer.handle}
                           </p>
 
                           <p className="truncate text-xs text-kelo-muted">
@@ -369,15 +355,6 @@ export default function VerificationBadge({
                       </Link>
                     ))}
                   </div>
-
-                  {keloCertification?.issuedAt && (
-                    <p className="mt-3 text-xs text-kelo-muted">
-                      Certification Kelo attribuée le{" "}
-                      {new Date(
-                        keloCertification.issuedAt
-                      ).toLocaleDateString("fr-BE")}
-                    </p>
-                  )}
                 </>
               )}
 
@@ -398,9 +375,7 @@ export default function VerificationBadge({
           ) : (
             <div
               className="fixed left-1/2 top-1/2 z-40 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-kelo-border bg-white p-6 shadow-kelo"
-              onClick={(event) =>
-                event.stopPropagation()
-              }
+              onClick={(event) => event.stopPropagation()}
             >
               <div className="mb-5 rounded-2xl bg-kelo-background p-5">
                 <div className="flex items-center justify-center gap-3">
@@ -408,7 +383,6 @@ export default function VerificationBadge({
                     <div className="flex h-14 w-14 items-center justify-center rounded-full bg-kelo-gradient">
                       <Logo className="h-8 w-8" />
                     </div>
-
                     <span className="text-xs font-semibold text-kelo-muted">
                       Kelo
                     </span>
@@ -422,7 +396,6 @@ export default function VerificationBadge({
                       alt="Certificateur de confiance"
                       className="h-14 w-14 object-contain"
                     />
-
                     <span className="text-center text-xs font-semibold text-kelo-muted">
                       Certificateur
                       <br />
@@ -438,7 +411,6 @@ export default function VerificationBadge({
                       alt="Compte certifié"
                       className="h-14 w-14 object-contain"
                     />
-
                     <span className="text-center text-xs font-semibold text-kelo-muted">
                       Compte
                       <br />
@@ -449,8 +421,7 @@ export default function VerificationBadge({
               </div>
 
               <h3 className="mb-2 text-center text-base font-extrabold text-kelo-text">
-                {actor?.displayName || actor?.handle} est
-                un certificateur de confiance
+                {actor?.displayName || actor?.handle} est un certificateur de confiance
               </h3>
 
               <p className="mb-5 text-center text-sm text-kelo-muted">
