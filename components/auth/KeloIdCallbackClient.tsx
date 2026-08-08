@@ -14,6 +14,7 @@ import type { AtpSession } from "@/types/auth";
 
 const MAX_CALLBACK_ATTEMPTS = 12;
 const CALLBACK_RETRY_DELAY_MS = 750;
+const LOGIN_FINALIZATION_TIMEOUT_MS = 5000;
 const PENDING_LOGIN_KEY = "kelo-id.pending-login";
 const PENDING_LOGIN_MAX_AGE_MS = 10 * 60 * 1000;
 
@@ -170,6 +171,30 @@ export default function KeloIdCallbackClient() {
       );
     }
 
+    async function finalizeSessionWithoutBlocking(
+      session: AtpSession
+    ): Promise<void> {
+      const validation = loginWithKeloIdSession(session);
+
+      const timeoutFallback = wait(LOGIN_FINALIZATION_TIMEOUT_MS).then(() => {
+        const stored = getStoredSession();
+
+        // loginWithKeloIdSession enregistre la session avant sa vérification
+        // réseau. Sur mobile/PWA, cette vérification PDS peut rester pendante.
+        // Dans ce cas, on ne bloque pas l'ouverture du feed : la session sera
+        // revalidée par le mécanisme normal d'AuthProvider après navigation.
+        if (stored?.did === session.did) {
+          return stored;
+        }
+
+        throw new Error(
+          "La session Kelo ID n’a pas pu être enregistrée sur cet appareil."
+        );
+      });
+
+      await Promise.race([validation, timeoutFallback]);
+    }
+
     async function completeLogin() {
       try {
         const session = await fetchReadySession();
@@ -180,15 +205,16 @@ export default function KeloIdCallbackClient() {
           "Connexion confirmée. Ouverture de Kelo Social..."
         );
 
-        await loginWithKeloIdSession(session);
+        await finalizeSessionWithoutBlocking(session);
+
+        if (cancelled) return;
+
         refreshSession();
         window.sessionStorage.removeItem(PENDING_LOGIN_KEY);
 
-        if (!cancelled) {
-          // Navigation franche pour redémarrer AuthProvider à partir de la
-          // session AT Protocol persistée et ne pas conserver le callback.
-          window.location.replace("/feed");
-        }
+        // Navigation franche pour redémarrer AuthProvider à partir de la
+        // session AT Protocol persistée et ne pas conserver le callback.
+        window.location.replace("/feed");
       } catch (callbackError) {
         if (cancelled) return;
 
