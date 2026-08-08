@@ -27,9 +27,11 @@ interface VerificationBadgeProps {
 }
 
 interface IssuerProfile {
+  did?: string;
   handle: string;
   displayName?: string;
   avatar?: string;
+  source?: "native" | "kelo";
 }
 
 const CERTIFIER_IMAGE =
@@ -62,8 +64,8 @@ export default function VerificationBadge({
 
   const [open, setOpen] = useState(false);
 
-  const [issuer, setIssuer] =
-    useState<IssuerProfile | null>(null);
+  const [issuers, setIssuers] =
+    useState<IssuerProfile[]>([]);
 
   const [loadingIssuer, setLoadingIssuer] =
     useState(false);
@@ -83,11 +85,6 @@ export default function VerificationBadge({
       try {
         const tasks: Promise<any>[] = [];
 
-        /*
-         * On relit toujours le profil public lorsque l’objet actor peut venir
-         * d’un PDS tiers. Cela permet de détecter correctement les
-         * certificateurs de confiance Bluesky.
-         */
         tasks.push(
           getPublicNativeVerification(actor)
         );
@@ -144,13 +141,6 @@ export default function VerificationBadge({
     };
   }, [actor]);
 
-  /**
-   * Priorité finale :
-   * 1. Certificateur natif Bluesky
-   * 2. Certificateur Kelo
-   * 3. Certification native Bluesky
-   * 4. Certification Kelo
-   */
   const badgeType = useMemo<
     VerificationBadgeType
   >(() => {
@@ -196,53 +186,104 @@ export default function VerificationBadge({
 
     if (
       badgeType === "verified" &&
-      !issuer &&
+      issuers.length === 0 &&
       !loadingIssuer
     ) {
-      const nativeIssuers =
-        getVerificationIssuers(nativeActor);
-
-      const nativeIssuerDid =
-        nativeIssuers[0]?.issuer;
-
-      const keloIssuerDid =
-        keloCertification?.issuerDid;
-
-      const issuerDid =
-        nativeIssuerDid || keloIssuerDid;
-
-      if (!issuerDid) {
-        /*
-         * Anciennes certifications Kelo sans issuerDid :
-         * on affiche directement @kelosocial.eu.
-         */
-        if (keloCertification) {
-          setIssuer({
-            handle:
-              keloCertification.issuerHandle ||
-              "kelosocial.eu",
-            displayName: "Kelo Social",
-          });
-          return;
-        }
-
-        setIssuerError(true);
-        return;
-      }
-
       setLoadingIssuer(true);
+      setIssuerError(false);
 
       try {
-        const profile =
-          await getIssuerProfile(issuerDid);
+        const nativeIssuers =
+          getVerificationIssuers(nativeActor);
 
-        setIssuer(profile);
-      } catch (error) {
-        console.error(
-          "Erreur récupération certificateur :",
-          error
+        const issuerEntries: Array<{
+          did?: string;
+          handle?: string;
+          displayName?: string;
+          source: "native" | "kelo";
+        }> = nativeIssuers.map((item) => ({
+          did: item.issuer,
+          source: "native" as const,
+        }));
+
+        if (keloCertification) {
+          issuerEntries.push({
+            did: keloCertification.issuerDid,
+            handle:
+              keloCertification.issuerHandle ||
+              (!keloCertification.issuerDid
+                ? "kelosocial.eu"
+                : undefined),
+            displayName:
+              !keloCertification.issuerDid
+                ? "Kelo Social"
+                : undefined,
+            source: "kelo",
+          });
+        }
+
+        const uniqueEntries = issuerEntries.filter(
+          (entry, index, all) => {
+            const key =
+              entry.did?.toLowerCase() ||
+              entry.handle?.toLowerCase();
+
+            return (
+              !!key &&
+              all.findIndex((candidate) =>
+                (candidate.did?.toLowerCase() ||
+                  candidate.handle?.toLowerCase()) === key
+              ) === index
+            );
+          }
         );
 
+        const profiles = await Promise.all(
+          uniqueEntries.map(async (entry) => {
+            if (entry.did) {
+              try {
+                const profile =
+                  await getIssuerProfile(entry.did);
+
+                return {
+                  did: entry.did,
+                  handle: profile.handle,
+                  displayName: profile.displayName,
+                  avatar: profile.avatar,
+                  source: entry.source,
+                } as IssuerProfile;
+              } catch (error) {
+                console.error(
+                  "Erreur récupération certificateur :",
+                  error
+                );
+              }
+            }
+
+            if (entry.handle) {
+              return {
+                handle: entry.handle,
+                displayName: entry.displayName,
+                source: entry.source,
+              } as IssuerProfile;
+            }
+
+            return null;
+          })
+        );
+
+        const validProfiles = profiles.filter(
+          (profile): profile is IssuerProfile =>
+            Boolean(profile?.handle)
+        );
+
+        setIssuers(validProfiles);
+        setIssuerError(validProfiles.length === 0);
+      } catch (error) {
+        console.error(
+          "Erreur récupération certificateurs :",
+          error
+        );
         setIssuerError(true);
       } finally {
         setLoadingIssuer(false);
@@ -275,7 +316,7 @@ export default function VerificationBadge({
 
           {badgeType === "verified" ? (
             <div
-              className="fixed left-1/2 top-1/2 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-kelo-border bg-white p-5 shadow-kelo"
+              className="fixed left-1/2 top-1/2 z-40 max-h-[80vh] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-kelo-border bg-white p-5 shadow-kelo"
               onClick={(event) =>
                 event.stopPropagation()
               }
@@ -290,41 +331,48 @@ export default function VerificationBadge({
                 </p>
               )}
 
-              {!loadingIssuer && issuer && (
+              {!loadingIssuer && issuers.length > 0 && (
                 <>
                   <p className="mb-2 text-xs text-kelo-muted">
-                    Certifié par :
+                    {issuers.length > 1
+                      ? `Certifié par ${issuers.length} certificateurs de confiance :`
+                      : "Certifié par :"}
                   </p>
 
-                  <Link
-                    href={`/profile/${issuer.handle}`}
-                    className="flex items-center gap-3 rounded-xl p-2 hover:bg-kelo-background"
-                    onClick={() => setOpen(false)}
-                  >
-                    <Avatar
-                      src={issuer.avatar}
-                      fallback={
-                        issuer.handle[0]?.toUpperCase() ||
-                        "K"
-                      }
-                      size="sm"
-                    />
+                  <div className="space-y-1">
+                    {issuers.map((issuer) => (
+                      <Link
+                        key={issuer.did || issuer.handle}
+                        href={`/profile/${issuer.handle}`}
+                        className="flex items-center gap-3 rounded-xl p-2 hover:bg-kelo-background"
+                        onClick={() => setOpen(false)}
+                      >
+                        <Avatar
+                          src={issuer.avatar}
+                          fallback={
+                            issuer.handle[0]?.toUpperCase() ||
+                            "K"
+                          }
+                          size="sm"
+                        />
 
-                    <div>
-                      <p className="text-sm font-bold text-kelo-text">
-                        {issuer.displayName ||
-                          issuer.handle}
-                      </p>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-kelo-text">
+                            {issuer.displayName ||
+                              issuer.handle}
+                          </p>
 
-                      <p className="text-xs text-kelo-muted">
-                        @{issuer.handle}
-                      </p>
-                    </div>
-                  </Link>
+                          <p className="truncate text-xs text-kelo-muted">
+                            @{issuer.handle}
+                          </p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
 
                   {keloCertification?.issuedAt && (
                     <p className="mt-3 text-xs text-kelo-muted">
-                      Attribuée le{" "}
+                      Certification Kelo attribuée le{" "}
                       {new Date(
                         keloCertification.issuedAt
                       ).toLocaleDateString("fr-BE")}
@@ -335,7 +383,7 @@ export default function VerificationBadge({
 
               {!loadingIssuer && issuerError && (
                 <p className="text-sm text-kelo-muted">
-                  Impossible de déterminer le certificateur.
+                  Impossible de déterminer les certificateurs.
                 </p>
               )}
 
