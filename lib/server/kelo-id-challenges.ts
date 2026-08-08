@@ -30,11 +30,11 @@ runtime.__keloChallengeInflight = inflight;
 function cleanupExpiredEntries() {
   const now = Date.now();
 
-  for (const [id, cached] of approvedCache.entries()) {
+  approvedCache.forEach((cached, id) => {
     if (cached.expiresAt <= now) {
       approvedCache.delete(id);
     }
-  }
+  });
 }
 
 /**
