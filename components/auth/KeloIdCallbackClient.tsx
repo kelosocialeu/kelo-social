@@ -5,16 +5,56 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { useAuthContext } from "@/components/providers/AuthProvider";
-import { loginWithKeloIdSession } from "@/services/auth.service";
+import {
+  getStoredSession,
+  loginWithKeloIdSession,
+  restoreStoredSession,
+} from "@/services/auth.service";
 import type { AtpSession } from "@/types/auth";
 
 const MAX_CALLBACK_ATTEMPTS = 12;
 const CALLBACK_RETRY_DELAY_MS = 750;
+const PENDING_LOGIN_KEY = "kelo-id.pending-login";
+const PENDING_LOGIN_MAX_AGE_MS = 10 * 60 * 1000;
 
 function wait(ms: number) {
   return new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+function readPendingLogin(): {
+  id: string;
+  clientState: string;
+} | null {
+  try {
+    const raw = window.sessionStorage.getItem(PENDING_LOGIN_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as {
+      id?: string;
+      clientState?: string;
+      createdAt?: number;
+    };
+
+    if (
+      !parsed.id ||
+      !parsed.clientState ||
+      !parsed.createdAt ||
+      Date.now() - parsed.createdAt > PENDING_LOGIN_MAX_AGE_MS
+    ) {
+      window.sessionStorage.removeItem(PENDING_LOGIN_KEY);
+      return null;
+    }
+
+    return {
+      id: parsed.id,
+      clientState: parsed.clientState,
+    };
+  } catch {
+    window.sessionStorage.removeItem(PENDING_LOGIN_KEY);
+    return null;
+  }
 }
 
 export default function KeloIdCallbackClient() {
@@ -32,15 +72,45 @@ export default function KeloIdCallbackClient() {
     if (startedRef.current) return;
     startedRef.current = true;
 
-    const id = searchParams.get("id") || "";
-    const clientState = searchParams.get("clientState") || "";
-
-    if (!id || !clientState) {
-      setError("Retour Kelo ID incomplet.");
-      return;
-    }
+    const pending = readPendingLogin();
+    const id = searchParams.get("id") || pending?.id || "";
+    const clientState =
+      searchParams.get("clientState") || pending?.clientState || "";
 
     let cancelled = false;
+
+    async function recoverExistingSession(): Promise<boolean> {
+      if (!getStoredSession()) {
+        return false;
+      }
+
+      try {
+        const restored = await restoreStoredSession();
+
+        if (!restored || cancelled) {
+          return false;
+        }
+
+        refreshSession();
+        window.sessionStorage.removeItem(PENDING_LOGIN_KEY);
+        window.location.replace("/feed");
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    if (!id || !clientState) {
+      void recoverExistingSession().then((recovered) => {
+        if (!recovered && !cancelled) {
+          setError("Retour Kelo ID incomplet. Générez une nouvelle connexion.");
+        }
+      });
+
+      return () => {
+        cancelled = true;
+      };
+    }
 
     async function fetchReadySession(): Promise<AtpSession> {
       let lastError = "La connexion Kelo ID n’a pas été confirmée.";
@@ -68,8 +138,8 @@ export default function KeloIdCallbackClient() {
           } else if (data.status === "expired") {
             throw new Error("Cette connexion Kelo ID a expiré. Générez-en une nouvelle.");
           } else if (!response.ok) {
-            // Les erreurs métier (compte non vérifié, accès QR à recréer, etc.)
-            // ne gagneront rien à être répétées pendant plusieurs secondes.
+            // Les erreurs métier (compte non vérifié, challenge déjà utilisé,
+            // etc.) ne doivent pas déclencher plusieurs consommations du QR.
             throw new Error(data.error || lastError);
           } else {
             lastError = data.error || lastError;
@@ -112,6 +182,7 @@ export default function KeloIdCallbackClient() {
 
         await loginWithKeloIdSession(session);
         refreshSession();
+        window.sessionStorage.removeItem(PENDING_LOGIN_KEY);
 
         if (!cancelled) {
           // Navigation franche pour redémarrer AuthProvider à partir de la
@@ -119,13 +190,22 @@ export default function KeloIdCallbackClient() {
           window.location.replace("/feed");
         }
       } catch (callbackError) {
-        if (!cancelled) {
-          setError(
-            callbackError instanceof Error
-              ? callbackError.message
-              : "Connexion Kelo ID impossible."
-          );
+        if (cancelled) return;
+
+        // Si le navigateur revient deux fois sur le callback ou si Kelo ID
+        // indique qu'un challenge est déjà consommé, une session peut déjà
+        // avoir été enregistrée. On la valide avant d'afficher une erreur et
+        // avant de demander inutilement une nouvelle déconnexion/reconnexion.
+        if (await recoverExistingSession()) {
+          return;
         }
+
+        window.sessionStorage.removeItem(PENDING_LOGIN_KEY);
+        setError(
+          callbackError instanceof Error
+            ? callbackError.message
+            : "Connexion Kelo ID impossible."
+        );
       }
     }
 
