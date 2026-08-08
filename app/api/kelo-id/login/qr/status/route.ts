@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { callKeloId } from "@/lib/server/kelo-id-verification";
+import { getKeloIdChallenge } from "@/lib/server/kelo-id-challenges";
 
 interface KeloIdAtSession {
   accessJwt: string;
@@ -23,17 +23,17 @@ export async function GET(request: Request) {
       );
     }
 
-    const response = await callKeloId(
-      `/api/integrations/kelo-social/challenges?id=${encodeURIComponent(id)}`,
-      { method: "GET" }
-    );
+    const challenge = await getKeloIdChallenge(id);
+    const data = challenge.data;
 
-    const data = await response.json();
-
-    if (!response.ok) {
+    if (!challenge.ok) {
       return NextResponse.json(
-        { error: data.error || "Connexion Kelo ID impossible." },
-        { status: response.status }
+        {
+          error:
+            (typeof data.error === "string" && data.error) ||
+            "Connexion Kelo ID impossible.",
+        },
+        { status: challenge.status }
       );
     }
 
