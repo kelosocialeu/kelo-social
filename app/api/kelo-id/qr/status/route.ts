@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { getKeloIdChallenge } from "@/lib/server/kelo-id-challenges";
 import {
-  callKeloId,
   publishKeloIdVerification,
   verifyBrowserSession,
 } from "@/lib/server/kelo-id-verification";
@@ -22,25 +22,17 @@ export async function POST(request: Request) {
       body?.session
     );
 
-    const response = await callKeloId(
-      `/api/integrations/kelo-social/challenges?id=${encodeURIComponent(
-        id
-      )}`,
-      {
-        method: "GET",
-      }
-    );
+    const challenge = await getKeloIdChallenge(id);
+    const data = challenge.data;
 
-    const data = await response.json();
-
-    if (!response.ok) {
+    if (!challenge.ok) {
       return NextResponse.json(
         {
           error:
-            data.error ||
+            (typeof data.error === "string" && data.error) ||
             "Impossible de vérifier le QR.",
         },
-        { status: response.status }
+        { status: challenge.status }
       );
     }
 
