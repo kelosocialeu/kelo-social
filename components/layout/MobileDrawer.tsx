@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BadgeCheck,
   Bell,
   Bookmark,
   Hash,
@@ -20,7 +21,7 @@ import {
 } from "lucide-react";
 
 import Logo from "@/components/ui/Logo";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useAdminRole } from "@/hooks/useAdminRole";
 
 interface MobileDrawerProps {
   open: boolean;
@@ -92,7 +93,7 @@ export default function MobileDrawer({
   onCreatePost,
 }: MobileDrawerProps) {
   const pathname = usePathname();
-  const { isAdmin } = useIsAdmin();
+  const { isAdmin, isTrustedVerifier } = useAdminRole();
 
   return (
     <>
@@ -206,6 +207,26 @@ export default function MobileDrawer({
               >
                 <ShieldCheck className="h-5 w-5" />
                 Panneau Admin
+              </Link>
+            )}
+
+            {!isAdmin && isTrustedVerifier && (
+              <Link
+                href="/verifier"
+                onClick={onClose}
+                aria-current={
+                  isRouteActive(pathname, "/verifier")
+                    ? "page"
+                    : undefined
+                }
+                className={`flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                  isRouteActive(pathname, "/verifier")
+                    ? "bg-kelo-gradient text-white shadow-sm"
+                    : "text-kelo-secondary hover:bg-white/60"
+                }`}
+              >
+                <BadgeCheck className="h-5 w-5" />
+                Panneau certificateur
               </Link>
             )}
           </nav>
