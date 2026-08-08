@@ -44,6 +44,10 @@ function normalizePdsUrl(value: string): string {
   return value.trim().replace(/\/$/, "");
 }
 
+function isDefinitelyExpiredSessionStatus(status: number): boolean {
+  return status === 400 || status === 401 || status === 403;
+}
+
 async function refreshAtProtocolSession(
   session: AtpSession
 ): Promise<AtpSession> {
@@ -78,8 +82,16 @@ async function refreshAtProtocolSession(
     }
 
     if (!response.ok) {
-      throw new AuthError(
-        "Votre session a expiré. Veuillez vous reconnecter."
+      if (isDefinitelyExpiredSessionStatus(response.status)) {
+        throw new AuthError(
+          "Votre session a expiré. Veuillez vous reconnecter."
+        );
+      }
+
+      // Une panne, un 429 ou une erreur serveur ne doit pas effacer la
+      // session locale ni provoquer une boucle déconnexion/reconnexion.
+      throw new Error(
+        `Le PDS est temporairement indisponible pendant le renouvellement de session (${response.status}).`
       );
     }
 
