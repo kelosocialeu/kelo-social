@@ -65,19 +65,31 @@ export default function IdentitySection() {
     setChecking(true);
     setVerified(false);
     setMessage(null);
+
     try {
-      let ok = false;
-      if (method === "dns") {
-        const response = await fetch(`https://dns.google/resolve?name=_atproto.${encodeURIComponent(domain)}&type=TXT`);
-        const data = await response.json();
-        ok = Array.isArray(data.Answer) && data.Answer.some((answer: any) => String(answer.data || "").replace(/^"|"$/g, "") === `did=${did}`);
-      } else {
-        const response = await fetch(`https://${domain}/.well-known/atproto-did`, { cache: "no-store" });
-        ok = response.ok && (await response.text()).trim() === did;
+      const response = await fetch("/api/account/verify-handle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain, did, method }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data?.ok) {
+        setMessage(data?.error || "Impossible de vérifier ce domaine pour le moment.");
+        return;
       }
+
+      const ok = data.verified === true && data.available === true && data.resolvedDid === did;
       setVerified(ok);
-      setMessage(ok ? "Domaine vérifié. Vous pouvez continuer." : "La vérification n’est pas encore valide. Vérifiez l’enregistrement puis réessayez.");
-    } catch {
+
+      if (ok) {
+        setMessage("Domaine vérifié par AT Protocol et disponible pour votre compte. Vous pouvez continuer.");
+      } else {
+        setMessage(data.reason || "La vérification n’est pas encore valide. Vérifiez la configuration puis réessayez.");
+      }
+    } catch (error) {
+      console.error(error);
       setMessage("Impossible de vérifier pour le moment. Vérifiez la configuration puis réessayez.");
     } finally {
       setChecking(false);
@@ -126,14 +138,14 @@ export default function IdentitySection() {
           <button type="button" onClick={() => setMode("choice")} className="mb-4 flex items-center gap-1 text-sm font-bold text-kelo-muted"><ChevronLeft className="h-4 w-4" /> Retour</button>
           <h4 className="font-extrabold text-kelo-text">Utiliser mon propre domaine</h4>
           <p className="mt-1 text-sm text-kelo-muted">Entrez d’abord le domaine que vous voulez utiliser.</p>
-          <div className="mt-4"><Input value={domainInput} onChange={(e) => { setDomainInput(e.target.value); setVerified(false); }} placeholder="monsite.fr" /></div>
+          <div className="mt-4"><Input value={domainInput} onChange={(e) => { setDomainInput(e.target.value); setVerified(false); setMessage(null); }} placeholder="monsite.fr" /></div>
 
           {domain && (
             <div className="mt-5">
               <p className="mb-2 text-sm font-bold text-kelo-text">Comment voulez-vous le vérifier ?</p>
               <div className="grid gap-2 sm:grid-cols-2">
-                <button type="button" onClick={() => { setMethod("dns"); setVerified(false); }} className={`rounded-xl border p-3 text-left text-sm font-bold ${method === "dns" ? "border-kelo-primary bg-kelo-primary/10 text-kelo-primary" : "border-kelo-border text-kelo-text"}`}>J’ai accès au panneau DNS</button>
-                <button type="button" onClick={() => { setMethod("web"); setVerified(false); }} className={`rounded-xl border p-3 text-left text-sm font-bold ${method === "web" ? "border-kelo-primary bg-kelo-primary/10 text-kelo-primary" : "border-kelo-border text-kelo-text"}`}>Je n’ai pas de panneau DNS</button>
+                <button type="button" onClick={() => { setMethod("dns"); setVerified(false); setMessage(null); }} className={`rounded-xl border p-3 text-left text-sm font-bold ${method === "dns" ? "border-kelo-primary bg-kelo-primary/10 text-kelo-primary" : "border-kelo-border text-kelo-text"}`}>J’ai accès au panneau DNS</button>
+                <button type="button" onClick={() => { setMethod("web"); setVerified(false); setMessage(null); }} className={`rounded-xl border p-3 text-left text-sm font-bold ${method === "web" ? "border-kelo-primary bg-kelo-primary/10 text-kelo-primary" : "border-kelo-border text-kelo-text"}`}>Je n’ai pas de panneau DNS</button>
               </div>
 
               <div className="mt-4 rounded-xl bg-kelo-background p-4">
@@ -148,7 +160,7 @@ export default function IdentitySection() {
                 </>}
               </div>
 
-              <Button variant="secondary" className="mt-4 w-full sm:w-auto" onClick={verifyDomain} disabled={checking}>{checking ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Vérification...</> : "Vérifier l’enregistrement"}</Button>
+              <Button variant="secondary" className="mt-4 w-full sm:w-auto" onClick={verifyDomain} disabled={checking}>{checking ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Vérification réelle...</> : "Vérifier l’enregistrement"}</Button>
               {verified && <Button className="mt-2 w-full sm:ml-2 sm:w-auto" onClick={() => apply(domain)} loading={saving}><CheckCircle2 className="mr-2 h-4 w-4" />Continuer avec @{domain}</Button>}
             </div>
           )}
