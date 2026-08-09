@@ -1,6 +1,18 @@
 export type KeloTheme = "system" | "light" | "dark";
 export type TextScale = "90" | "100" | "110" | "120";
-export type KeloPalette = "default" | "violet-cyan" | "rose-sunset" | "blue-green" | "prism";
+export type KeloPalette =
+  | "default"
+  | "violet-cyan"
+  | "rose-sunset"
+  | "blue-green"
+  | "prism"
+  | "classic-blue"
+  | "classic-violet"
+  | "classic-green"
+  | "classic-rose"
+  | "classic-orange"
+  | "classic-red"
+  | "classic-black";
 
 export interface DisplayPreferences {
   theme: KeloTheme;
@@ -16,6 +28,8 @@ type PaletteDefinition = {
   secondaryRgb: string;
   gradient: string;
 };
+
+const solid = (color: string) => `linear-gradient(90deg,${color} 0%,${color} 100%)`;
 
 export const KELO_PALETTES: Record<KeloPalette, PaletteDefinition> = {
   default: {
@@ -52,6 +66,27 @@ export const KELO_PALETTES: Record<KeloPalette, PaletteDefinition> = {
     secondary: "#168bff",
     secondaryRgb: "22 139 255",
     gradient: "linear-gradient(135deg,#ff385d 0%,#ed0ca9 28%,#9718f2 52%,#2464ff 76%,#10d5e5 100%)",
+  },
+  "classic-blue": {
+    primary: "#2563eb", primaryRgb: "37 99 235", secondary: "#2563eb", secondaryRgb: "37 99 235", gradient: solid("#2563eb"),
+  },
+  "classic-violet": {
+    primary: "#7c3aed", primaryRgb: "124 58 237", secondary: "#7c3aed", secondaryRgb: "124 58 237", gradient: solid("#7c3aed"),
+  },
+  "classic-green": {
+    primary: "#059669", primaryRgb: "5 150 105", secondary: "#059669", secondaryRgb: "5 150 105", gradient: solid("#059669"),
+  },
+  "classic-rose": {
+    primary: "#e11d48", primaryRgb: "225 29 72", secondary: "#e11d48", secondaryRgb: "225 29 72", gradient: solid("#e11d48"),
+  },
+  "classic-orange": {
+    primary: "#ea580c", primaryRgb: "234 88 12", secondary: "#ea580c", secondaryRgb: "234 88 12", gradient: solid("#ea580c"),
+  },
+  "classic-red": {
+    primary: "#dc2626", primaryRgb: "220 38 38", secondary: "#dc2626", secondaryRgb: "220 38 38", gradient: solid("#dc2626"),
+  },
+  "classic-black": {
+    primary: "#171717", primaryRgb: "23 23 23", secondary: "#171717", secondaryRgb: "23 23 23", gradient: solid("#171717"),
   },
 };
 
