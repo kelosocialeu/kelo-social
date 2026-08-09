@@ -56,74 +56,20 @@ body {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
+img, video, canvas, svg { max-width: 100%; }
+button { transition: .25s; }
 
-img,
-video,
-canvas,
-svg {
-  max-width: 100%;
-}
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-thumb { background: #c8c8d8; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #a7a7bd; }
 
-button {
-  transition: .25s;
-}
-
-::-webkit-scrollbar {
-  width: 10px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #c8c8d8;
-  border-radius: 999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #a7a7bd;
-}
-
-.kelo-gradient {
-  background: var(--gradient);
-}
-
-.kelo-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 24px;
-  box-shadow: 0 10px 35px rgba(0,0,0,.06);
-}
-
-.kelo-button {
-  background: var(--gradient);
-  color: white;
-  border: none;
-  border-radius: 999px;
-  padding: 14px 24px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.kelo-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgb(var(--primary-rgb) / .28);
-}
-
-.kelo-input {
-  width: 100%;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 14px 18px;
-  font-size: 15px;
-}
-
-.kelo-input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgb(var(--primary-rgb) / .12);
-}
+.kelo-gradient { background: var(--gradient); }
+.kelo-card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; box-shadow: 0 10px 35px rgba(0,0,0,.06); }
+.kelo-button { background: var(--gradient); color: white; border: none; border-radius: 999px; padding: 14px 24px; font-weight: 700; cursor: pointer; }
+.kelo-button:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgb(var(--primary-rgb) / .28); }
+.kelo-input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 18px; font-size: 15px; }
+.kelo-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgb(var(--primary-rgb) / .12); }
 
 /* Préférences d'affichage Kelo Social. */
 html.kelo-theme-dark {
@@ -131,10 +77,10 @@ html.kelo-theme-dark {
   --background-rgb: 13 13 16;
   --surface: #151519;
   --surface-rgb: 21 21 25;
-  --text: #f5f5f7;
-  --text-rgb: 245 245 247;
-  --text-light: #a5a5ad;
-  --text-light-rgb: 165 165 173;
+  --text: #ffffff;
+  --text-rgb: 255 255 255;
+  --text-light: #ffffff;
+  --text-light-rgb: 255 255 255;
   --border: #2a2a31;
   --border-rgb: 42 42 49;
   color-scheme: dark;
@@ -154,24 +100,50 @@ html.kelo-theme-dark .bg-kelo-background\/70 {
   background-color: var(--background) !important;
 }
 
-html.kelo-theme-dark .text-gray-900,
-html.kelo-theme-dark .text-kelo-text {
-  color: var(--text) !important;
+/* En mode sombre, toute la typographie devient blanche. */
+html.kelo-theme-dark :where(
+  h1,h2,h3,h4,h5,h6,p,span,a,label,li,dt,dd,strong,small,time,blockquote
+) {
+  color: #ffffff !important;
 }
 
-html.kelo-theme-dark .text-kelo-muted {
-  color: var(--text-light) !important;
+html.kelo-theme-dark .text-gray-900,
+html.kelo-theme-dark .text-gray-800,
+html.kelo-theme-dark .text-gray-700,
+html.kelo-theme-dark .text-gray-600,
+html.kelo-theme-dark .text-gray-500,
+html.kelo-theme-dark .text-kelo-text,
+html.kelo-theme-dark .text-kelo-muted,
+html.kelo-theme-dark .text-kelo-primary,
+html.kelo-theme-dark .text-kelo-secondary,
+html.kelo-theme-dark .text-kelo-success,
+html.kelo-theme-dark .text-kelo-warning,
+html.kelo-theme-dark .text-kelo-danger {
+  color: #ffffff !important;
+}
+
+/* Les icônes Lucide et icônes héritant de currentColor deviennent blanches. */
+html.kelo-theme-dark svg {
+  color: #ffffff !important;
+}
+
+html.kelo-theme-dark svg:not([fill="none"]) {
+  fill: currentColor;
 }
 
 html.kelo-theme-dark input,
 html.kelo-theme-dark textarea,
-html.kelo-theme-dark select {
-  color: var(--text);
+html.kelo-theme-dark select,
+html.kelo-theme-dark button {
+  color: #ffffff;
 }
 
-html.kelo-theme-dark .kelo-input {
-  background: var(--surface);
+html.kelo-theme-dark input::placeholder,
+html.kelo-theme-dark textarea::placeholder {
+  color: rgba(255,255,255,.65);
 }
+
+html.kelo-theme-dark .kelo-input { background: var(--surface); }
 
 html.kelo-reduce-motion *,
 html.kelo-reduce-motion *::before,
@@ -193,4 +165,10 @@ html.kelo-reduce-motion *::after {
 .settings-bluesky-section textarea,
 .settings-bluesky-section button {
   max-width: 100%;
+}
+
+@media (max-width: 1023px) {
+  .settings-bluesky-section > * {
+    min-width: 0;
+  }
 }
