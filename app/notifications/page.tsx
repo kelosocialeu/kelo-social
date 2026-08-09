@@ -3,6 +3,8 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
+  useState,
 } from "react";
 import Link from "next/link";
 
@@ -18,6 +20,10 @@ import {
   getNotifications,
   markNotificationsSeen,
 } from "@/lib/atproto/notifications";
+import {
+  getKeloNotificationPreferences,
+  shouldShowNotificationReason,
+} from "@/lib/kelo-notification-preferences";
 
 const NOTIFICATION_REFRESH_MS = 20_000;
 
@@ -39,63 +45,51 @@ const REASON_ICONS: Record<string, string> = {
   quote: "🔁",
 };
 
-function getNotificationHref(
-  notification: any
-): string {
+function getNotificationHref(notification: any): string {
   if (notification.reason === "follow") {
     return `/profile/${notification.author?.handle}`;
   }
 
   const targetUri =
-    notification.reason === "like" ||
-    notification.reason === "repost"
+    notification.reason === "like" || notification.reason === "repost"
       ? notification.reasonSubject
       : notification.uri;
 
-  return `/post?uri=${encodeURIComponent(
-    targetUri || ""
-  )}`;
+  return `/post?uri=${encodeURIComponent(targetUri || "")}`;
 }
 
-function formatNotificationDate(
-  indexedAt?: string
-): string {
+function formatNotificationDate(indexedAt?: string): string {
   if (!indexedAt) return "";
-
   try {
-    return new Date(indexedAt).toLocaleString(
-      "fr-BE",
-      {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }
-    );
+    return new Date(indexedAt).toLocaleString("fr-BE", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
   } catch {
     return indexedAt;
   }
 }
 
 export default function NotificationsPage() {
-  const { checked, handle } = useRequireAuth();
+  const { checked, handle, did } = useRequireAuth();
+  const [prefsVersion, setPrefsVersion] = useState(0);
+
+  useEffect(() => {
+    const update = () => setPrefsVersion((value) => value + 1);
+    window.addEventListener("kelo-notification-preferences-changed", update);
+    return () => window.removeEventListener("kelo-notification-preferences-changed", update);
+  }, []);
+
+  const notificationPrefs = useMemo(
+    () => getKeloNotificationPreferences(did),
+    [did, prefsVersion]
+  );
 
   const fetchNotificationsPage = useCallback(
     async (cursor?: string) => {
-      if (!checked) {
-        return {
-          items: [],
-          cursor: undefined,
-        };
-      }
-
-      const response = await getNotifications(
-        30,
-        cursor
-      );
-
-      return {
-        items: response.items,
-        cursor: response.cursor,
-      };
+      if (!checked) return { items: [], cursor: undefined };
+      const response = await getNotifications(30, cursor);
+      return { items: response.items, cursor: response.cursor };
     },
     [checked]
   );
@@ -109,37 +103,32 @@ export default function NotificationsPage() {
     error,
     loadMore,
     refresh,
-  } = useInfiniteFeed(
-    fetchNotificationsPage,
-    [checked],
-    {
-      cacheKey: "notifications:me",
-      staleTimeMs: 15_000,
-      getItemKey: (notification: any) =>
-        `${notification.uri}-${notification.indexedAt}`,
-    }
+  } = useInfiniteFeed(fetchNotificationsPage, [checked, did], {
+    cacheKey: `notifications:${did || "me"}`,
+    staleTimeMs: 15_000,
+    getItemKey: (notification: any) =>
+      `${notification.uri}-${notification.indexedAt}`,
+  });
+
+  const visibleItems = useMemo(
+    () => items.filter((notification: any) =>
+      shouldShowNotificationReason(notification.reason, notificationPrefs)
+    ),
+    [items, notificationPrefs]
   );
 
   useEffect(() => {
     if (!checked) return;
-
     markNotificationsSeen().catch((error) => {
-      console.error(
-        "Impossible de marquer les notifications comme lues :",
-        error
-      );
+      console.error("Impossible de marquer les notifications comme lues :", error);
     });
   }, [checked]);
 
   useEffect(() => {
     if (!checked) return;
-
     const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        refresh();
-      }
+      if (document.visibilityState === "visible") refresh();
     }, NOTIFICATION_REFRESH_MS);
-
     return () => window.clearInterval(interval);
   }, [checked, refresh]);
 
@@ -165,23 +154,18 @@ export default function NotificationsPage() {
           <div className="px-4 py-4 sm:px-5 lg:px-6">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h1 className="text-xl font-extrabold text-kelo-text sm:text-2xl">
-                  Notifications
-                </h1>
+                <h1 className="text-xl font-extrabold text-kelo-text sm:text-2xl">Notifications</h1>
                 <p className="mt-1 text-xs text-kelo-muted sm:text-sm">
                   Retrouvez les nouvelles interactions avec votre compte.
                 </p>
               </div>
-
               <div className="flex items-center gap-2">
-                {refreshing && items.length > 0 && (
-                  <span className="text-xs text-kelo-muted">
-                    Actualisation…
-                  </span>
+                {refreshing && visibleItems.length > 0 && (
+                  <span className="text-xs text-kelo-muted">Actualisation…</span>
                 )}
-                {items.length > 0 && (
+                {visibleItems.length > 0 && (
                   <span className="rounded-full bg-kelo-background px-3 py-1 text-xs font-semibold text-kelo-muted">
-                    {items.length}
+                    {visibleItems.length}
                   </span>
                 )}
               </div>
@@ -190,10 +174,11 @@ export default function NotificationsPage() {
         </div>
 
         <div className="divide-y divide-kelo-border">
-          {items.map((notification: any) => (
+          {visibleItems.map((notification: any) => (
             <Link
               key={`${notification.uri}-${notification.indexedAt}`}
               href={getNotificationHref(notification)}
+              prefetch
               className="group flex gap-3 px-4 py-4 transition-colors hover:bg-kelo-background/60 sm:px-5 lg:px-6"
             >
               <Avatar
@@ -201,86 +186,58 @@ export default function NotificationsPage() {
                 fallback={notification.author?.handle?.[0]?.toUpperCase() || "U"}
                 size="sm"
               />
-
               <div className="min-w-0 flex-grow">
                 <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="max-w-full truncate text-sm font-bold text-kelo-text">
                     {notification.author?.displayName || notification.author?.handle || "Utilisateur"}
                   </span>
-                  <AccountBadges
-                    actor={notification.author}
-                    identitySize="sm"
-                    certificationSize={15}
-                    gap="xs"
-                  />
+                  <AccountBadges actor={notification.author} identitySize="sm" certificationSize={15} gap="xs" />
                   {notification.author?.handle && (
-                    <span className="max-w-full truncate text-xs text-kelo-muted">
-                      @{notification.author.handle}
-                    </span>
+                    <span className="max-w-full truncate text-xs text-kelo-muted">@{notification.author.handle}</span>
                   )}
                 </div>
-
                 <p className="mt-1 text-sm text-kelo-muted">
-                  <span className="mr-1">
-                    {REASON_ICONS[notification.reason] || "🔔"}
-                  </span>
+                  <span className="mr-1">{REASON_ICONS[notification.reason] || "🔔"}</span>
                   {REASON_LABELS[notification.reason] || notification.reason}
                 </p>
-
                 {notification.record?.text && (
                   <p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-kelo-text">
                     {notification.record.text}
                   </p>
                 )}
-
                 <time className="mt-2 block text-xs text-kelo-muted">
                   {formatNotificationDate(notification.indexedAt)}
                 </time>
               </div>
-
               {!notification.isRead && (
-                <span
-                  aria-label="Notification non lue"
-                  className="mt-2 h-2.5 w-2.5 flex-shrink-0 rounded-full bg-kelo-primary"
-                />
+                <span aria-label="Notification non lue" className="mt-2 h-2.5 w-2.5 flex-shrink-0 rounded-full bg-kelo-primary" />
               )}
             </Link>
           ))}
 
-          {items.length === 0 && !loading && !error && (
+          {visibleItems.length === 0 && !loading && !error && (
             <div className="flex min-h-[calc(100vh-100px)] items-start justify-center px-6 py-12 sm:items-center">
               <div className="max-w-md text-center">
                 <div className="text-4xl" aria-hidden="true">🔔</div>
-                <h2 className="mt-4 text-lg font-bold text-kelo-text">
-                  Aucune notification
-                </h2>
+                <h2 className="mt-4 text-lg font-bold text-kelo-text">Aucune notification à afficher</h2>
                 <p className="mt-2 text-sm leading-relaxed text-kelo-muted">
-                  Les mentions, réponses, abonnements, likes et reposts apparaîtront ici.
+                  Les interactions autorisées dans vos paramètres apparaîtront ici.
                 </p>
               </div>
             </div>
           )}
 
-          {error && items.length === 0 && (
-            <p className="px-4 py-8 text-center text-sm text-kelo-danger">
-              {error}
-            </p>
+          {error && visibleItems.length === 0 && (
+            <p className="px-4 py-8 text-center text-sm text-kelo-danger">{error}</p>
           )}
 
-          {loading && items.length === 0 && (
+          {loading && visibleItems.length === 0 && (
             <div className="flex justify-center py-10">
-              <img
-                src="https://kelosocial.sirv.com/logo.png"
-                alt="Chargement"
-                className="h-10 w-10 animate-spin object-contain"
-              />
+              <img src="https://kelosocial.sirv.com/logo.png" alt="Chargement" className="h-10 w-10 animate-spin object-contain" />
             </div>
           )}
 
-          <InfiniteScrollSentinel
-            onIntersect={loadMore}
-            disabled={loadingMore || !hasMore}
-          />
+          <InfiniteScrollSentinel onIntersect={loadMore} disabled={loadingMore || !hasMore} />
         </div>
       </main>
     </div>
