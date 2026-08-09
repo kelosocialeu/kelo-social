@@ -1,20 +1,19 @@
-import { getReadAgent } from "@/lib/atproto/read-agent";
 import { getStoredSession, resumeAgentSession } from "@/services/auth.service";
 
-async function getWriteAgent() {
+async function getPreferenceAgent() {
   const session = getStoredSession();
   if (!session) throw new Error("Vous devez être connecté.");
   return resumeAgentSession(session);
 }
 
 export async function getPreferences(): Promise<any[]> {
-  const agent = await getReadAgent();
+  const agent = await getPreferenceAgent();
   const res = await agent.api.app.bsky.actor.getPreferences();
   return res.data.preferences;
 }
 
 async function putPreferences(preferences: any[]): Promise<void> {
-  const agent = await getWriteAgent();
+  const agent = await getPreferenceAgent();
   await agent.api.app.bsky.actor.putPreferences({ preferences }, { encoding: "application/json" });
 }
 
@@ -89,4 +88,40 @@ export async function removeMutedWord(value: string): Promise<void> {
   const pref = prefs.find((p) => p.$type === "app.bsky.actor.defs#mutedWordsPref");
   const items = (pref?.items || []).filter((w: MutedWordEntry) => w.value !== value);
   await putPreferences(upsertPref(prefs, "app.bsky.actor.defs#mutedWordsPref", { items }));
+}
+
+export interface FeedViewPreferences {
+  hideReplies: boolean;
+  hideReposts: boolean;
+  hideQuotePosts: boolean;
+}
+
+export async function getFeedViewPreferences(): Promise<FeedViewPreferences> {
+  const prefs = await getPreferences();
+  const pref = prefs.find(
+    (p) => p.$type === "app.bsky.actor.defs#feedViewPref" && p.feed === "home"
+  );
+
+  return {
+    hideReplies: pref?.hideReplies ?? false,
+    hideReposts: pref?.hideReposts ?? false,
+    hideQuotePosts: pref?.hideQuotePosts ?? false,
+  };
+}
+
+export async function setFeedViewPreferences(next: FeedViewPreferences): Promise<void> {
+  const prefs = await getPreferences();
+  const filtered = prefs.filter(
+    (p) => !(p.$type === "app.bsky.actor.defs#feedViewPref" && p.feed === "home")
+  );
+
+  filtered.push({
+    $type: "app.bsky.actor.defs#feedViewPref",
+    feed: "home",
+    hideReplies: next.hideReplies,
+    hideReposts: next.hideReposts,
+    hideQuotePosts: next.hideQuotePosts,
+  });
+
+  await putPreferences(filtered);
 }
