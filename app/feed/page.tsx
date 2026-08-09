@@ -72,41 +72,21 @@ export default function FeedPage() {
 
   useEffect(() => {
     if (!checked) return;
-
     const session = getStoredSession();
-
-    if (session) {
-      setMyDid(session.did);
-    }
+    if (session) setMyDid(session.did);
   }, [checked]);
 
-  const fetchFeedPage = useCallback(
-    async (cursor?: string) => {
-      if (!checked) {
-        return { items: [], cursor: undefined };
-      }
+  const fetchFeedPage = useCallback(async (cursor?: string) => {
+    if (!checked) return { items: [], cursor: undefined };
 
-      if (activeTab === "decouvrir") {
-        const { items, cursor: nextCursor } = await getDiscoverFeed(25, cursor);
+    if (activeTab === "decouvrir") {
+      const { items, cursor: nextCursor } = await getDiscoverFeed(25, cursor);
+      return { items: formatFeed(items), cursor: nextCursor };
+    }
 
-        return {
-          items: formatFeed(items),
-          cursor: nextCursor,
-        };
-      }
-
-      const { items, cursor: nextCursor } = await getFollowingTimeline(
-        25,
-        cursor
-      );
-
-      return {
-        items: formatFeed(items),
-        cursor: nextCursor,
-      };
-    },
-    [activeTab, checked]
-  );
+    const { items, cursor: nextCursor } = await getFollowingTimeline(25, cursor);
+    return { items: formatFeed(items), cursor: nextCursor };
+  }, [activeTab, checked]);
 
   const {
     items: posts,
@@ -137,14 +117,11 @@ export default function FeedPage() {
           searchNetworkPosts(trimmed),
           searchNetworkActors(trimmed),
         ]);
-
         setSearchPosts(formatSearchPosts(foundPosts));
         setSearchProfiles(foundActors);
       } catch (err) {
         console.error("Erreur de recherche :", err);
-        setSearchError(
-          "La recherche a échoué. Réessayez dans un instant."
-        );
+        setSearchError("La recherche a échoué. Réessayez dans un instant.");
         setSearchPosts([]);
         setSearchProfiles([]);
       } finally {
@@ -157,36 +134,20 @@ export default function FeedPage() {
 
   const handleCreatePost = async (event: React.FormEvent) => {
     event.preventDefault();
-
-    if (!postText.trim()) {
-      return;
-    }
-
+    if (!postText.trim()) return;
     setLoadingPost(true);
-
     try {
       const created = await createPost(postText);
-
-      const newPostItem = {
+      setPosts((previousPosts) => [{
         uri: created.uri,
         cid: created.cid,
-        author: {
-          handle,
-          displayName: handle,
-          did: myDid,
-        },
-        record: {
-          text: created.text,
-          facets: created.facets,
-          createdAt: new Date().toISOString(),
-        },
+        author: { handle, displayName: handle, did: myDid },
+        record: { text: created.text, facets: created.facets, createdAt: new Date().toISOString() },
         likeCount: 0,
         repostCount: 0,
         replyCount: 0,
         viewer: {},
-      };
-
-      setPosts((previousPosts) => [newPostItem, ...previousPosts]);
+      }, ...previousPosts]);
       setPostText("");
     } catch (err) {
       console.error("Erreur lors de la publication", err);
@@ -197,23 +158,11 @@ export default function FeedPage() {
   };
 
   const handleDeletePost = async (uri: string) => {
-    if (!confirm("Supprimer définitivement cette publication ?")) {
-      return;
-    }
-
+    if (!confirm("Supprimer définitivement cette publication ?")) return;
     try {
       await deleteOwnPost(uri);
-      setPosts((previousPosts) =>
-        previousPosts.filter((post) => post.uri !== uri)
-      );
-
-      if (searchPosts) {
-        setSearchPosts((previousPosts) =>
-          previousPosts
-            ? previousPosts.filter((post) => post.uri !== uri)
-            : previousPosts
-        );
-      }
+      setPosts((previousPosts) => previousPosts.filter((post) => post.uri !== uri));
+      if (searchPosts) setSearchPosts((previousPosts) => previousPosts ? previousPosts.filter((post) => post.uri !== uri) : previousPosts);
     } catch (err) {
       console.error("Erreur lors de la suppression :", err);
       alert("Impossible de supprimer cette publication.");
@@ -221,23 +170,9 @@ export default function FeedPage() {
   };
 
   const removeAuthorPosts = (authorDid?: string) => {
-    if (!authorDid) {
-      return;
-    }
-
-    setPosts((previousPosts) =>
-      previousPosts.filter((post) => post.author?.did !== authorDid)
-    );
-
-    if (searchPosts) {
-      setSearchPosts((previousPosts) =>
-        previousPosts
-          ? previousPosts.filter(
-              (post) => post.author?.did !== authorDid
-            )
-          : previousPosts
-      );
-    }
+    if (!authorDid) return;
+    setPosts((previousPosts) => previousPosts.filter((post) => post.author?.did !== authorDid));
+    if (searchPosts) setSearchPosts((previousPosts) => previousPosts ? previousPosts.filter((post) => post.author?.did !== authorDid) : previousPosts);
   };
 
   const handleLogout = () => {
@@ -246,11 +181,7 @@ export default function FeedPage() {
   };
 
   if (!checked) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-kelo-background font-sans text-kelo-muted">
-        Vérification de votre session...
-      </div>
-    );
+    return <div className="flex min-h-screen items-center justify-center bg-kelo-background font-sans text-kelo-muted">Vérification de votre session...</div>;
   }
 
   const isSearching = searchQuery.trim().length >= 2;
@@ -265,29 +196,14 @@ export default function FeedPage() {
           <div className="sticky top-0 z-10 w-full max-w-full overflow-x-hidden border-b border-kelo-border bg-white/90 backdrop-blur-md">
             <div className="p-4">
               <h2 className="break-words text-xl font-extrabold text-kelo-text">
-                {isSearching
-                  ? `Résultats pour « ${searchQuery} »`
-                  : "Fil Fédéré Global"}
+                {isSearching ? `Résultats pour « ${searchQuery} »` : "Fil Fédéré Global"}
               </h2>
             </div>
 
             {!isSearching && (
               <div className="flex w-full min-w-0 border-t border-kelo-border text-sm">
-                {(
-                  [
-                    ["pourvous", "🔥 Pour vous"],
-                    ["decouvrir", "✨ Découvrir"],
-                  ] as [Tab, string][]
-                ).map(([tab, label]) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`min-w-0 flex-1 py-3 text-center font-bold transition-colors ${
-                      activeTab === tab
-                        ? "border-b-4 border-kelo-primary text-kelo-text"
-                        : "text-kelo-muted hover:bg-kelo-background"
-                    }`}
-                  >
+                {([ ["pourvous", "🔥 Pour vous"], ["decouvrir", "✨ Découvrir"] ] as [Tab, string][]).map(([tab, label]) => (
+                  <button key={tab} onClick={() => setActiveTab(tab)} className={`min-w-0 flex-1 py-3 text-center font-bold transition-colors ${activeTab === tab ? "border-b-4 border-kelo-primary text-kelo-text" : "text-kelo-muted hover:bg-kelo-background"}`}>
                     {label}
                   </button>
                 ))}
@@ -295,111 +211,49 @@ export default function FeedPage() {
             )}
           </div>
 
-          {!isSearching && (
-            <Composer
-              handle={handle}
-              value={postText}
-              onChange={setPostText}
-              onSubmit={handleCreatePost}
-              loading={loadingPost}
-            />
-          )}
+          {!isSearching && <Composer handle={handle} value={postText} onChange={setPostText} onSubmit={handleCreatePost} loading={loadingPost} />}
 
           <div className="w-full max-w-full divide-y divide-kelo-border overflow-x-hidden">
-            {searching && isSearching && (
-              <p className="py-6 text-center text-sm text-kelo-muted">
-                Recherche en cours...
-              </p>
-            )}
+            {searching && isSearching && <p className="py-6 text-center text-sm text-kelo-muted">Recherche en cours...</p>}
+            {!searching && searchError && <p className="py-6 text-center text-sm text-kelo-danger">{searchError}</p>}
+            {!isSearching && !loading && feedError && <p className="py-6 text-center text-sm text-kelo-danger">{feedError}</p>}
 
-            {!searching && searchError && (
-              <p className="py-6 text-center text-sm text-kelo-danger">
-                {searchError}
-              </p>
-            )}
+            {!searching && !searchError && displayedPosts.map((post: any, index: number) => {
+              const isMine = !!myDid && post.author?.did === myDid;
+              return <PostCard
+                key={post.uri || index}
+                post={post}
+                isMine={isMine}
+                isBookmarked={isBookmarked(post.uri)}
+                replyOpen={activeReplyUri === post.uri}
+                replyText={replyText}
+                onToggleReply={() => setActiveReplyUri(activeReplyUri === post.uri ? null : post.uri)}
+                onReplyTextChange={setReplyText}
+                onSendReply={() => { alert("Commentaire publié !"); setReplyText(""); setActiveReplyUri(null); }}
+                onBookmark={() => toggleBookmark(post)}
+                onDelete={() => handleDeletePost(post.uri)}
+                onBlocked={() => removeAuthorPosts(post.author?.did)}
+                onMuted={() => removeAuthorPosts(post.author?.did)}
+              />;
+            })}
 
-            {!isSearching && !loading && feedError && (
-              <p className="py-6 text-center text-sm text-kelo-danger">
-                {feedError}
-              </p>
-            )}
-
-            {!searching &&
-              !searchError &&
-              displayedPosts.map((post: any, index: number) => {
-                const isMine = !!myDid && post.author?.did === myDid;
-
-                return (
-                  <PostCard
-                    key={post.uri || index}
-                    post={post}
-                    isMine={isMine}
-                    isBookmarked={isBookmarked(post.uri)}
-                    replyOpen={activeReplyUri === post.uri}
-                    replyText={replyText}
-                    onToggleReply={() =>
-                      setActiveReplyUri(
-                        activeReplyUri === post.uri ? null : post.uri
-                      )
-                    }
-                    onReplyTextChange={setReplyText}
-                    onSendReply={() => {
-                      alert("Commentaire publié !");
-                      setReplyText("");
-                      setActiveReplyUri(null);
-                    }}
-                    onBookmark={() => toggleBookmark(post)}
-                    onDelete={() => handleDeletePost(post.uri)}
-                    onBlocked={() =>
-                      removeAuthorPosts(post.author?.did)
-                    }
-                    onMuted={() =>
-                      removeAuthorPosts(post.author?.did)
-                    }
-                  />
-                );
-              })}
-
-            {!isSearching &&
-              !loading &&
-              !feedError &&
-              displayedPosts.length === 0 && (
-                <p className="py-10 text-center text-sm text-kelo-muted">
-                  Aucune publication pour l&apos;instant.
-                </p>
-              )}
-
-            {isSearching &&
-              !searching &&
-              !searchError &&
-              displayedPosts.length === 0 && (
-                <p className="py-10 text-center text-sm text-kelo-muted">
-                  Aucun résultat trouvé.
-                </p>
-              )}
+            {!isSearching && !loading && !feedError && displayedPosts.length === 0 && <p className="py-10 text-center text-sm text-kelo-muted">Aucune publication pour l&apos;instant.</p>}
+            {isSearching && !searching && !searchError && displayedPosts.length === 0 && <p className="py-10 text-center text-sm text-kelo-muted">Aucun résultat trouvé.</p>}
 
             {!isSearching && loading && (
               <div className="flex justify-center py-10">
                 <div className="h-12 w-12 animate-spin">
-                  <img
-                    src="https://kelosocial.sirv.com/logo.png"
-                    alt="Chargement"
-                    className="h-full w-full object-contain"
-                  />
+                  <img src="https://kelosocial.sirv.com/logo.png" alt="Chargement" className="h-full w-full object-contain" />
                 </div>
               </div>
             )}
 
-            {!isSearching && (
-              <InfiniteScrollSentinel
-                onIntersect={loadMore}
-                disabled={loadingMore || !hasMore}
-              />
-            )}
+            {!isSearching && <InfiniteScrollSentinel onIntersect={loadMore} disabled={loadingMore || !hasMore} />}
           </div>
         </main>
 
-        <aside className="sticky top-0 hidden h-screen flex-shrink-0 border-r border-kelo-border bg-white p-4 xl:block xl:w-[300px] 2xl:w-[360px] 2xl:p-6">
+        <div className="hidden flex-shrink-0 xl:block xl:w-[300px] 2xl:w-[360px]" aria-hidden="true" />
+        <aside className="fixed right-0 top-0 z-20 hidden h-screen overflow-y-auto border-l border-kelo-border bg-white p-4 xl:block xl:w-[300px] 2xl:w-[360px] 2xl:p-6">
           <div className="relative mb-6">
             <input
               type="text"
@@ -412,40 +266,17 @@ export default function FeedPage() {
 
           {isSearching && searchProfiles.length > 0 ? (
             <div className="rounded-2xl border border-kelo-border bg-kelo-background p-4">
-              <h3 className="mb-3 text-sm font-bold text-kelo-text">
-                Comptes trouvés
-              </h3>
-
+              <h3 className="mb-3 text-sm font-bold text-kelo-text">Comptes trouvés</h3>
               <div className="flex flex-col gap-3">
                 {searchProfiles.map((actor: any) => (
-                  <Link
-                    key={actor.did}
-                    href={`/profile/${actor.handle}`}
-                    className="flex items-center gap-3 rounded-xl p-1 transition-colors hover:bg-white"
-                  >
-                    <Avatar
-                      src={actor.avatar}
-                      fallback={actor.handle[0].toUpperCase()}
-                      size="sm"
-                    />
-
+                  <Link key={actor.did} href={`/profile/${actor.handle}`} className="flex items-center gap-3 rounded-xl p-1 transition-colors hover:bg-white">
+                    <Avatar src={actor.avatar} fallback={actor.handle[0].toUpperCase()} size="sm" />
                     <div className="min-w-0">
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <p className="max-w-full truncate text-sm font-bold text-kelo-text">
-                          {actor.displayName || actor.handle}
-                        </p>
-
-                        <AccountBadges
-                          actor={actor}
-                          identitySize="sm"
-                          certificationSize={15}
-                          gap="xs"
-                        />
+                        <p className="max-w-full truncate text-sm font-bold text-kelo-text">{actor.displayName || actor.handle}</p>
+                        <AccountBadges actor={actor} identitySize="sm" certificationSize={15} gap="xs" />
                       </div>
-
-                      <p className="truncate text-xs text-kelo-muted">
-                        @{actor.handle}
-                      </p>
+                      <p className="truncate text-xs text-kelo-muted">@{actor.handle}</p>
                     </div>
                   </Link>
                 ))}
