@@ -1,180 +1,166 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Copy, Globe2, RefreshCw } from "lucide-react";
+import { CheckCircle2, ChevronLeft, Copy, Globe2, Loader2 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { getSessionInfo, updateHandle } from "@/lib/atproto/account";
+import { getStoredSession } from "@/services/auth.service";
 
-function normalizeDomain(value: string): string {
-  return value
-    .trim()
-    .replace(/^https?:\/\//i, "")
-    .replace(/^@/, "")
-    .replace(/\/$/, "")
-    .toLowerCase();
+function clean(value: string) {
+  return value.trim().replace(/^https?:\/\//i, "").replace(/^@/, "").replace(/\/$/, "").toLowerCase();
 }
+
+function pdsDomain() {
+  try {
+    const session = getStoredSession();
+    return session?.pdsUrl ? new URL(session.pdsUrl).hostname : "";
+  } catch {
+    return "";
+  }
+}
+
+type Mode = "choice" | "pds" | "domain";
+type DomainMethod = "dns" | "web";
 
 export default function IdentitySection() {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
-  const [handleInput, setHandleInput] = useState("");
+  const [mode, setMode] = useState<Mode>("choice");
+  const [method, setMethod] = useState<DomainMethod>("dns");
+  const [nickname, setNickname] = useState("");
+  const [domainInput, setDomainInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [verified, setVerified] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const suffix = useMemo(() => pdsDomain(), []);
+  const domain = clean(domainInput);
+  const did = session?.did || "";
 
   useEffect(() => {
-    getSessionInfo()
-      .then((info) => {
-        setSession(info);
-        setHandleInput(info.handle || "");
-      })
-      .catch((error) => {
-        console.error(error);
-        setMessage("Impossible de charger votre identité AT Protocol.");
-      })
-      .finally(() => setLoading(false));
+    getSessionInfo().then(setSession).catch(() => setMessage("Impossible de charger votre compte.")).finally(() => setLoading(false));
   }, []);
 
-  const domain = useMemo(() => normalizeDomain(handleInput), [handleInput]);
-  const did = session?.did || "";
-  const dnsValue = did ? `did=${did}` : "did:...";
-  const wellKnownValue = did || "did:...";
+  const refresh = async () => setSession(await getSessionInfo());
 
-  const saveHandle = async () => {
-    if (!domain) return;
+  const apply = async (handle: string) => {
     setSaving(true);
     setMessage(null);
-
     try {
-      await updateHandle(domain);
-      const info = await getSessionInfo();
-      setSession(info);
-      setHandleInput(info.handle || domain);
-      setMessage("Votre nom d’utilisateur AT Protocol a été mis à jour.");
+      await updateHandle(handle);
+      await refresh();
+      setMessage(`Votre nom d’utilisateur est maintenant @${handle}.`);
+      setMode("choice");
     } catch (error) {
       console.error(error);
-      setMessage(
-        "Le changement a été refusé par votre PDS. Vérifiez que le domaine pointe bien vers votre DID et qu’il n’est pas utilisé par un autre compte."
-      );
+      setMessage("Ce nom d’utilisateur n’a pas pu être appliqué. Vérifiez qu’il est disponible et correctement configuré.");
     } finally {
       setSaving(false);
     }
   };
 
-  const copy = (value: string) => {
-    navigator.clipboard?.writeText(value).catch(() => {});
+  const verifyDomain = async () => {
+    if (!domain || !did) return;
+    setChecking(true);
+    setVerified(false);
+    setMessage(null);
+    try {
+      let ok = false;
+      if (method === "dns") {
+        const response = await fetch(`https://dns.google/resolve?name=_atproto.${encodeURIComponent(domain)}&type=TXT`);
+        const data = await response.json();
+        ok = Array.isArray(data.Answer) && data.Answer.some((answer: any) => String(answer.data || "").replace(/^"|"$/g, "") === `did=${did}`);
+      } else {
+        const response = await fetch(`https://${domain}/.well-known/atproto-did`, { cache: "no-store" });
+        ok = response.ok && (await response.text()).trim() === did;
+      }
+      setVerified(ok);
+      setMessage(ok ? "Domaine vérifié. Vous pouvez continuer." : "La vérification n’est pas encore valide. Vérifiez l’enregistrement puis réessayez.");
+    } catch {
+      setMessage("Impossible de vérifier pour le moment. Vérifiez la configuration puis réessayez.");
+    } finally {
+      setChecking(false);
+    }
   };
 
-  if (loading) {
-    return <p className="p-6 text-sm text-kelo-muted">Chargement...</p>;
-  }
+  const copy = (value: string) => navigator.clipboard?.writeText(value).catch(() => {});
+
+  if (loading) return <p className="p-6 text-sm text-kelo-muted">Chargement...</p>;
+
+  const generatedHandle = nickname && suffix ? `${clean(nickname).split(".")[0]}.${suffix}` : "";
 
   return (
-    <div className="flex flex-col gap-7 p-4 sm:p-6">
+    <div className="flex flex-col gap-6 p-4 sm:p-6">
       <section>
-        <h3 className="text-base font-extrabold text-kelo-text">Votre identité AT Protocol</h3>
-        <p className="mt-1 text-sm leading-6 text-kelo-muted">
-          Votre DID est l’identité permanente de votre compte. Votre nom d’utilisateur peut changer sans modifier ce DID.
-        </p>
-
-        <div className="mt-4 overflow-hidden rounded-2xl border border-kelo-border bg-kelo-background/50">
-          <div className="border-b border-kelo-border p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-kelo-muted">DID permanent</p>
-            <div className="mt-1 flex items-center gap-2">
-              <code className="min-w-0 flex-1 break-all text-sm font-semibold text-kelo-text">{did || "Indisponible"}</code>
-              {did && (
-                <button type="button" onClick={() => copy(did)} className="rounded-full p-2 text-kelo-muted hover:bg-white" aria-label="Copier le DID">
-                  <Copy className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-kelo-muted">Nom d’utilisateur actuel</p>
-            <p className="mt-1 text-sm font-bold text-kelo-text">@{session?.handle || "—"}</p>
-          </div>
-        </div>
+        <h3 className="text-lg font-extrabold text-kelo-text">Nom d’utilisateur</h3>
+        <p className="mt-1 text-sm text-kelo-muted">Actuellement <strong className="text-kelo-text">@{session?.handle || "—"}</strong></p>
       </section>
 
-      <section className="border-t border-kelo-border pt-6">
-        <div className="flex items-center gap-2">
-          <Globe2 className="h-5 w-5 text-kelo-primary" />
-          <h3 className="text-base font-extrabold text-kelo-text">Lier votre nom de domaine</h3>
-        </div>
-        <p className="mt-1 text-sm leading-6 text-kelo-muted">
-          Vous pouvez utiliser votre propre domaine comme nom d’utilisateur, par exemple <strong>votrenom.fr</strong>. Le domaine doit d’abord prouver qu’il appartient à votre DID.
-        </p>
+      {mode === "choice" && (
+        <section className="grid gap-3 sm:grid-cols-2">
+          <button type="button" onClick={() => { setMode("pds"); setMessage(null); }} className="rounded-2xl border border-kelo-border bg-white p-5 text-left transition hover:border-kelo-primary">
+            <p className="font-extrabold text-kelo-text">Changer mon pseudo</p>
+            <p className="mt-1 text-sm leading-5 text-kelo-muted">Choisissez simplement un nouveau pseudo. Il utilisera le domaine de votre PDS.</p>
+            {suffix && <p className="mt-3 text-xs font-bold text-kelo-primary">exemple.{suffix}</p>}
+          </button>
+          <button type="button" onClick={() => { setMode("domain"); setVerified(false); setMessage(null); }} className="rounded-2xl border border-kelo-border bg-white p-5 text-left transition hover:border-kelo-primary">
+            <div className="flex items-center gap-2"><Globe2 className="h-5 w-5 text-kelo-primary" /><p className="font-extrabold text-kelo-text">J’ai mon propre nom de domaine</p></div>
+            <p className="mt-1 text-sm leading-5 text-kelo-muted">Utilisez votre domaine comme nom d’utilisateur avec une vérification guidée.</p>
+          </button>
+        </section>
+      )}
 
-        <div className="mt-4 rounded-2xl border border-kelo-border p-4">
-          <p className="text-sm font-bold text-kelo-text">Méthode DNS recommandée</p>
-          <p className="mt-1 text-xs leading-5 text-kelo-muted">
-            Ajoutez un enregistrement TXT chez votre fournisseur de domaine.
-          </p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-xl bg-kelo-background p-3">
-              <p className="text-[11px] font-bold uppercase text-kelo-muted">Nom / hôte</p>
-              <div className="mt-1 flex items-center gap-2">
-                <code className="flex-1 break-all text-xs text-kelo-text">_atproto</code>
-                <button type="button" onClick={() => copy("_atproto")} className="p-1.5 text-kelo-muted" aria-label="Copier le nom DNS"><Copy className="h-3.5 w-3.5" /></button>
+      {mode === "pds" && (
+        <section className="rounded-2xl border border-kelo-border bg-white p-4 sm:p-5">
+          <button type="button" onClick={() => setMode("choice")} className="mb-4 flex items-center gap-1 text-sm font-bold text-kelo-muted"><ChevronLeft className="h-4 w-4" /> Retour</button>
+          <h4 className="font-extrabold text-kelo-text">Choisissez votre nouveau pseudo</h4>
+          <div className="mt-4"><Input value={nickname} onChange={(e) => setNickname(e.target.value.replace(/[^a-zA-Z0-9-]/g, ""))} placeholder="votrepseudo" /></div>
+          {generatedHandle && <p className="mt-3 rounded-xl bg-kelo-background p-3 text-sm text-kelo-text">Votre nom sera <strong>@{generatedHandle}</strong></p>}
+          <Button className="mt-4 w-full sm:w-auto" onClick={() => apply(generatedHandle)} disabled={!generatedHandle} loading={saving}>Continuer avec @{generatedHandle || "votrepseudo"}</Button>
+        </section>
+      )}
+
+      {mode === "domain" && (
+        <section className="rounded-2xl border border-kelo-border bg-white p-4 sm:p-5">
+          <button type="button" onClick={() => setMode("choice")} className="mb-4 flex items-center gap-1 text-sm font-bold text-kelo-muted"><ChevronLeft className="h-4 w-4" /> Retour</button>
+          <h4 className="font-extrabold text-kelo-text">Utiliser mon propre domaine</h4>
+          <p className="mt-1 text-sm text-kelo-muted">Entrez d’abord le domaine que vous voulez utiliser.</p>
+          <div className="mt-4"><Input value={domainInput} onChange={(e) => { setDomainInput(e.target.value); setVerified(false); }} placeholder="monsite.fr" /></div>
+
+          {domain && (
+            <div className="mt-5">
+              <p className="mb-2 text-sm font-bold text-kelo-text">Comment voulez-vous le vérifier ?</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button type="button" onClick={() => { setMethod("dns"); setVerified(false); }} className={`rounded-xl border p-3 text-left text-sm font-bold ${method === "dns" ? "border-kelo-primary bg-kelo-primary/10 text-kelo-primary" : "border-kelo-border text-kelo-text"}`}>J’ai accès au panneau DNS</button>
+                <button type="button" onClick={() => { setMethod("web"); setVerified(false); }} className={`rounded-xl border p-3 text-left text-sm font-bold ${method === "web" ? "border-kelo-primary bg-kelo-primary/10 text-kelo-primary" : "border-kelo-border text-kelo-text"}`}>Je n’ai pas de panneau DNS</button>
               </div>
-            </div>
-            <div className="rounded-xl bg-kelo-background p-3">
-              <p className="text-[11px] font-bold uppercase text-kelo-muted">Valeur TXT</p>
-              <div className="mt-1 flex items-center gap-2">
-                <code className="min-w-0 flex-1 break-all text-xs text-kelo-text">{dnsValue}</code>
-                <button type="button" onClick={() => copy(dnsValue)} className="p-1.5 text-kelo-muted" aria-label="Copier la valeur DNS"><Copy className="h-3.5 w-3.5" /></button>
+
+              <div className="mt-4 rounded-xl bg-kelo-background p-4">
+                {method === "dns" ? <>
+                  <p className="text-sm font-bold text-kelo-text">Ajoutez cet enregistrement TXT</p>
+                  <p className="mt-3 text-xs text-kelo-muted">Nom / hôte</p><div className="flex items-center gap-2"><code className="flex-1 break-all text-sm text-kelo-text">_atproto</code><button onClick={() => copy("_atproto")}><Copy className="h-4 w-4" /></button></div>
+                  <p className="mt-3 text-xs text-kelo-muted">Valeur</p><div className="flex items-center gap-2"><code className="flex-1 break-all text-sm text-kelo-text">did={did}</code><button onClick={() => copy(`did=${did}`)}><Copy className="h-4 w-4" /></button></div>
+                </> : <>
+                  <p className="text-sm font-bold text-kelo-text">Ajoutez un fichier sur votre site</p>
+                  <p className="mt-2 break-all text-xs text-kelo-muted">https://{domain}/.well-known/atproto-did</p>
+                  <p className="mt-3 text-xs text-kelo-muted">Contenu du fichier</p><div className="flex items-center gap-2"><code className="flex-1 break-all text-sm text-kelo-text">{did}</code><button onClick={() => copy(did)}><Copy className="h-4 w-4" /></button></div>
+                </>}
               </div>
+
+              <Button variant="secondary" className="mt-4 w-full sm:w-auto" onClick={verifyDomain} disabled={checking}>{checking ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Vérification...</> : "Vérifier l’enregistrement"}</Button>
+              {verified && <Button className="mt-2 w-full sm:ml-2 sm:w-auto" onClick={() => apply(domain)} loading={saving}><CheckCircle2 className="mr-2 h-4 w-4" />Continuer avec @{domain}</Button>}
             </div>
-          </div>
-        </div>
+          )}
+        </section>
+      )}
 
-        <div className="mt-3 rounded-2xl border border-kelo-border p-4">
-          <p className="text-sm font-bold text-kelo-text">Alternative via votre site web</p>
-          <p className="mt-1 text-xs leading-5 text-kelo-muted">
-            Publiez votre DID en texte brut à l’adresse <code>https://votredomaine/.well-known/atproto-did</code>.
-          </p>
-          <div className="mt-3 flex items-center gap-2 rounded-xl bg-kelo-background p-3">
-            <code className="min-w-0 flex-1 break-all text-xs text-kelo-text">{wellKnownValue}</code>
-            <button type="button" onClick={() => copy(wellKnownValue)} className="p-1.5 text-kelo-muted" aria-label="Copier le DID"><Copy className="h-3.5 w-3.5" /></button>
-          </div>
-        </div>
-      </section>
+      {message && <p className={`rounded-xl p-3 text-sm ${verified || message.startsWith("Votre") ? "bg-green-500/10 text-green-700" : "bg-kelo-background text-kelo-muted"}`}>{message}</p>}
 
-      <section className="border-t border-kelo-border pt-6">
-        <h3 className="text-base font-extrabold text-kelo-text">Changer de nom d’utilisateur</h3>
-        <p className="mt-1 text-sm leading-6 text-kelo-muted">
-          Une fois votre domaine configuré, saisissez-le ici. Votre PDS vérifiera automatiquement qu’il correspond bien à votre DID avant d’accepter le changement.
-        </p>
-
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <div className="min-w-0 flex-1">
-            <Input
-              value={handleInput}
-              onChange={(event) => setHandleInput(event.target.value)}
-              placeholder="votredomaine.fr"
-              startAdornment="@"
-            />
-          </div>
-          <Button
-            variant="secondary"
-            className="w-full px-5 sm:w-auto"
-            onClick={saveHandle}
-            loading={saving}
-            disabled={!domain || domain === session?.handle}
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Appliquer
-          </Button>
-        </div>
-
-        {message && (
-          <div className="mt-3 flex items-start gap-2 rounded-xl bg-kelo-background p-3 text-sm text-kelo-muted">
-            {message.startsWith("Votre") && <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-kelo-success" />}
-            <span>{message}</span>
-          </div>
-        )}
-      </section>
+      <details className="border-t border-kelo-border pt-5 text-sm text-kelo-muted">
+        <summary className="cursor-pointer font-bold text-kelo-text">Informations techniques</summary>
+        <p className="mt-3">DID permanent : <code className="break-all">{did}</code></p>
+      </details>
     </div>
   );
 }
