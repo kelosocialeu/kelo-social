@@ -52,25 +52,38 @@ export default function SettingsPage() {
       <Sidebar handle={handle} onLogout={handleLogout} />
 
       <main className="min-h-screen min-w-0 flex-1 bg-white pb-24 md:border-x md:border-kelo-border md:pb-0">
-        <header className="sticky top-0 z-20 border-b border-kelo-border bg-white/95 px-4 py-4 backdrop-blur sm:px-5">
-          <h1 className="text-xl font-extrabold text-kelo-text">
-            Paramètres
-          </h1>
-          {handle && (
-            <p className="mt-0.5 text-sm text-kelo-muted">
-              @{handle}
-            </p>
-          )}
+        <header className="sticky top-[calc(56px+env(safe-area-inset-top))] z-20 border-b border-kelo-border bg-white/95 px-4 py-3.5 backdrop-blur md:top-0 sm:px-5 md:py-4">
+          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-xl font-extrabold text-kelo-text">
+                Paramètres
+              </h1>
+              {handle && (
+                <p className="mt-0.5 truncate text-sm text-kelo-muted">
+                  @{handle}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-kelo-border px-3 text-sm font-bold text-kelo-muted transition hover:bg-red-50 hover:text-red-600 lg:hidden"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Déconnexion</span>
+            </button>
+          </div>
         </header>
 
-        <div className="mx-auto grid w-full max-w-5xl md:grid-cols-[340px_minmax(0,1fr)]">
-          <aside className="border-b border-kelo-border md:min-h-[calc(100vh-73px)] md:border-b-0 md:border-r">
+        <div className="mx-auto grid w-full max-w-6xl lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="border-b border-kelo-border lg:min-h-[calc(100vh-73px)] lg:border-b-0 lg:border-r">
             <SettingsNav
               active={section}
               onChange={setSection}
             />
 
-            <div className="border-t border-kelo-border p-3">
+            <div className="hidden border-t border-kelo-border p-3 lg:block">
               <button
                 type="button"
                 onClick={handleLogout}
@@ -85,13 +98,13 @@ export default function SettingsPage() {
           </aside>
 
           <section className="min-w-0 bg-white">
-            <div className="border-b border-kelo-border px-4 py-4 sm:px-6">
+            <div className="border-b border-kelo-border px-4 py-3.5 sm:px-6 md:py-4">
               <h2 className="text-lg font-bold text-kelo-text">
                 {sectionTitle}
               </h2>
             </div>
 
-            <div className="settings-bluesky-section">
+            <div className="settings-bluesky-section min-w-0">
               {section === "account" && <AccountSection />}
               {section === "identity" && <IdentitySection />}
               {section === "appearance" && <DisplaySection />}
