@@ -54,25 +54,22 @@ export function AuthProvider({
   useEffect(() => {
     let cancelled = false;
 
-    // On restaure immédiatement la copie locale pour éviter tout flash vers
-    // /login au redémarrage d'une PWA installée.
+    // Une session déjà persistée suffit pour afficher immédiatement l'app.
+    // Sa validation réseau se poursuit en arrière-plan au lieu de bloquer
+    // chaque navigation avec un écran de vérification.
     const localSession = getStoredSession();
     setSession(localSession);
+    setChecked(true);
 
-    if (!localSession) {
-      setChecked(true);
-    } else {
-      // Puis on renouvelle/valide silencieusement auprès du PDS.
+    if (localSession) {
       restoreStoredSession()
         .then((restored) => {
           if (cancelled) return;
-          setSession(restored);
-          setChecked(true);
+          setSession(restored || getStoredSession());
         })
         .catch(() => {
           if (cancelled) return;
           setSession(getStoredSession());
-          setChecked(true);
         });
     }
 
