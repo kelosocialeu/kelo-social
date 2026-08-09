@@ -1,10 +1,15 @@
-import { getReadAgent } from "@/lib/atproto/read-agent";
+import { getAuthenticatedAgent } from "@/services/auth.service";
+
+async function getNotificationAgent() {
+  const { agent } = await getAuthenticatedAgent();
+  return agent;
+}
 
 export async function getNotifications(
   limit = 30,
   cursor?: string
 ) {
-  const agent = await getReadAgent();
+  const agent = await getNotificationAgent();
   const response =
     await agent.api.app.bsky.notification.listNotifications({
       limit,
@@ -31,7 +36,7 @@ export async function getUnreadNotificationCount(): Promise<number> {
 }
 
 export async function markNotificationsSeen() {
-  const agent = await getReadAgent();
+  const agent = await getNotificationAgent();
 
   await agent.api.app.bsky.notification.updateSeen({
     seenAt: new Date().toISOString(),
