@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Moon, Sun, Monitor, Type, Sparkles } from "lucide-react";
+import { Check, Moon, Sun, Monitor, Type, Sparkles, Palette } from "lucide-react";
 import {
   DisplayPreferences,
   KeloTheme,
   TextScale,
+  KeloPalette,
+  KELO_PALETTES,
   getDisplayPreferences,
   saveDisplayPreferences,
 } from "@/lib/display-preferences";
@@ -23,11 +25,20 @@ const TEXT_SCALES: Array<{ key: TextScale; label: string }> = [
   { key: "120", label: "Très grand" },
 ];
 
+const PALETTES: Array<{ key: KeloPalette; label: string; description: string }> = [
+  { key: "default", label: "Kelo Social", description: "Palette originale · par défaut" },
+  { key: "violet-cyan", label: "Violet & Cyan", description: "Violet, bleu électrique et cyan" },
+  { key: "rose-sunset", label: "Rose Sunset", description: "Rose, magenta, violet et orange" },
+  { key: "blue-green", label: "Bleu & Émeraude", description: "Bleu, turquoise et vert" },
+  { key: "prism", label: "Prisme", description: "Rose, violet, bleu et cyan" },
+];
+
 export default function DisplaySection() {
   const [prefs, setPrefs] = useState<DisplayPreferences>(() => ({
     theme: "system",
     textScale: "100",
     reduceMotion: false,
+    palette: "default",
   }));
 
   useEffect(() => {
@@ -44,20 +55,65 @@ export default function DisplaySection() {
     <div className="flex flex-col gap-7 p-4 sm:p-6">
       <section>
         <div className="flex items-center gap-2">
+          <Palette className="h-5 w-5 text-kelo-primary" />
+          <h3 className="text-base font-extrabold text-kelo-text">Palette de couleurs</h3>
+        </div>
+        <p className="mt-1 text-sm leading-6 text-kelo-muted">
+          Personnalisez les couleurs de Kelo Social. La palette originale reste toujours disponible pour revenir au style principal.
+        </p>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {PALETTES.map(({ key, label, description }) => {
+            const selected = prefs.palette === key;
+            const palette = KELO_PALETTES[key];
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => update({ palette: key })}
+                aria-pressed={selected}
+                className={`overflow-hidden rounded-2xl border bg-white text-left transition ${
+                  selected
+                    ? "border-kelo-primary ring-2 ring-kelo-primary/20"
+                    : "border-kelo-border hover:border-kelo-primary/50"
+                }`}
+              >
+                <span
+                  className="relative block h-24 w-full"
+                  style={{ background: palette.gradient }}
+                >
+                  {selected && (
+                    <span className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white text-kelo-primary shadow-md">
+                      <Check className="h-4 w-4" />
+                    </span>
+                  )}
+                </span>
+                <span className="block p-3.5">
+                  <span className="block text-sm font-extrabold text-kelo-text">{label}</span>
+                  <span className="mt-1 block text-xs leading-5 text-kelo-muted">{description}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="border-t border-kelo-border pt-6">
+        <div className="flex items-center gap-2">
           <Sun className="h-5 w-5 text-kelo-primary" />
           <h3 className="text-base font-extrabold text-kelo-text">Thème</h3>
         </div>
         <p className="mt-1 text-sm text-kelo-muted">
-          Choisissez l’apparence de Kelo Social sur cet appareil.
+          Choisissez l’apparence claire ou sombre de Kelo Social sur cet appareil.
         </p>
 
-        <div className="mt-4 grid grid-cols-3 gap-2">
+        <div className="mt-4 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
           {THEMES.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               type="button"
               onClick={() => update({ theme: key })}
-              className={`flex flex-col items-center gap-2 rounded-2xl border p-4 text-sm font-bold transition ${
+              className={`flex min-h-20 flex-col items-center justify-center gap-2 rounded-2xl border p-3 text-sm font-bold transition ${
                 prefs.theme === key
                   ? "border-kelo-primary bg-kelo-primary/10 text-kelo-primary"
                   : "border-kelo-border bg-white text-kelo-text hover:bg-kelo-background"
