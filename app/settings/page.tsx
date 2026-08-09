@@ -12,7 +12,7 @@ import IdentitySection from "@/components/settings/IdentitySection";
 import DisplaySection from "@/components/settings/DisplaySection";
 import ModerationSection from "@/components/settings/ModerationSection";
 import PrivacySection from "@/components/settings/PrivacySection";
-import ComingSoonSection from "@/components/settings/ComingSoonSection";
+import NotificationFeedSection from "@/components/settings/NotificationFeedSection";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 
 const SECTION_TITLES: Record<SettingsSection, string> = {
@@ -110,18 +110,7 @@ export default function SettingsPage() {
               {section === "appearance" && <DisplaySection />}
               {section === "moderation" && <ModerationSection />}
               {section === "privacy" && <PrivacySection />}
-
-              {section === "notifications" && (
-                <ComingSoonSection
-                  title="Notifications et flux"
-                  items={[
-                    "Choisir les notifications à recevoir",
-                    "Réponses, mentions, abonnements et réactions",
-                    "Masquer les réponses ou republications dans certains flux",
-                    "Organiser les fils enregistrés",
-                  ]}
-                />
-              )}
+              {section === "notifications" && <NotificationFeedSection />}
             </div>
           </section>
         </div>
