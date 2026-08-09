@@ -11,29 +11,21 @@ const config: Config = {
     extend: {
       colors: {
         kelo: {
-          background: "#f8f8fb",
-          surface: "#ffffff",
-
-          primary: "#7d4cff",
-          secondary: "#d54cff",
-
-          text: "#151515",
-          muted: "#666666",
-
-          border: "#ececf4",
-
-          success: "#2dbf6d",
-          warning: "#f4b400",
-          danger: "#ea4335",
+          background: "rgb(var(--background-rgb) / <alpha-value>)",
+          surface: "rgb(var(--surface-rgb) / <alpha-value>)",
+          primary: "rgb(var(--primary-rgb) / <alpha-value>)",
+          secondary: "rgb(var(--secondary-rgb) / <alpha-value>)",
+          text: "rgb(var(--text-rgb) / <alpha-value>)",
+          muted: "rgb(var(--text-light-rgb) / <alpha-value>)",
+          border: "rgb(var(--border-rgb) / <alpha-value>)",
+          success: "rgb(var(--success-rgb) / <alpha-value>)",
+          warning: "rgb(var(--warning-rgb) / <alpha-value>)",
+          danger: "rgb(var(--danger-rgb) / <alpha-value>)",
         },
       },
 
       backgroundImage: {
-        // Dégradé en 90deg (horizontal) au lieu de 135deg : les trois
-        // couleurs restent visibles même sur des éléments courts/étroits
-        // (items de sidebar, petits boutons), pas seulement les grands.
-        "kelo-gradient":
-          "linear-gradient(90deg,#7d4cff 0%,#b14fff 50%,#ff4fa0 100%)",
+        "kelo-gradient": "var(--gradient)",
       },
 
       borderRadius: {
