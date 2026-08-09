@@ -1,6 +1,6 @@
 "use client";
 
-import { Play } from "lucide-react";
+import KeloVideoPlayer from "@/components/feed/KeloVideoPlayer";
 
 interface PostEmbedProps {
   embed?: any;
@@ -65,22 +65,8 @@ export default function PostEmbed({ embed }: PostEmbedProps) {
   }
 
   if (type === "app.bsky.embed.video#view") {
-    return (
-      <a
-        href={embed.playlist}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className="relative mt-3 block overflow-hidden rounded-2xl border border-kelo-border bg-kelo-background"
-      >
-        {embed.thumbnail && <img src={embed.thumbnail} alt="" className="h-56 w-full object-cover" />}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90">
-            <Play className="h-5 w-5 text-kelo-text" fill="currentColor" />
-          </div>
-        </div>
-      </a>
-    );
+    if (!embed.playlist) return null;
+    return <KeloVideoPlayer src={embed.playlist} poster={embed.thumbnail} />;
   }
 
   return null;
