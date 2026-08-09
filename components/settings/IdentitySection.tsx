@@ -11,10 +11,34 @@ function clean(value: string) {
   return value.trim().replace(/^https?:\/\//i, "").replace(/^@/, "").replace(/\/$/, "").toLowerCase();
 }
 
-function pdsDomain() {
+async function getPdsHandleDomain(): Promise<string> {
   try {
-    const session = getStoredSession();
-    return session?.pdsUrl ? new URL(session.pdsUrl).hostname : "";
+    const stored = getStoredSession();
+    const pdsUrl = stored?.pdsUrl;
+    if (!pdsUrl) return "";
+
+    const base = pdsUrl.replace(/\/$/, "");
+    const response = await fetch(`${base}/xrpc/com.atproto.server.describeServer`, {
+      cache: "no-store",
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const domains = Array.isArray(data?.availableUserDomains)
+        ? data.availableUserDomains
+        : [];
+
+      const advertised = domains.find(
+        (value: unknown) => typeof value === "string" && value.trim().length > 0
+      );
+
+      if (typeof advertised === "string") {
+        return advertised.replace(/^\./, "").toLowerCase();
+      }
+    }
+
+    // Fallback uniquement si le PDS ne publie pas availableUserDomains.
+    return new URL(pdsUrl).hostname;
   } catch {
     return "";
   }
@@ -34,12 +58,18 @@ export default function IdentitySection() {
   const [checking, setChecking] = useState(false);
   const [verified, setVerified] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const suffix = useMemo(() => pdsDomain(), []);
+  const [suffix, setSuffix] = useState("");
   const domain = clean(domainInput);
   const did = session?.did || "";
 
   useEffect(() => {
-    getSessionInfo().then(setSession).catch(() => setMessage("Impossible de charger votre compte.")).finally(() => setLoading(false));
+    Promise.all([getSessionInfo(), getPdsHandleDomain()])
+      .then(([info, handleDomain]) => {
+        setSession(info);
+        setSuffix(handleDomain);
+      })
+      .catch(() => setMessage("Impossible de charger votre compte."))
+      .finally(() => setLoading(false));
   }, []);
 
   const refresh = async () => setSession(await getSessionInfo());
@@ -113,7 +143,7 @@ export default function IdentitySection() {
         <section className="grid gap-3 sm:grid-cols-2">
           <button type="button" onClick={() => { setMode("pds"); setMessage(null); }} className="rounded-2xl border border-kelo-border bg-white p-5 text-left transition hover:border-kelo-primary">
             <p className="font-extrabold text-kelo-text">Changer mon pseudo</p>
-            <p className="mt-1 text-sm leading-5 text-kelo-muted">Choisissez simplement un nouveau pseudo. Il utilisera le domaine de votre PDS.</p>
+            <p className="mt-1 text-sm leading-5 text-kelo-muted">Choisissez simplement un nouveau pseudo. Il utilisera le domaine proposé par votre PDS.</p>
             {suffix && <p className="mt-3 text-xs font-bold text-kelo-primary">exemple.{suffix}</p>}
           </button>
           <button type="button" onClick={() => { setMode("domain"); setVerified(false); setMessage(null); }} className="rounded-2xl border border-kelo-border bg-white p-5 text-left transition hover:border-kelo-primary">
