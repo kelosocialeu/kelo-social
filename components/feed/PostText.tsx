@@ -26,6 +26,7 @@ export default function PostText({ text, facets }: PostTextProps) {
             </Link>
           );
         }
+
         if (seg.type === "link") {
           return (
             <a
@@ -40,13 +41,23 @@ export default function PostText({ text, facets }: PostTextProps) {
             </a>
           );
         }
+
         if (seg.type === "tag") {
+          const hashtag = seg.text.startsWith("#") ? seg.text : `#${seg.text}`;
+
           return (
-            <span key={i} className="text-kelo-primary">
+            <Link
+              key={i}
+              href={`/search?q=${encodeURIComponent(hashtag)}`}
+              onClick={(e) => e.stopPropagation()}
+              className="font-semibold text-kelo-primary hover:underline"
+              aria-label={`Rechercher les publications avec ${hashtag}`}
+            >
               {seg.text}
-            </span>
+            </Link>
           );
         }
+
         return <span key={i}>{seg.text}</span>;
       })}
     </p>
