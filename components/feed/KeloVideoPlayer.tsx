@@ -1,11 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Maximize, Pause, Play, Volume2, VolumeX } from "lucide-react";
+import {
+  Loader2,
+  Maximize,
+  Pause,
+  Play,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 
 interface KeloVideoPlayerProps {
   src: string;
   poster?: string;
+}
+
+interface IOSVideoElement extends HTMLVideoElement {
+  webkitEnterFullscreen?: () => void;
+  webkitSupportsFullscreen?: boolean;
 }
 
 function formatTime(value: number) {
@@ -23,6 +35,8 @@ export default function KeloVideoPlayer({ src, poster }: KeloVideoPlayerProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [failed, setFailed] = useState(false);
+  const [buffering, setBuffering] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState("16 / 9");
 
   useEffect(() => {
     const video = videoRef.current;
@@ -30,23 +44,41 @@ export default function KeloVideoPlayer({ src, poster }: KeloVideoPlayerProps) {
 
     const onTime = () => setCurrentTime(video.currentTime || 0);
     const onDuration = () => setDuration(video.duration || 0);
-    const onPlay = () => setPlaying(true);
+    const onPlay = () => {
+      setPlaying(true);
+      setBuffering(false);
+    };
     const onPause = () => setPlaying(false);
-    const onError = () => setFailed(true);
+    const onWaiting = () => setBuffering(true);
+    const onPlaying = () => setBuffering(false);
+    const onError = () => {
+      setBuffering(false);
+      setFailed(true);
+    };
+    const onMetadata = () => {
+      setDuration(video.duration || 0);
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        setAspectRatio(`${video.videoWidth} / ${video.videoHeight}`);
+      }
+    };
 
     video.addEventListener("timeupdate", onTime);
-    video.addEventListener("loadedmetadata", onDuration);
+    video.addEventListener("loadedmetadata", onMetadata);
     video.addEventListener("durationchange", onDuration);
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
+    video.addEventListener("waiting", onWaiting);
+    video.addEventListener("playing", onPlaying);
     video.addEventListener("error", onError);
 
     return () => {
       video.removeEventListener("timeupdate", onTime);
-      video.removeEventListener("loadedmetadata", onDuration);
+      video.removeEventListener("loadedmetadata", onMetadata);
       video.removeEventListener("durationchange", onDuration);
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
+      video.removeEventListener("waiting", onWaiting);
+      video.removeEventListener("playing", onPlaying);
       video.removeEventListener("error", onError);
     };
   }, []);
@@ -54,10 +86,13 @@ export default function KeloVideoPlayer({ src, poster }: KeloVideoPlayerProps) {
   const togglePlay = async () => {
     const video = videoRef.current;
     if (!video) return;
+
     if (video.paused) {
       try {
+        setBuffering(true);
         await video.play();
       } catch {
+        setBuffering(false);
         setFailed(true);
       }
     } else {
@@ -80,9 +115,27 @@ export default function KeloVideoPlayer({ src, poster }: KeloVideoPlayerProps) {
   };
 
   const fullscreen = async () => {
+    const container = containerRef.current;
+    const video = videoRef.current as IOSVideoElement | null;
+
     try {
-      await containerRef.current?.requestFullscreen?.();
-    } catch {}
+      if (container?.requestFullscreen) {
+        await container.requestFullscreen();
+        return;
+      }
+
+      // Safari iPhone/iPad n'autorise pas toujours le plein écran sur un div.
+      // On utilise alors l'API vidéo native iOS.
+      if (video?.webkitEnterFullscreen) {
+        video.webkitEnterFullscreen();
+      }
+    } catch {
+      if (video?.webkitEnterFullscreen) {
+        try {
+          video.webkitEnterFullscreen();
+        } catch {}
+      }
+    }
   };
 
   if (failed) {
@@ -92,14 +145,22 @@ export default function KeloVideoPlayer({ src, poster }: KeloVideoPlayerProps) {
         target="_blank"
         rel="noopener noreferrer"
         onClick={(event) => event.stopPropagation()}
-        className="group relative mt-3 block overflow-hidden rounded-3xl border border-kelo-border bg-slate-950"
+        className="group relative mt-3 block overflow-hidden rounded-2xl border border-kelo-border bg-slate-950 sm:rounded-3xl"
       >
-        {poster && <img src={poster} alt="" className="aspect-video w-full object-cover opacity-80" />}
+        {poster && (
+          <img
+            src={poster}
+            alt=""
+            className="aspect-video w-full object-cover opacity-80"
+          />
+        )}
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/30 px-4 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-kelo-gradient text-white shadow-lg transition group-hover:scale-105">
-            <Play className="h-6 w-6" fill="currentColor" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-kelo-gradient text-white shadow-lg transition active:scale-95 sm:h-14 sm:w-14 sm:group-hover:scale-105">
+            <Play className="h-7 w-7 sm:h-6 sm:w-6" fill="currentColor" />
           </div>
-          <span className="rounded-full bg-black/55 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-md">Ouvrir la vidéo</span>
+          <span className="rounded-full bg-black/55 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-md">
+            Ouvrir la vidéo
+          </span>
         </div>
       </a>
     );
@@ -109,7 +170,8 @@ export default function KeloVideoPlayer({ src, poster }: KeloVideoPlayerProps) {
     <div
       ref={containerRef}
       onClick={(event) => event.stopPropagation()}
-      className="group relative mt-3 overflow-hidden rounded-3xl border border-kelo-border bg-slate-950 shadow-sm"
+      className="group relative mt-3 w-full touch-manipulation overflow-hidden rounded-2xl border border-kelo-border bg-black shadow-sm sm:rounded-3xl"
+      style={{ aspectRatio }}
     >
       <video
         ref={videoRef}
@@ -117,22 +179,30 @@ export default function KeloVideoPlayer({ src, poster }: KeloVideoPlayerProps) {
         poster={poster}
         playsInline
         preload="metadata"
-        className="aspect-video w-full bg-black object-contain"
+        className="absolute inset-0 h-full w-full bg-black object-contain"
         onClick={togglePlay}
       />
 
-      {!playing && (
+      {buffering && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/15">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-md">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        </div>
+      )}
+
+      {!playing && !buffering && (
         <button
           type="button"
           onClick={togglePlay}
           aria-label="Lire la vidéo"
-          className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-kelo-gradient text-white shadow-[0_14px_35px_rgba(0,0,0,0.35)] transition hover:scale-105 active:scale-95"
+          className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-kelo-gradient text-white shadow-[0_14px_35px_rgba(0,0,0,0.35)] transition active:scale-95 sm:hover:scale-105"
         >
           <Play className="ml-1 h-7 w-7" fill="currentColor" />
         </button>
       )}
 
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-3 pt-10 opacity-100 transition sm:px-4">
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-2.5 pb-[max(10px,env(safe-area-inset-bottom))] pt-10 sm:px-4 sm:pb-3">
         <input
           type="range"
           min={0}
@@ -141,24 +211,51 @@ export default function KeloVideoPlayer({ src, poster }: KeloVideoPlayerProps) {
           value={Math.min(currentTime, duration || 0)}
           onChange={(event) => seek(Number(event.target.value))}
           aria-label="Position de lecture"
-          className="h-1.5 w-full cursor-pointer accent-kelo-primary"
+          className="h-2 w-full cursor-pointer touch-pan-x accent-kelo-primary sm:h-1.5"
         />
 
-        <div className="mt-2 flex items-center gap-2 text-white">
-          <button type="button" onClick={togglePlay} aria-label={playing ? "Pause" : "Lecture"} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 backdrop-blur-md transition hover:bg-white/20">
-            {playing ? <Pause className="h-4 w-4" fill="currentColor" /> : <Play className="ml-0.5 h-4 w-4" fill="currentColor" />}
+        <div className="mt-2 flex items-center gap-1.5 text-white sm:gap-2">
+          <button
+            type="button"
+            onClick={togglePlay}
+            aria-label={playing ? "Pause" : "Lecture"}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/10 backdrop-blur-md transition active:bg-white/25 sm:h-9 sm:w-9 sm:hover:bg-white/20"
+          >
+            {playing ? (
+              <Pause className="h-5 w-5 sm:h-4 sm:w-4" fill="currentColor" />
+            ) : (
+              <Play className="ml-0.5 h-5 w-5 sm:h-4 sm:w-4" fill="currentColor" />
+            )}
           </button>
 
-          <button type="button" onClick={toggleMute} aria-label={muted ? "Activer le son" : "Couper le son"} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 backdrop-blur-md transition hover:bg-white/20">
-            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          <button
+            type="button"
+            onClick={toggleMute}
+            aria-label={muted ? "Activer le son" : "Couper le son"}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/10 backdrop-blur-md transition active:bg-white/25 sm:h-9 sm:w-9 sm:hover:bg-white/20"
+          >
+            {muted ? (
+              <VolumeX className="h-5 w-5 sm:h-4 sm:w-4" />
+            ) : (
+              <Volume2 className="h-5 w-5 sm:h-4 sm:w-4" />
+            )}
           </button>
 
-          <span className="min-w-0 flex-1 text-xs font-semibold text-white/90">{formatTime(currentTime)} / {formatTime(duration)}</span>
+          <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-white/90 sm:text-xs">
+            {formatTime(currentTime)} / {formatTime(duration)}
+          </span>
 
-          <div className="rounded-full bg-kelo-gradient px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white">Kelo</div>
+          <div className="hidden rounded-full bg-kelo-gradient px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white min-[430px]:block">
+            Kelo
+          </div>
 
-          <button type="button" onClick={fullscreen} aria-label="Plein écran" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 backdrop-blur-md transition hover:bg-white/20">
-            <Maximize className="h-4 w-4" />
+          <button
+            type="button"
+            onClick={fullscreen}
+            aria-label="Plein écran"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/10 backdrop-blur-md transition active:bg-white/25 sm:h-9 sm:w-9 sm:hover:bg-white/20"
+          >
+            <Maximize className="h-5 w-5 sm:h-4 sm:w-4" />
           </button>
         </div>
       </div>
