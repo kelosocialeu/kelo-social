@@ -66,21 +66,15 @@ export default function MobileNavigationShell({ children }: MobileNavigationShel
       ? [...PRIMARY_APP_ROUTES, `/profile/${handle}`]
       : PRIMARY_APP_ROUTES;
 
-    const prefetch = () => {
+    const timeoutId = globalThis.setTimeout(() => {
       routes.forEach((route) => {
         if (!matchesRoute(pathname, route)) {
           router.prefetch(route);
         }
       });
-    };
+    }, 200);
 
-    if ("requestIdleCallback" in window) {
-      const idleId = window.requestIdleCallback(prefetch, { timeout: 1500 });
-      return () => window.cancelIdleCallback(idleId);
-    }
-
-    const timeoutId = window.setTimeout(prefetch, 250);
-    return () => window.clearTimeout(timeoutId);
+    return () => globalThis.clearTimeout(timeoutId);
   }, [checked, session, handle, pathname, router]);
 
   const isConversation = pathname.startsWith("/messages/");
