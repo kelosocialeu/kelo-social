@@ -133,6 +133,25 @@ function createIdentityVerificationAgent(): AtpAgent {
   });
 }
 
+function isMissingRecordError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const candidate = error as {
+    status?: number;
+    error?: string;
+    message?: string;
+  };
+
+  const text = `${candidate.error || ""} ${candidate.message || ""}`.toLowerCase();
+
+  return (
+    candidate.status === 404 ||
+    text.includes("recordnotfound") ||
+    text.includes("record not found") ||
+    text.includes("could not locate record")
+  );
+}
+
 export async function listIdentityVerifications(): Promise<
   IdentityVerificationRecord[]
 > {
@@ -212,13 +231,19 @@ export async function getIdentityVerification(
     });
 
     return parsed;
-  } catch {
-    identityVerificationCache.set(normalizedDid, {
-      value: null,
-      expiresAt: Date.now() + CACHE_DURATION_MS,
-    });
+  } catch (error) {
+    // Une absence réelle peut être mémorisée. Une panne réseau, un timeout,
+    // un 429 ou une erreur 5xx doit au contraire remonter jusqu'au hook afin
+    // qu'il conserve le dernier statut de certification connu.
+    if (isMissingRecordError(error)) {
+      identityVerificationCache.set(normalizedDid, {
+        value: null,
+        expiresAt: Date.now() + CACHE_DURATION_MS,
+      });
+      return null;
+    }
 
-    return null;
+    throw error;
   }
 }
 
