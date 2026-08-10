@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import MobileDrawer from "@/components/layout/MobileDrawer";
@@ -22,6 +22,18 @@ const PUBLIC_ROUTES = [
   "/kelo-id/callback",
 ];
 
+const PRIMARY_APP_ROUTES = [
+  "/feed",
+  "/search",
+  "/messages",
+  "/notifications",
+  "/bookmarks",
+  "/feeds",
+  "/lists",
+  "/starter-packs",
+  "/settings",
+];
+
 function matchesRoute(pathname: string, route: string): boolean {
   if (route === "/") return pathname === "/";
   return pathname === route || pathname.startsWith(`${route}/`);
@@ -29,6 +41,7 @@ function matchesRoute(pathname: string, route: string): boolean {
 
 export default function MobileNavigationShell({ children }: MobileNavigationShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { session, checked, handle, logout } = useAuthContext();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -42,6 +55,33 @@ export default function MobileNavigationShell({ children }: MobileNavigationShel
       document.body.style.overflow = "";
     };
   }, [menuOpen]);
+
+  useEffect(() => {
+    if (!checked || !session) return;
+
+    // Précharge le code des destinations principales une fois la session
+    // disponible. Les clics de navigation deviennent alors de simples
+    // transitions client au lieu d'attendre le chargement du prochain écran.
+    const routes = handle
+      ? [...PRIMARY_APP_ROUTES, `/profile/${handle}`]
+      : PRIMARY_APP_ROUTES;
+
+    const prefetch = () => {
+      routes.forEach((route) => {
+        if (!matchesRoute(pathname, route)) {
+          router.prefetch(route);
+        }
+      });
+    };
+
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(prefetch, { timeout: 1500 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timeoutId = window.setTimeout(prefetch, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [checked, session, handle, pathname, router]);
 
   const isConversation = pathname.startsWith("/messages/");
   const isPublicRoute = PUBLIC_ROUTES.some((route) => matchesRoute(pathname, route));
