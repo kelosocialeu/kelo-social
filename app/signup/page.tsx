@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import HCaptcha from "@hcaptcha/react-hcaptcha";
 import AuthLayout from "@/components/layout/AuthLayout";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -24,18 +23,71 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [birthDate, setBirthDate] = useState("");
   const [pdsUrl, setPdsUrl] = useState(SIGNUP_PDS_PROVIDERS[0].url);
-  const [hcaptchaToken, setHcaptchaToken] = useState("");
-
-  const captchaRef = useRef<HCaptcha>(null);
+  const [verificationError, setVerificationError] = useState("");
+  const [verifying, setVerifying] = useState(false);
   const { signup, loading, error } = useSignup();
+
+  const completeSignupWithCode = async (verificationCode: string) => {
+    await signup({
+      handle,
+      email,
+      password,
+      birthDate,
+      pdsUrl,
+      verificationCode,
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hcaptchaToken) return;
+    setVerificationError("");
 
-    await signup({ handle, email, password, birthDate, hcaptchaToken, pdsUrl });
-    captchaRef.current?.resetCaptcha();
-    setHcaptchaToken("");
+    if (!handle || !email || !password || !birthDate) return;
+
+    const fullHandle = handle.includes(".") ? handle : `${handle}.kelosocial.eu`;
+    const state = crypto.randomUUID();
+    const callbackUrl = `${window.location.origin}/signup/gate-callback`;
+    const gateUrl = new URL(`${pdsUrl.replace(/\/$/, "")}/gate`);
+    gateUrl.searchParams.set("handle", fullHandle);
+    gateUrl.searchParams.set("state", state);
+    gateUrl.searchParams.set("redirect_url", callbackUrl);
+
+    const popup = window.open(
+      gateUrl.toString(),
+      "kelo-pds-verification",
+      "popup=yes,width=520,height=720"
+    );
+
+    if (!popup) {
+      setVerificationError(
+        "Votre navigateur a bloqué la fenêtre de vérification. Autorisez les fenêtres contextuelles pour Kelo Social puis réessayez."
+      );
+      return;
+    }
+
+    setVerifying(true);
+
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener("message", onMessage);
+      setVerifying(false);
+      setVerificationError("La vérification a expiré. Réessayez.");
+      try { popup.close(); } catch {}
+    }, 5 * 60 * 1000);
+
+    async function onMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as { type?: string; code?: string; state?: string };
+      if (data?.type !== "kelo-gatekeeper-verification") return;
+      if (data.state !== state || !data.code) return;
+
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", onMessage);
+      setVerifying(false);
+      try { popup.close(); } catch {}
+      await completeSignupWithCode(data.code);
+    }
+
+    window.addEventListener("message", onMessage);
   };
 
   return (
@@ -99,16 +151,15 @@ export default function SignupPage() {
           }
         />
 
-        <div className="my-2 flex justify-center">
-          <HCaptcha
-            ref={captchaRef}
-            sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || ""}
-            onVerify={(token) => setHcaptchaToken(token)}
-            onExpire={() => setHcaptchaToken("")}
-          />
+        <div className="rounded-2xl border border-kelo-border bg-kelo-background p-3 text-center text-xs text-kelo-muted">
+          En cliquant sur S&apos;inscrire, le captcha sécurisé du PDS Kelo Social s&apos;ouvrira. Une fois validé, la création du compte reprendra automatiquement.
         </div>
 
-        {error && <p className="text-center text-sm font-medium text-kelo-danger">{error}</p>}
+        {(error || verificationError) && (
+          <p className="text-center text-sm font-medium text-kelo-danger">
+            {verificationError || error}
+          </p>
+        )}
 
         <div className="mt-2 flex gap-4">
           <Link
@@ -117,14 +168,19 @@ export default function SignupPage() {
           >
             Déjà un compte ?
           </Link>
-          <Button type="submit" loading={loading} loadingText="Création..." className="w-1/2">
-            S'inscrire
+          <Button
+            type="submit"
+            loading={loading || verifying}
+            loadingText={verifying ? "Vérification..." : "Création..."}
+            className="w-1/2"
+          >
+            S&apos;inscrire
           </Button>
         </div>
 
         <div className="mt-2 flex justify-center">
           <Link href="/" className="text-sm text-kelo-muted transition-colors hover:text-kelo-text">
-            Retour à l'accueil
+            Retour à l&apos;accueil
           </Link>
         </div>
       </form>
