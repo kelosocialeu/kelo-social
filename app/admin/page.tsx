@@ -40,6 +40,7 @@ import {
 } from "@/lib/atproto/identity-verifications";
 
 type CertificationStatus = "certified" | "trusted-verifier" | "none";
+type VisibleCertificationStatus = Exclude<CertificationStatus, "none">;
 type AdminSection = "certifications" | "identity-verifications";
 
 type AccountSearchResult = {
@@ -203,6 +204,11 @@ export default function AdminPage() {
     const session = getStoredSession();
     if (!session) throw new Error("Votre session est introuvable. Reconnectez-vous.");
     return session;
+  };
+
+  const getAccountCertification = (did: string): VisibleCertificationStatus | null => {
+    const certification = certifiedUsers.find((record) => record.subjectDid === did);
+    return certification?.status ?? null;
   };
 
   const addSelectedAccount = (account: AccountSearchResult) => {
@@ -461,30 +467,37 @@ export default function AdminPage() {
                       ) : searchError ? (
                         <p className="px-3 py-4 text-sm text-kelo-danger">{searchError}</p>
                       ) : accountSuggestions.length > 0 ? (
-                        accountSuggestions.map((account) => (
-                          <button
-                            key={account.did}
-                            type="button"
-                            onClick={() => addSelectedAccount(account)}
-                            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-kelo-background"
-                          >
-                            {account.avatar ? (
-                              <img
-                                src={account.avatar}
-                                alt=""
-                                className="h-10 w-10 flex-shrink-0 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-kelo-background text-sm font-extrabold text-kelo-primary">
-                                {(account.displayName || account.handle).slice(0, 1).toUpperCase()}
+                        accountSuggestions.map((account) => {
+                          const currentCertification = getAccountCertification(account.did);
+
+                          return (
+                            <button
+                              key={account.did}
+                              type="button"
+                              onClick={() => addSelectedAccount(account)}
+                              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-kelo-background"
+                            >
+                              {account.avatar ? (
+                                <img
+                                  src={account.avatar}
+                                  alt=""
+                                  className="h-10 w-10 flex-shrink-0 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-kelo-background text-sm font-extrabold text-kelo-primary">
+                                  {(account.displayName || account.handle).slice(0, 1).toUpperCase()}
+                                </div>
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex min-w-0 items-center gap-1.5">
+                                  <p className="truncate text-sm font-bold text-kelo-text">{account.displayName}</p>
+                                  {currentCertification && <Badge status={currentCertification} size={18} />}
+                                </div>
+                                <p className="truncate text-xs text-kelo-muted">@{account.handle}</p>
                               </div>
-                            )}
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-bold text-kelo-text">{account.displayName}</p>
-                              <p className="truncate text-xs text-kelo-muted">@{account.handle}</p>
-                            </div>
-                          </button>
-                        ))
+                            </button>
+                          );
+                        })
                       ) : (
                         <p className="px-3 py-4 text-center text-sm text-kelo-muted">Aucun compte trouvé.</p>
                       )}
@@ -503,27 +516,32 @@ export default function AdminPage() {
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {selectedAccounts.map((account) => (
-                        <div
-                          key={account.did}
-                          className="flex max-w-full items-center gap-2 rounded-full border border-kelo-border bg-kelo-background px-3 py-2"
-                        >
-                          {account.avatar && (
-                            <img src={account.avatar} alt="" className="h-6 w-6 rounded-full object-cover" />
-                          )}
-                          <span className="max-w-[220px] truncate text-xs font-bold text-kelo-text">
-                            @{account.handle}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removeSelectedAccount(account.did)}
-                            aria-label={`Retirer @${account.handle}`}
-                            className="rounded-full p-0.5 text-kelo-muted transition hover:bg-white hover:text-kelo-danger"
+                      {selectedAccounts.map((account) => {
+                        const currentCertification = getAccountCertification(account.did);
+
+                        return (
+                          <div
+                            key={account.did}
+                            className="flex max-w-full items-center gap-2 rounded-full border border-kelo-border bg-kelo-background px-3 py-2"
                           >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ))}
+                            {account.avatar && (
+                              <img src={account.avatar} alt="" className="h-6 w-6 rounded-full object-cover" />
+                            )}
+                            <span className="max-w-[220px] truncate text-xs font-bold text-kelo-text">
+                              @{account.handle}
+                            </span>
+                            {currentCertification && <Badge status={currentCertification} size={17} />}
+                            <button
+                              type="button"
+                              onClick={() => removeSelectedAccount(account.did)}
+                              aria-label={`Retirer @${account.handle}`}
+                              className="rounded-full p-0.5 text-kelo-muted transition hover:bg-white hover:text-kelo-danger"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
