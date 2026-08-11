@@ -55,10 +55,14 @@ export async function GET(request: NextRequest) {
 
     const certificationsByDid = new Map<string, CertificationStatus>();
     for (const certification of certifications) {
-      certificationsByDid.set(
-        normalizeDid(certification.subjectDid),
-        certification.status
-      );
+      const did = normalizeDid(certification.subjectDid);
+      const current = certificationsByDid.get(did);
+
+      // Une fleur est prioritaire visuellement si un compte possède aussi
+      // une ancienne certification ronde ou plusieurs records historiques.
+      if (certification.status === "trusted-verifier" || !current) {
+        certificationsByDid.set(did, certification.status);
+      }
     }
 
     const actors = (data.actors || [])
