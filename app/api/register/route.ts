@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { AtpAgent } from "@atproto/api";
+import { randomUUID } from "crypto";
 
 const KELO_PDS_URL = (
   process.env.KELO_PDS_URL ||
@@ -18,9 +19,7 @@ async function verifyCaptcha(token: string): Promise<boolean> {
     throw new Error("Configuration hCaptcha manquante sur le serveur.");
   }
 
-  if (!token) {
-    return false;
-  }
+  if (!token) return false;
 
   const body = new URLSearchParams({
     secret: hcaptchaSecret,
@@ -44,7 +43,12 @@ async function verifyCaptcha(token: string): Promise<boolean> {
   return result.success === true;
 }
 
-async function pdsRequiresInviteCode(): Promise<boolean> {
+interface PdsSignupRequirements {
+  inviteCodeRequired: boolean;
+  verificationRequired: boolean;
+}
+
+async function getPdsSignupRequirements(): Promise<PdsSignupRequirements> {
   const response = await fetch(
     `${KELO_PDS_URL}/xrpc/com.atproto.server.describeServer`,
     {
@@ -61,9 +65,15 @@ async function pdsRequiresInviteCode(): Promise<boolean> {
 
   const data = (await response.json()) as {
     inviteCodeRequired?: boolean;
+    phoneVerificationRequired?: boolean;
   };
 
-  return data.inviteCodeRequired === true;
+  return {
+    inviteCodeRequired: data.inviteCodeRequired === true,
+    // PDS Gatekeeper réutilise ce drapeau pour annoncer qu'un code de
+    // vérification (obtenu après captcha) est requis par createAccount.
+    verificationRequired: data.phoneVerificationRequired === true,
+  };
 }
 
 async function createInviteCode(): Promise<string> {
@@ -81,9 +91,7 @@ async function createInviteCode(): Promise<string> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Basic ${Buffer.from(
-          `admin:${adminPassword}`
-        ).toString("base64")}`,
+        Authorization: `Basic ${Buffer.from(`admin:${adminPassword}`).toString("base64")}`,
       },
       body: JSON.stringify({ useCount: 1 }),
       cache: "no-store",
@@ -99,12 +107,109 @@ async function createInviteCode(): Promise<string> {
   }
 
   const data = (await response.json()) as { code?: string };
+  if (!data.code) throw new Error("Le PDS n'a retourné aucun code d'invitation.");
+  return data.code;
+}
 
-  if (!data.code) {
-    throw new Error("Le PDS n'a retourné aucun code d'invitation.");
+/**
+ * PDS Gatekeeper n'accepte pas directement le jeton hCaptcha dans
+ * createAccount. Il faut d'abord envoyer ce jeton à /gate, qui renvoie un
+ * verificationCode dans l'URL de redirection. Ce code est ensuite transmis
+ * au lexicon standard com.atproto.server.createAccount.
+ *
+ * redirect: "manual" est essentiel : Kelo Social récupère le code côté
+ * serveur sans envoyer l'utilisateur vers bsky.app ou une autre page.
+ */
+async function exchangeCaptchaForVerificationCode(
+  hcaptchaToken: string,
+  handle: string
+): Promise<string> {
+  if (!hcaptchaToken) {
+    throw new Error("La vérification anti-robot est requise.");
   }
 
-  return data.code;
+  const state = randomUUID();
+  const gateUrl = new URL(`${KELO_PDS_URL}/gate`);
+  gateUrl.searchParams.set("handle", handle);
+  gateUrl.searchParams.set("state", state);
+
+  const form = new URLSearchParams();
+  form.set("h-captcha-response", hcaptchaToken);
+
+  const response = await fetch(gateUrl.toString(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "text/html,application/json",
+    },
+    body: form,
+    redirect: "manual",
+    cache: "no-store",
+  });
+
+  const location = response.headers.get("location");
+
+  if (!location) {
+    const detail = await response.text().catch(() => "");
+    console.error("PDS gatekeeper verification failed:", response.status, detail);
+    throw new Error(
+      "La vérification anti-robot du PDS n'a pas pu être finalisée. Veuillez recommencer le captcha."
+    );
+  }
+
+  let redirectUrl: URL;
+  try {
+    redirectUrl = new URL(location, KELO_PDS_URL);
+  } catch {
+    throw new Error("Le PDS a retourné une réponse de vérification invalide.");
+  }
+
+  const returnedState = redirectUrl.searchParams.get("state");
+  const verificationCode = redirectUrl.searchParams.get("code");
+
+  if (returnedState !== state || !verificationCode) {
+    throw new Error(
+      "La vérification anti-robot du PDS a échoué. Veuillez recommencer le captcha."
+    );
+  }
+
+  return verificationCode;
+}
+
+function mapRegistrationError(error: unknown): { message: string; status: number } {
+  const candidate = error as {
+    status?: number;
+    error?: string;
+    message?: string;
+  };
+
+  const message =
+    candidate?.message ||
+    (error instanceof Error ? error.message : "Erreur lors de la création du compte.");
+
+  if (/handle.*taken|already.*handle/i.test(message)) {
+    return { message: "Ce nom d'utilisateur est déjà utilisé.", status: 409 };
+  }
+  if (/email.*taken|already.*email/i.test(message)) {
+    return { message: "Cette adresse e-mail est déjà utilisée.", status: 409 };
+  }
+  if (/verification|captcha|invalidtoken|expiredtoken/i.test(message)) {
+    return {
+      message: "La vérification anti-robot a expiré ou a échoué. Veuillez refaire le captcha.",
+      status: 400,
+    };
+  }
+  if (/password/i.test(message)) {
+    return { message, status: 400 };
+  }
+
+  return {
+    message,
+    status:
+      typeof candidate?.status === "number" && candidate.status >= 400 && candidate.status < 500
+        ? candidate.status
+        : 500,
+  };
 }
 
 export async function POST(request: Request) {
@@ -131,21 +236,15 @@ export async function POST(request: Request) {
     }
 
     const birth = new Date(birthDate);
-
     if (Number.isNaN(birth.getTime())) {
-      return NextResponse.json(
-        { error: "Date de naissance invalide." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Date de naissance invalide." }, { status: 400 });
     }
 
     const today = new Date();
     let age = today.getFullYear() - birth.getFullYear();
     const birthdayPassed =
       today.getMonth() > birth.getMonth() ||
-      (today.getMonth() === birth.getMonth() &&
-        today.getDate() >= birth.getDate());
-
+      (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
     if (!birthdayPassed) age -= 1;
 
     if (age < 18) {
@@ -155,28 +254,37 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!(await verifyCaptcha(hcaptchaToken))) {
+    const fullHandle = handle.includes(".") ? handle : `${handle}.kelosocial.eu`;
+    const requirements = await getPdsSignupRequirements();
+
+    let verificationCode: string | undefined;
+
+    if (requirements.verificationRequired) {
+      // Important : ne pas appeler hCaptcha siteverify ici avant Gatekeeper.
+      // Le jeton hCaptcha est à usage unique et doit être consommé par /gate.
+      verificationCode = await exchangeCaptchaForVerificationCode(
+        hcaptchaToken,
+        fullHandle
+      );
+    } else if (!(await verifyCaptcha(hcaptchaToken))) {
       return NextResponse.json(
         { error: "La vérification anti-robot a échoué. Veuillez réessayer." },
         { status: 400 }
       );
     }
 
-    const inviteCodeRequired = await pdsRequiresInviteCode();
-    const inviteCode = inviteCodeRequired
+    const inviteCode = requirements.inviteCodeRequired
       ? await createInviteCode()
       : undefined;
 
     const agent = new AtpAgent({ service: KELO_PDS_URL });
-    const fullHandle = handle.includes(".")
-      ? handle
-      : `${handle}.kelosocial.eu`;
 
     await agent.createAccount({
       email,
       handle: fullHandle,
       password,
       ...(inviteCode ? { inviteCode } : {}),
+      ...(verificationCode ? { verificationCode } : {}),
     });
 
     return NextResponse.json({
@@ -186,15 +294,7 @@ export async function POST(request: Request) {
     });
   } catch (error: unknown) {
     console.error("Kelo Social registration error:", error);
-
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Erreur lors de la création du compte.";
-
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    );
+    const mapped = mapRegistrationError(error);
+    return NextResponse.json({ error: mapped.message }, { status: mapped.status });
   }
 }
