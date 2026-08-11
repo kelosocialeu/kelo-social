@@ -1,21 +1,12 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  BadgeCheck,
-  RefreshCw,
-  ShieldCheck,
-  Trash2,
-} from "lucide-react";
+import { BadgeCheck, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 
 import Sidebar from "@/components/layout/Sidebar";
 import Badge from "@/components/ui/Badge";
+import BatchCertificationManager from "@/components/admin/BatchCertificationManager";
 
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { getStoredSession } from "@/services/auth.service";
@@ -32,11 +23,7 @@ interface PendingReview {
 
 export default function CertifiersAdminPage() {
   const router = useRouter();
-  const {
-    checked,
-    isAdmin,
-    handle,
-  } = useAdminRole();
+  const { checked, isAdmin, handle } = useAdminRole();
 
   const [records, setRecords] = useState<CertificationRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,10 +59,7 @@ export default function CertifiersAdminPage() {
   }, [checked, isAdmin, loadRecords, router]);
 
   const trustedVerifiers = useMemo(
-    () =>
-      records.filter(
-        (record) => record.status === "trusted-verifier"
-      ),
+    () => records.filter((record) => record.status === "trusted-verifier"),
     [records]
   );
 
@@ -83,13 +67,7 @@ export default function CertifiersAdminPage() {
     const map = new Map<string, CertificationRecord[]>();
 
     for (const record of records) {
-      if (
-        record.status !== "certified" ||
-        !record.issuerDid
-      ) {
-        continue;
-      }
-
+      if (record.status !== "certified" || !record.issuerDid) continue;
       const key = record.issuerDid.toLowerCase();
       const current = map.get(key) || [];
       current.push(record);
@@ -106,43 +84,25 @@ export default function CertifiersAdminPage() {
     const session = getStoredSession();
 
     if (!session) {
-      throw new Error(
-        "Session introuvable. Reconnectez-vous."
-      );
+      throw new Error("Session introuvable. Reconnectez-vous.");
     }
 
     const response = await fetch("/api/admin/certify", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        session,
-        targetHandle,
-        status,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session, targetHandle, status }),
     });
 
     const data = await response.json();
-
     if (!response.ok) {
-      throw new Error(
-        data.error ||
-          "Impossible de modifier la certification."
-      );
+      throw new Error(data.error || "Impossible de modifier la certification.");
     }
 
     return data;
   }
 
-  const beginRemoval = async (
-    verifier: CertificationRecord
-  ) => {
-    const issued =
-      certificationsByIssuer.get(
-        verifier.subjectDid.toLowerCase()
-      ) || [];
-
+  const beginRemoval = async (verifier: CertificationRecord) => {
+    const issued = certificationsByIssuer.get(verifier.subjectDid.toLowerCase()) || [];
     const confirmed = window.confirm(
       `Retirer la fleur de @${verifier.subjectHandle} ? Ses ${issued.length} certification(s) seront ensuite examinées.`
     );
@@ -154,31 +114,17 @@ export default function CertifiersAdminPage() {
     setSuccess(null);
 
     try {
-      await sendCertificationAction(
-        verifier.subjectHandle,
-        "none"
-      );
-
-      setPendingReview({
-        verifier,
-        certifications: issued,
-      });
-
+      await sendCertificationAction(verifier.subjectHandle, "none");
+      setPendingReview({ verifier, certifications: issued });
       setRecords((previous) =>
-        previous.filter(
-          (record) =>
-            record.subjectDid !== verifier.subjectDid
-        )
+        previous.filter((record) => record.subjectDid !== verifier.subjectDid)
       );
-
       setSuccess(
         `La fleur de @${verifier.subjectHandle} a été retirée. Examinez maintenant ses certifications.`
       );
     } catch (actionError) {
       setError(
-        actionError instanceof Error
-          ? actionError.message
-          : "Une erreur est survenue."
+        actionError instanceof Error ? actionError.message : "Une erreur est survenue."
       );
     } finally {
       setWorkingDid(null);
@@ -201,18 +147,10 @@ export default function CertifiersAdminPage() {
 
       setPendingReview((current) => {
         if (!current) return current;
-
         const remaining = current.certifications.filter(
-          (item) =>
-            item.subjectDid !== certification.subjectDid
+          (item) => item.subjectDid !== certification.subjectDid
         );
-
-        return remaining.length > 0
-          ? {
-              ...current,
-              certifications: remaining,
-            }
-          : null;
+        return remaining.length > 0 ? { ...current, certifications: remaining } : null;
       });
 
       setSuccess(
@@ -224,9 +162,7 @@ export default function CertifiersAdminPage() {
       await loadRecords();
     } catch (actionError) {
       setError(
-        actionError instanceof Error
-          ? actionError.message
-          : "Une erreur est survenue."
+        actionError instanceof Error ? actionError.message : "Une erreur est survenue."
       );
     } finally {
       setWorkingDid(null);
@@ -258,7 +194,7 @@ export default function CertifiersAdminPage() {
                 Certificateurs de confiance
               </h1>
               <p className="mt-1 text-sm text-kelo-muted">
-                Gérez les fleurs et les certifications attribuées par chaque certificateur.
+                Recherchez, sélectionnez et certifiez plusieurs comptes AT Protocol en une seule opération.
               </p>
             </div>
 
@@ -268,11 +204,7 @@ export default function CertifiersAdminPage() {
               disabled={loading}
               className="inline-flex items-center gap-2 rounded-full bg-kelo-background px-4 py-2 text-sm font-bold"
             >
-              <RefreshCw
-                className={`h-4 w-4 ${
-                  loading ? "animate-spin" : ""
-                }`}
-              />
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Actualiser
             </button>
           </div>
@@ -291,6 +223,8 @@ export default function CertifiersAdminPage() {
             </p>
           )}
 
+          <BatchCertificationManager onUpdated={loadRecords} />
+
           {pendingReview && (
             <section className="rounded-3xl border border-kelo-primary bg-kelo-background p-5 sm:p-6">
               <div className="flex items-start gap-3">
@@ -298,9 +232,7 @@ export default function CertifiersAdminPage() {
                   <ShieldCheck className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-extrabold">
-                    Certifications à examiner
-                  </h2>
+                  <h2 className="text-lg font-extrabold">Certifications à examiner</h2>
                   <p className="mt-1 text-sm text-kelo-muted">
                     Fleur retirée à @{pendingReview.verifier.subjectHandle}. Choisissez pour chaque compte.
                   </p>
@@ -308,57 +240,38 @@ export default function CertifiersAdminPage() {
               </div>
 
               <div className="mt-5 divide-y divide-kelo-border overflow-hidden rounded-2xl border border-kelo-border bg-white">
-                {pendingReview.certifications.map(
-                  (certification) => (
-                    <div
-                      key={certification.subjectDid}
-                      className="flex flex-wrap items-center justify-between gap-4 p-4"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-bold">
-                          @{certification.subjectHandle}
-                        </p>
-                        <p className="truncate text-xs text-kelo-muted">
-                          {certification.subjectDid}
-                        </p>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            resolveCertification(
-                              certification,
-                              "keep"
-                            )
-                          }
-                          disabled={
-                            workingDid === certification.subjectDid
-                          }
-                          className="rounded-full bg-kelo-gradient px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
-                        >
-                          Conserver
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            resolveCertification(
-                              certification,
-                              "remove"
-                            )
-                          }
-                          disabled={
-                            workingDid === certification.subjectDid
-                          }
-                          className="rounded-full bg-kelo-background px-4 py-2 text-xs font-bold text-kelo-danger disabled:opacity-50"
-                        >
-                          Retirer
-                        </button>
-                      </div>
+                {pendingReview.certifications.map((certification) => (
+                  <div
+                    key={certification.subjectDid}
+                    className="flex flex-wrap items-center justify-between gap-4 p-4"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-bold">@{certification.subjectHandle}</p>
+                      <p className="truncate text-xs text-kelo-muted">
+                        {certification.subjectDid}
+                      </p>
                     </div>
-                  )
-                )}
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => resolveCertification(certification, "keep")}
+                        disabled={workingDid === certification.subjectDid}
+                        className="rounded-full bg-kelo-gradient px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+                      >
+                        Conserver
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => resolveCertification(certification, "remove")}
+                        disabled={workingDid === certification.subjectDid}
+                        className="rounded-full bg-kelo-background px-4 py-2 text-xs font-bold text-kelo-danger disabled:opacity-50"
+                      >
+                        Retirer
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </section>
           )}
@@ -366,9 +279,7 @@ export default function CertifiersAdminPage() {
           <section>
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-extrabold">
-                  Certificateurs actifs
-                </h2>
+                <h2 className="text-lg font-extrabold">Certificateurs actifs</h2>
                 <p className="mt-1 text-sm text-kelo-muted">
                   Une fleur permet uniquement d’attribuer des badges ronds.
                 </p>
@@ -380,15 +291,11 @@ export default function CertifiersAdminPage() {
 
             <div className="divide-y divide-kelo-border overflow-hidden rounded-2xl border border-kelo-border bg-white">
               {loading ? (
-                <p className="p-6 text-center text-sm text-kelo-muted">
-                  Chargement…
-                </p>
+                <p className="p-6 text-center text-sm text-kelo-muted">Chargement…</p>
               ) : trustedVerifiers.length > 0 ? (
                 trustedVerifiers.map((verifier) => {
                   const count =
-                    certificationsByIssuer.get(
-                      verifier.subjectDid.toLowerCase()
-                    )?.length || 0;
+                    certificationsByIssuer.get(verifier.subjectDid.toLowerCase())?.length || 0;
 
                   return (
                     <div
@@ -400,9 +307,7 @@ export default function CertifiersAdminPage() {
                           <BadgeCheck className="h-5 w-5" />
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate font-bold">
-                            @{verifier.subjectHandle}
-                          </p>
+                          <p className="truncate font-bold">@{verifier.subjectHandle}</p>
                           <p className="text-xs text-kelo-muted">
                             {count} certification{count > 1 ? "s" : ""} attribuée{count > 1 ? "s" : ""}
                           </p>
