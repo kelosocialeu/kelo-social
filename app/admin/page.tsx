@@ -48,6 +48,7 @@ type AccountSearchResult = {
   handle: string;
   displayName: string;
   avatar: string | null;
+  certificationStatus: VisibleCertificationStatus | null;
 };
 
 const IDENTITY_TYPE_ICONS: Record<IdentityVerificationType, typeof UserRoundCheck> = {
@@ -100,10 +101,12 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!checked) return;
+
     if (!isAdmin) {
       const timeout = window.setTimeout(() => router.replace("/feed"), 1500);
       return () => window.clearTimeout(timeout);
     }
+
     refreshAll();
   }, [checked, isAdmin, router]);
 
@@ -128,10 +131,13 @@ export default function AdminPage() {
       setSearchError(null);
 
       try {
-        const response = await fetch(`/api/admin/account-search?q=${encodeURIComponent(query)}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
+        const response = await fetch(
+          `/api/admin/account-search?q=${encodeURIComponent(query)}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          }
+        );
         const data = await response.json();
 
         if (!response.ok) {
@@ -145,7 +151,10 @@ export default function AdminPage() {
           )
         );
       } catch (searchFailure) {
-        if (searchFailure instanceof DOMException && searchFailure.name === "AbortError") return;
+        if (searchFailure instanceof DOMException && searchFailure.name === "AbortError") {
+          return;
+        }
+
         setAccountSuggestions([]);
         setSearchError(
           searchFailure instanceof Error
@@ -166,6 +175,7 @@ export default function AdminPage() {
   async function refreshCertifications() {
     setLoadingCertifications(true);
     setCertificationListError(null);
+
     try {
       setCertifiedUsers(await listCertifications());
     } catch (refreshError) {
@@ -179,6 +189,7 @@ export default function AdminPage() {
   async function refreshIdentityVerifications() {
     setLoadingIdentityVerifications(true);
     setIdentityListError(null);
+
     try {
       setIdentityVerifiedUsers(await listIdentityVerifications());
     } catch (refreshError) {
@@ -202,13 +213,36 @@ export default function AdminPage() {
 
   const getSessionOrThrow = () => {
     const session = getStoredSession();
-    if (!session) throw new Error("Votre session est introuvable. Reconnectez-vous.");
+    if (!session) {
+      throw new Error("Votre session est introuvable. Reconnectez-vous.");
+    }
     return session;
   };
 
-  const getAccountCertification = (did: string): VisibleCertificationStatus | null => {
-    const certification = certifiedUsers.find((record) => record.subjectDid === did);
-    return certification?.status ?? null;
+  const getAccountCertification = (
+    account: AccountSearchResult
+  ): VisibleCertificationStatus | null => {
+    // Le statut fourni par l’API de recherche est prioritaire. Il est calculé
+    // côté serveur au moment même de la recherche et reste attaché au compte
+    // après sélection. Le fallback conserve la compatibilité avec la liste
+    // historique chargée dans le panneau admin.
+    if (account.certificationStatus) {
+      return account.certificationStatus;
+    }
+
+    const matches = certifiedUsers.filter(
+      (record) => record.subjectDid.trim().toLowerCase() === account.did.trim().toLowerCase()
+    );
+
+    if (matches.some((record) => record.status === "trusted-verifier")) {
+      return "trusted-verifier";
+    }
+
+    if (matches.some((record) => record.status === "certified")) {
+      return "certified";
+    }
+
+    return null;
   };
 
   const addSelectedAccount = (account: AccountSearchResult) => {
@@ -251,6 +285,7 @@ export default function AdminPage() {
               status: certificationStatus,
             }),
           });
+
           const data = await response.json();
           if (!response.ok) {
             failures.push(`@${account.handle}: ${data.error || "échec"}`);
@@ -274,9 +309,14 @@ export default function AdminPage() {
           ? `${updatedCount} compte${updatedCount > 1 ? "s" : ""} mis à jour avec succès.`
           : `${updatedCount} compte${updatedCount > 1 ? "s" : ""} mis à jour. Échecs : ${failures.join(" · ")}`
       );
+
       await refreshCertifications();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Une erreur inconnue est survenue.");
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Une erreur inconnue est survenue."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -284,6 +324,7 @@ export default function AdminPage() {
 
   const handleIdentityVerification = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
     const cleanTargetHandle = getCleanTargetHandle();
     if (!cleanTargetHandle) return;
 
@@ -305,9 +346,12 @@ export default function AdminPage() {
           remove: identityVerificationAction === "remove",
         }),
       });
+
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "Erreur lors de la mise à jour de la vérification.");
+        throw new Error(
+          data.error || "Erreur lors de la mise à jour de la vérification."
+        );
       }
 
       setTargetHandle("");
@@ -316,9 +360,14 @@ export default function AdminPage() {
           ? "La vérification d’identité a été révoquée."
           : "La vérification d’identité a été attribuée."
       );
+
       await refreshIdentityVerifications();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Une erreur inconnue est survenue.");
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Une erreur inconnue est survenue."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -353,11 +402,14 @@ export default function AdminPage() {
         <header className="sticky top-0 z-20 border-b border-kelo-border bg-white/90 px-4 py-4 backdrop-blur-md sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-xl font-extrabold text-kelo-text sm:text-2xl">Administration Kelo Social</h1>
+              <h1 className="text-xl font-extrabold text-kelo-text sm:text-2xl">
+                Administration Kelo Social
+              </h1>
               <p className="mt-1 text-xs text-kelo-muted sm:text-sm">
                 Connecté en tant que @{handle || "administrateur"}
               </p>
             </div>
+
             <button
               type="button"
               onClick={refreshAll}
@@ -366,7 +418,9 @@ export default function AdminPage() {
             >
               <RefreshCw
                 className={`h-4 w-4 ${
-                  loadingCertifications || loadingIdentityVerifications ? "animate-spin" : ""
+                  loadingCertifications || loadingIdentityVerifications
+                    ? "animate-spin"
+                    : ""
                 }`}
               />
               Actualiser
@@ -396,10 +450,14 @@ export default function AdminPage() {
                 </div>
                 <div>
                   <h2 className="font-extrabold text-kelo-text">Certifications</h2>
-                  <p className="text-xs text-kelo-muted">Badges ronds et certificateurs de confiance</p>
+                  <p className="text-xs text-kelo-muted">
+                    Badges ronds et certificateurs de confiance
+                  </p>
                 </div>
               </div>
-              <p className="mt-4 text-2xl font-extrabold text-kelo-text">{certifiedUsers.length}</p>
+              <p className="mt-4 text-2xl font-extrabold text-kelo-text">
+                {certifiedUsers.length}
+              </p>
             </button>
 
             <button
@@ -422,11 +480,17 @@ export default function AdminPage() {
                   <ShieldCheck className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="font-extrabold text-kelo-text">Vérifications d’identité</h2>
-                  <p className="text-xs text-kelo-muted">Attribution manuelle de secours</p>
+                  <h2 className="font-extrabold text-kelo-text">
+                    Vérifications d’identité
+                  </h2>
+                  <p className="text-xs text-kelo-muted">
+                    Attribution manuelle de secours
+                  </p>
                 </div>
               </div>
-              <p className="mt-4 text-2xl font-extrabold text-kelo-text">{identityVerifiedUsers.length}</p>
+              <p className="mt-4 text-2xl font-extrabold text-kelo-text">
+                {identityVerifiedUsers.length}
+              </p>
             </button>
           </div>
 
@@ -437,16 +501,23 @@ export default function AdminPage() {
                 className="flex flex-col gap-4 rounded-3xl border border-kelo-border bg-kelo-background p-4 sm:p-6"
               >
                 <div>
-                  <h2 className="text-lg font-extrabold text-kelo-text">Gérer les certifications en lot</h2>
+                  <h2 className="text-lg font-extrabold text-kelo-text">
+                    Gérer les certifications en lot
+                  </h2>
                   <p className="mt-1 text-sm text-kelo-muted">
-                    Recherchez un compte, sélectionnez-le, puis recommencez pour ajouter autant de comptes que vous voulez.
+                    Recherchez un compte, sélectionnez-le, puis recommencez pour
+                    ajouter autant de comptes que vous voulez.
                   </p>
                 </div>
 
                 <div className="relative">
-                  <label htmlFor="account-search" className="mb-2 block text-sm font-bold text-kelo-text">
+                  <label
+                    htmlFor="account-search"
+                    className="mb-2 block text-sm font-bold text-kelo-text"
+                  >
                     Rechercher des comptes
                   </label>
+
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-kelo-muted" />
                     <input
@@ -460,49 +531,71 @@ export default function AdminPage() {
                     />
                   </div>
 
-                  {(searchingAccounts || accountSuggestions.length > 0 || searchError) && targetHandle.trim().length >= 2 && (
-                    <div className="absolute z-30 mt-2 max-h-80 w-full overflow-y-auto rounded-2xl border border-kelo-border bg-white p-2 shadow-xl">
-                      {searchingAccounts ? (
-                        <p className="px-3 py-4 text-center text-sm text-kelo-muted">Recherche des comptes...</p>
-                      ) : searchError ? (
-                        <p className="px-3 py-4 text-sm text-kelo-danger">{searchError}</p>
-                      ) : accountSuggestions.length > 0 ? (
-                        accountSuggestions.map((account) => {
-                          const currentCertification = getAccountCertification(account.did);
+                  {(searchingAccounts ||
+                    accountSuggestions.length > 0 ||
+                    searchError) &&
+                    targetHandle.trim().length >= 2 && (
+                      <div className="absolute z-30 mt-2 max-h-80 w-full overflow-y-auto rounded-2xl border border-kelo-border bg-white p-2 shadow-xl">
+                        {searchingAccounts ? (
+                          <p className="px-3 py-4 text-center text-sm text-kelo-muted">
+                            Recherche des comptes...
+                          </p>
+                        ) : searchError ? (
+                          <p className="px-3 py-4 text-sm text-kelo-danger">
+                            {searchError}
+                          </p>
+                        ) : accountSuggestions.length > 0 ? (
+                          accountSuggestions.map((account) => {
+                            const currentCertification =
+                              getAccountCertification(account);
 
-                          return (
-                            <button
-                              key={account.did}
-                              type="button"
-                              onClick={() => addSelectedAccount(account)}
-                              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-kelo-background"
-                            >
-                              {account.avatar ? (
-                                <img
-                                  src={account.avatar}
-                                  alt=""
-                                  className="h-10 w-10 flex-shrink-0 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-kelo-background text-sm font-extrabold text-kelo-primary">
-                                  {(account.displayName || account.handle).slice(0, 1).toUpperCase()}
+                            return (
+                              <button
+                                key={account.did}
+                                type="button"
+                                onClick={() => addSelectedAccount(account)}
+                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-kelo-background"
+                              >
+                                {account.avatar ? (
+                                  <img
+                                    src={account.avatar}
+                                    alt=""
+                                    className="h-10 w-10 flex-shrink-0 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-kelo-background text-sm font-extrabold text-kelo-primary">
+                                    {(account.displayName || account.handle)
+                                      .slice(0, 1)
+                                      .toUpperCase()}
+                                  </div>
+                                )}
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex min-w-0 items-center gap-1.5">
+                                    <p className="truncate text-sm font-bold text-kelo-text">
+                                      {account.displayName}
+                                    </p>
+                                    {currentCertification && (
+                                      <Badge
+                                        status={currentCertification}
+                                        size={18}
+                                      />
+                                    )}
+                                  </div>
+                                  <p className="truncate text-xs text-kelo-muted">
+                                    @{account.handle}
+                                  </p>
                                 </div>
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <div className="flex min-w-0 items-center gap-1.5">
-                                  <p className="truncate text-sm font-bold text-kelo-text">{account.displayName}</p>
-                                  {currentCertification && <Badge status={currentCertification} size={18} />}
-                                </div>
-                                <p className="truncate text-xs text-kelo-muted">@{account.handle}</p>
-                              </div>
-                            </button>
-                          );
-                        })
-                      ) : (
-                        <p className="px-3 py-4 text-center text-sm text-kelo-muted">Aucun compte trouvé.</p>
-                      )}
-                    </div>
-                  )}
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <p className="px-3 py-4 text-center text-sm text-kelo-muted">
+                            Aucun compte trouvé.
+                          </p>
+                        )}
+                      </div>
+                    )}
                 </div>
 
                 {selectedAccounts.length > 0 && (
@@ -515,9 +608,11 @@ export default function AdminPage() {
                         {selectedAccounts.length}
                       </span>
                     </div>
+
                     <div className="flex flex-wrap gap-2">
                       {selectedAccounts.map((account) => {
-                        const currentCertification = getAccountCertification(account.did);
+                        const currentCertification =
+                          getAccountCertification(account);
 
                         return (
                           <div
@@ -525,12 +620,21 @@ export default function AdminPage() {
                             className="flex max-w-full items-center gap-2 rounded-full border border-kelo-border bg-kelo-background px-3 py-2"
                           >
                             {account.avatar && (
-                              <img src={account.avatar} alt="" className="h-6 w-6 rounded-full object-cover" />
+                              <img
+                                src={account.avatar}
+                                alt=""
+                                className="h-6 w-6 rounded-full object-cover"
+                              />
                             )}
+
                             <span className="max-w-[220px] truncate text-xs font-bold text-kelo-text">
                               @{account.handle}
                             </span>
-                            {currentCertification && <Badge status={currentCertification} size={17} />}
+
+                            {currentCertification && (
+                              <Badge status={currentCertification} size={17} />
+                            )}
+
                             <button
                               type="button"
                               onClick={() => removeSelectedAccount(account.did)}
@@ -549,15 +653,23 @@ export default function AdminPage() {
                 <Select
                   label="Certification"
                   value={certificationStatus}
-                  onChange={(event) => setCertificationStatus(event.target.value as CertificationStatus)}
+                  onChange={(event) =>
+                    setCertificationStatus(event.target.value as CertificationStatus)
+                  }
                 >
                   <option value="certified">Compte certifié</option>
-                  <option value="trusted-verifier">Certificateur de confiance</option>
+                  <option value="trusted-verifier">
+                    Certificateur de confiance
+                  </option>
                   <option value="none">Révoquer la certification</option>
                 </Select>
 
-                {error && <p className="text-sm font-medium text-kelo-danger">{error}</p>}
-                {success && <p className="text-sm font-medium text-green-700">{success}</p>}
+                {error && (
+                  <p className="text-sm font-medium text-kelo-danger">{error}</p>
+                )}
+                {success && (
+                  <p className="text-sm font-medium text-green-700">{success}</p>
+                )}
 
                 <Button
                   type="submit"
@@ -566,32 +678,47 @@ export default function AdminPage() {
                   disabled={selectedAccounts.length === 0 || submitting}
                 >
                   Mettre à jour la certification
-                  {selectedAccounts.length > 0 ? ` (${selectedAccounts.length})` : ""}
+                  {selectedAccounts.length > 0
+                    ? ` (${selectedAccounts.length})`
+                    : ""}
                 </Button>
               </form>
 
               <section>
-                <h2 className="mb-4 text-lg font-bold text-kelo-text">Comptes certifiés</h2>
+                <h2 className="mb-4 text-lg font-bold text-kelo-text">
+                  Comptes certifiés
+                </h2>
+
                 <div className="divide-y divide-kelo-border overflow-hidden rounded-2xl border border-kelo-border bg-white">
                   {loadingCertifications ? (
-                    <p className="p-6 text-center text-sm text-kelo-muted">Chargement...</p>
+                    <p className="p-6 text-center text-sm text-kelo-muted">
+                      Chargement...
+                    </p>
                   ) : certificationListError ? (
-                    <p className="p-6 text-center text-sm text-kelo-danger">{certificationListError}</p>
+                    <p className="p-6 text-center text-sm text-kelo-danger">
+                      {certificationListError}
+                    </p>
                   ) : certifiedUsers.length > 0 ? (
                     certifiedUsers.map((user) => (
                       <div
-                        key={`${user.subjectDid}-${user.status}`}
+                        key={`${user.subjectDid}-${user.status}-${user.issuerDid || "legacy"}`}
                         className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm"
                       >
                         <div className="min-w-0">
-                          <p className="truncate font-semibold text-kelo-text">@{user.subjectHandle}</p>
-                          <p className="truncate text-xs text-kelo-muted">{user.subjectDid}</p>
+                          <p className="truncate font-semibold text-kelo-text">
+                            @{user.subjectHandle}
+                          </p>
+                          <p className="truncate text-xs text-kelo-muted">
+                            {user.subjectDid}
+                          </p>
                         </div>
                         <Badge status={user.status} />
                       </div>
                     ))
                   ) : (
-                    <p className="p-6 text-center text-sm text-kelo-muted">Aucun compte certifié.</p>
+                    <p className="p-6 text-center text-sm text-kelo-muted">
+                      Aucun compte certifié.
+                    </p>
                   )}
                 </div>
               </section>
@@ -605,9 +732,13 @@ export default function AdminPage() {
                 className="flex flex-col gap-4 rounded-3xl border border-kelo-border bg-kelo-background p-4 sm:p-6"
               >
                 <div>
-                  <h2 className="text-lg font-extrabold text-kelo-text">Vérification manuelle de secours</h2>
+                  <h2 className="text-lg font-extrabold text-kelo-text">
+                    Vérification manuelle de secours
+                  </h2>
                   <p className="mt-1 text-sm leading-relaxed text-kelo-muted">
-                    Utilisez cette fonction uniquement si la synchronisation avec Kelo ID ou Kelo Verify échoue. Aucune donnée d’identité sensible n’est enregistrée dans le PDS.
+                    Utilisez cette fonction uniquement si la synchronisation avec
+                    Kelo ID ou Kelo Verify échoue. Aucune donnée d’identité sensible
+                    n’est enregistrée dans le PDS.
                   </p>
                 </div>
 
@@ -623,7 +754,11 @@ export default function AdminPage() {
                 <Select
                   label="Action"
                   value={identityVerificationAction}
-                  onChange={(event) => setIdentityVerificationAction(event.target.value as "assign" | "remove")}
+                  onChange={(event) =>
+                    setIdentityVerificationAction(
+                      event.target.value as "assign" | "remove"
+                    )
+                  }
                 >
                   <option value="assign">Attribuer ou mettre à jour</option>
                   <option value="remove">Révoquer la vérification</option>
@@ -634,7 +769,11 @@ export default function AdminPage() {
                     <Select
                       label="Type de vérification"
                       value={identityVerificationType}
-                      onChange={(event) => setIdentityVerificationType(event.target.value as IdentityVerificationType)}
+                      onChange={(event) =>
+                        setIdentityVerificationType(
+                          event.target.value as IdentityVerificationType
+                        )
+                      }
                     >
                       <option value="human">Humain vérifié</option>
                       <option value="enterprise">Entreprise vérifiée</option>
@@ -647,7 +786,11 @@ export default function AdminPage() {
                     <Select
                       label="Source de la vérification"
                       value={identityVerificationSource}
-                      onChange={(event) => setIdentityVerificationSource(event.target.value as IdentityVerificationSource)}
+                      onChange={(event) =>
+                        setIdentityVerificationSource(
+                          event.target.value as IdentityVerificationSource
+                        )
+                      }
                     >
                       <option value="kelo-id">Kelo ID</option>
                       <option value="kelo-verify">Kelo Verify</option>
@@ -655,10 +798,18 @@ export default function AdminPage() {
                   </>
                 )}
 
-                {error && <p className="text-sm font-medium text-kelo-danger">{error}</p>}
-                {success && <p className="text-sm font-medium text-green-700">{success}</p>}
+                {error && (
+                  <p className="text-sm font-medium text-kelo-danger">{error}</p>
+                )}
+                {success && (
+                  <p className="text-sm font-medium text-green-700">{success}</p>
+                )}
 
-                <Button type="submit" loading={submitting} loadingText="Mise à jour...">
+                <Button
+                  type="submit"
+                  loading={submitting}
+                  loadingText="Mise à jour..."
+                >
                   {identityVerificationAction === "remove"
                     ? "Révoquer la vérification"
                     : "Attribuer la vérification"}
@@ -666,15 +817,23 @@ export default function AdminPage() {
               </form>
 
               <section>
-                <h2 className="mb-4 text-lg font-bold text-kelo-text">Identités vérifiées</h2>
+                <h2 className="mb-4 text-lg font-bold text-kelo-text">
+                  Identités vérifiées
+                </h2>
+
                 <div className="divide-y divide-kelo-border overflow-hidden rounded-2xl border border-kelo-border bg-white">
                   {loadingIdentityVerifications ? (
-                    <p className="p-6 text-center text-sm text-kelo-muted">Chargement...</p>
+                    <p className="p-6 text-center text-sm text-kelo-muted">
+                      Chargement...
+                    </p>
                   ) : identityListError ? (
-                    <p className="p-6 text-center text-sm text-kelo-danger">{identityListError}</p>
+                    <p className="p-6 text-center text-sm text-kelo-danger">
+                      {identityListError}
+                    </p>
                   ) : identityVerifiedUsers.length > 0 ? (
                     identityVerifiedUsers.map((record) => {
                       const Icon = IDENTITY_TYPE_ICONS[record.verificationType];
+
                       return (
                         <div
                           key={record.subjectDid}
@@ -684,24 +843,35 @@ export default function AdminPage() {
                             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-kelo-gradient text-white">
                               <Icon className="h-5 w-5" />
                             </div>
+
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-bold text-kelo-text">@{record.subjectHandle}</p>
-                              <p className="truncate text-xs text-kelo-muted">{record.subjectDid}</p>
+                              <p className="truncate text-sm font-bold text-kelo-text">
+                                @{record.subjectHandle}
+                              </p>
+                              <p className="truncate text-xs text-kelo-muted">
+                                {record.subjectDid}
+                              </p>
                             </div>
                           </div>
+
                           <div className="text-right">
                             <p className="text-sm font-bold text-kelo-text">
                               {IDENTITY_VERIFICATION_LABELS[record.verificationType]}
                             </p>
                             <p className="text-xs text-kelo-muted">
-                              {IDENTITY_VERIFICATION_SOURCE_LABELS[record.source]} · {record.assignmentMode === "manual" ? "Secours manuel" : "Automatique"}
+                              {IDENTITY_VERIFICATION_SOURCE_LABELS[record.source]} ·{" "}
+                              {record.assignmentMode === "manual"
+                                ? "Secours manuel"
+                                : "Automatique"}
                             </p>
                           </div>
                         </div>
                       );
                     })
                   ) : (
-                    <p className="p-6 text-center text-sm text-kelo-muted">Aucune vérification d’identité.</p>
+                    <p className="p-6 text-center text-sm text-kelo-muted">
+                      Aucune vérification d’identité.
+                    </p>
                   )}
                 </div>
               </section>
