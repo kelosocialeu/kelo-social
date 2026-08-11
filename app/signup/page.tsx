@@ -52,10 +52,9 @@ export default function SignupPage() {
     const state = crypto.randomUUID();
     const callbackUrl = `${window.location.origin}/signup/gate-callback`;
 
-    // The gatekeeper runs as a separate service in front of the PDS.
-    // Do not derive its URL from the selected PDS: that caused browsers to
-    // request GET /gate on the PDS host and return "Cannot GET /gate".
-    const gateUrl = new URL(`${GATEKEEPER_URL}/gate`);
+    // PDS Gatekeeper exposes the captcha page on GET /gate/signup.
+    // /gate itself is not a valid route and returns "Cannot GET /gate".
+    const gateUrl = new URL(`${GATEKEEPER_URL}/gate/signup`);
     gateUrl.searchParams.set("handle", fullHandle);
     gateUrl.searchParams.set("state", state);
     gateUrl.searchParams.set("redirect_url", callbackUrl);
