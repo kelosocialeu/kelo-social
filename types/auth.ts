@@ -23,6 +23,7 @@ export interface SignupPayload {
   email: string;
   password: string;
   birthDate: string;
-  hcaptchaToken: string;
   pdsUrl: string;
+  hcaptchaToken?: string;
+  verificationCode?: string;
 }
