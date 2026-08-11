@@ -21,6 +21,8 @@ let cachedAgent: ReturnType<typeof createAtpAgent> | null = null;
 let cachedSessionKey: string | null = null;
 let pendingSessionRefresh: Promise<AtpSession> | null = null;
 
+const BLUESKY_ENTRYWAY_URL = "https://bsky.social";
+
 function getSessionKey(session: AtpSession): string {
   return [
     session.did,
@@ -42,6 +44,31 @@ function saveSession(session: AtpSession): void {
 
 function normalizePdsUrl(value: string): string {
   return value.trim().replace(/\/$/, "");
+}
+
+/**
+ * Bluesky héberge ses comptes sur de nombreux PDS du type
+ * <nom>.<region>.host.bsky.network, mais la création de session est
+ * orchestrée par l'Entryway bsky.social. Le SDK AT Protocol se charge
+ * ensuite de router l'agent vers le véritable PDS de l'utilisateur.
+ *
+ * Tous les autres PDS AT Protocol sont contactés directement.
+ */
+function getLoginServiceForPds(pdsUrl: string): string {
+  try {
+    const hostname = new URL(pdsUrl).hostname.toLowerCase();
+
+    if (
+      hostname === "bsky.social" ||
+      hostname.endsWith(".host.bsky.network")
+    ) {
+      return BLUESKY_ENTRYWAY_URL;
+    }
+  } catch {
+    // L'URL a déjà été validée par la découverte AT Protocol.
+  }
+
+  return normalizePdsUrl(pdsUrl);
 }
 
 function isDefinitelyExpiredSessionStatus(status: number): boolean {
@@ -88,8 +115,6 @@ async function refreshAtProtocolSession(
         );
       }
 
-      // Une panne, un 429 ou une erreur serveur ne doit pas effacer la
-      // session locale ni provoquer une boucle déconnexion/reconnexion.
       throw new Error(
         `Le PDS est temporairement indisponible pendant le renouvellement de session (${response.status}).`
       );
@@ -139,7 +164,12 @@ async function refreshAtProtocolSession(
 }
 
 /**
- * Authentifie automatiquement un utilisateur auprès de son propre PDS.
+ * Authentifie automatiquement un utilisateur auprès de son infrastructure
+ * AT Protocol, quel que soit son PDS.
+ *
+ * - PDS indépendants : connexion directe au serviceEndpoint du DID.
+ * - PDS Bluesky *.host.bsky.network : création de session via bsky.social,
+ *   puis routage dynamique du SDK vers le PDS réel.
  */
 export async function login(
   credentials: LoginCredentials
@@ -175,9 +205,10 @@ export async function login(
     );
   }
 
-  const agent = createAtpAgent(
+  const loginService = getLoginServiceForPds(
     discoveredAccount.pdsUrl
   );
+  const agent = createAtpAgent(loginService);
 
   try {
     await agent.login({
@@ -185,7 +216,11 @@ export async function login(
       password: credentials.password,
     });
   } catch (error) {
-    console.error("AT Protocol login error:", error);
+    console.error(
+      "AT Protocol login error:",
+      { identifier: discoveredAccount.identifier, pds: discoveredAccount.pdsUrl, loginService },
+      error
+    );
 
     throw new AuthError(
       "Échec de la connexion. Vérifiez votre identifiant et votre mot de passe."
@@ -198,11 +233,18 @@ export async function login(
     );
   }
 
+  if (agent.session.did !== discoveredAccount.did) {
+    throw new AuthError(
+      "La session retournée ne correspond pas à l’identité AT Protocol demandée."
+    );
+  }
+
   const session: AtpSession = {
     accessJwt: agent.session.accessJwt,
     refreshJwt: agent.session.refreshJwt,
     handle: agent.session.handle,
     did: agent.session.did,
+    // Toujours conserver le PDS réel issu du document DID, jamais l'Entryway.
     pdsUrl: discoveredAccount.pdsUrl,
   };
 
@@ -231,8 +273,6 @@ export async function loginWithKeloIdSession(
     throw new AuthError("Session Kelo ID incomplète.");
   }
 
-  // On conserve d'abord la session reçue du backend Kelo Social afin que
-  // le renouvellement silencieux puisse la remplacer sans perdre le QR.
   saveSession(session);
 
   try {
@@ -266,28 +306,15 @@ export async function loginWithKeloIdSession(
   }
 }
 
-/**
- * Déconnecte l'utilisateur et efface la session locale.
- */
 export function logout(): void {
   clearCachedAgent();
   sessionStorage.clear();
 }
 
-/**
- * Récupère la session actuellement stockée.
- */
 export function getStoredSession(): AtpSession | null {
   return sessionStorage.get();
 }
 
-/**
- * Retourne un agent authentifié réutilisable.
- * Renouvelle silencieusement le jeton d'accès lorsqu'il a expiré.
- *
- * Une panne réseau ne doit jamais déconnecter l'utilisateur : la session
- * locale n'est supprimée que lorsque le PDS confirme qu'elle est invalide.
- */
 export async function resumeAgentSession(
   session: AtpSession
 ) {
@@ -352,9 +379,6 @@ export async function resumeAgentSession(
   }
 }
 
-/**
- * Restaure silencieusement une session persistante au démarrage de la PWA.
- */
 export async function restoreStoredSession(): Promise<AtpSession | null> {
   const stored = getStoredSession();
 
@@ -370,9 +394,6 @@ export async function restoreStoredSession(): Promise<AtpSession | null> {
   }
 }
 
-/**
- * Retourne directement la session et l’agent authentifié.
- */
 export async function getAuthenticatedAgent() {
   const session = getStoredSession();
 
@@ -391,9 +412,6 @@ export async function getAuthenticatedAgent() {
   };
 }
 
-/**
- * Inscrit un nouvel utilisateur au moyen de l'API interne de Kelo Social.
- */
 export async function signup(
   payload: SignupPayload
 ): Promise<void> {
