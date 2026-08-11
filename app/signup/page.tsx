@@ -16,6 +16,10 @@ const SIGNUP_PDS_PROVIDERS = [
   },
 ];
 
+const GATEKEEPER_URL = (
+  process.env.NEXT_PUBLIC_KELO_GATEKEEPER_URL || "https://pds.kelosocial.eu"
+).replace(/\/$/, "");
+
 export default function SignupPage() {
   const [handle, setHandle] = useState("");
   const [email, setEmail] = useState("");
@@ -47,7 +51,11 @@ export default function SignupPage() {
     const fullHandle = handle.includes(".") ? handle : `${handle}.kelosocial.eu`;
     const state = crypto.randomUUID();
     const callbackUrl = `${window.location.origin}/signup/gate-callback`;
-    const gateUrl = new URL(`${pdsUrl.replace(/\/$/, "")}/gate`);
+
+    // The gatekeeper runs as a separate service in front of the PDS.
+    // Do not derive its URL from the selected PDS: that caused browsers to
+    // request GET /gate on the PDS host and return "Cannot GET /gate".
+    const gateUrl = new URL(`${GATEKEEPER_URL}/gate`);
     gateUrl.searchParams.set("handle", fullHandle);
     gateUrl.searchParams.set("state", state);
     gateUrl.searchParams.set("redirect_url", callbackUrl);
