@@ -9,6 +9,7 @@ export interface AtpSession {
 export interface LoginCredentials {
   identifier: string;
   password: string;
+  authFactorToken?: string;
 }
 
 export interface PdsProvider {
