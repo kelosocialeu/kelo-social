@@ -16,6 +16,19 @@ function normalizeDid(value: string) {
   return value.trim().toLowerCase();
 }
 
+type BlueskyVerificationState = {
+  verifiedStatus?: "valid" | "invalid" | "none" | string;
+  trustedVerifierStatus?: "valid" | "invalid" | "none" | string;
+};
+
+type SearchActor = {
+  did?: string;
+  handle?: string;
+  displayName?: string;
+  avatar?: string;
+  verification?: BlueskyVerificationState;
+};
+
 export async function GET(request: NextRequest) {
   const query = cleanQuery(request.nextUrl.searchParams.get("q") || "");
 
@@ -45,12 +58,7 @@ export async function GET(request: NextRequest) {
     }
 
     const data = (await response.json()) as {
-      actors?: Array<{
-        did?: string;
-        handle?: string;
-        displayName?: string;
-        avatar?: string;
-      }>;
+      actors?: SearchActor[];
     };
 
     const certificationsByDid = new Map<string, CertificationStatus>();
@@ -58,8 +66,8 @@ export async function GET(request: NextRequest) {
       const did = normalizeDid(certification.subjectDid);
       const current = certificationsByDid.get(did);
 
-      // Une fleur est prioritaire visuellement si un compte possède aussi
-      // une ancienne certification ronde ou plusieurs records historiques.
+      // Une fleur Kelo est prioritaire visuellement si le compte possède aussi
+      // une certification ronde ou plusieurs records historiques.
       if (certification.status === "trusted-verifier" || !current) {
         certificationsByDid.set(did, certification.status);
       }
@@ -67,14 +75,48 @@ export async function GET(request: NextRequest) {
 
     const actors = (data.actors || [])
       .filter((actor) => actor.did && actor.handle)
-      .map((actor) => ({
-        did: actor.did!,
-        handle: actor.handle!,
-        displayName: actor.displayName || actor.handle!,
-        avatar: actor.avatar || null,
-        certificationStatus:
-          certificationsByDid.get(normalizeDid(actor.did!)) || null,
-      }));
+      .map((actor) => {
+        const did = normalizeDid(actor.did!);
+        const keloStatus = certificationsByDid.get(did) || null;
+
+        const blueskyTrustedVerifier =
+          actor.verification?.trustedVerifierStatus === "valid";
+        const blueskyVerified =
+          actor.verification?.verifiedStatus === "valid";
+
+        // Fusion Kelo + Bluesky :
+        // 1. toute fleur (Kelo ou Bluesky) est prioritaire ;
+        // 2. sinon un compte vérifié sur Kelo ou Bluesky reçoit le rond ;
+        // 3. sinon aucun badge.
+        let certificationStatus: CertificationStatus | null = null;
+
+        if (
+          keloStatus === "trusted-verifier" ||
+          blueskyTrustedVerifier
+        ) {
+          certificationStatus = "trusted-verifier";
+        } else if (
+          keloStatus === "certified" ||
+          blueskyVerified
+        ) {
+          certificationStatus = "certified";
+        }
+
+        return {
+          did: actor.did!,
+          handle: actor.handle!,
+          displayName: actor.displayName || actor.handle!,
+          avatar: actor.avatar || null,
+          certificationStatus,
+          certificationSources: {
+            kelo: keloStatus,
+            bluesky: {
+              verified: blueskyVerified,
+              trustedVerifier: blueskyTrustedVerifier,
+            },
+          },
+        };
+      });
 
     return NextResponse.json({ actors });
   } catch (error) {
