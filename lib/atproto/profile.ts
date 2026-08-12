@@ -86,3 +86,39 @@ export async function getActorFeed(
     cursor: response.data.cursor,
   };
 }
+
+export async function getActorFollowers(
+  actor: string,
+  limit = 50,
+  cursor?: string
+) {
+  const agent = await getReadAgent();
+  const response = await agent.api.app.bsky.graph.getFollowers({
+    actor,
+    limit,
+    cursor,
+  });
+
+  return {
+    items: response.data.followers,
+    cursor: response.data.cursor,
+  };
+}
+
+export async function getActorFollows(
+  actor: string,
+  limit = 50,
+  cursor?: string
+) {
+  const agent = await getReadAgent();
+  const response = await agent.api.app.bsky.graph.getFollows({
+    actor,
+    limit,
+    cursor,
+  });
+
+  return {
+    items: response.data.follows,
+    cursor: response.data.cursor,
+  };
+}
