@@ -4,6 +4,7 @@ import {
   listCertifications,
   type CertificationStatus,
 } from "@/lib/atproto/certifications";
+import { listCertificationSuppressions } from "@/lib/atproto/certification-suppressions";
 
 const APPVIEW_SEARCH_URL =
   "https://public.api.bsky.app/xrpc/app.bsky.actor.searchActorsTypeahead";
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
     url.searchParams.set("q", query);
     url.searchParams.set("limit", "10");
 
-    const [response, certifications] = await Promise.all([
+    const [response, certifications, suppressions] = await Promise.all([
       fetch(url.toString(), {
         headers: { Accept: "application/json" },
         cache: "no-store",
@@ -49,6 +50,10 @@ export async function GET(request: NextRequest) {
       }),
       listCertifications().catch((error) => {
         console.error("[admin/account-search] certifications", error);
+        return [];
+      }),
+      listCertificationSuppressions().catch((error) => {
+        console.error("[admin/account-search] suppressions", error);
         return [];
       }),
     ]);
@@ -66,41 +71,41 @@ export async function GET(request: NextRequest) {
       const did = normalizeDid(certification.subjectDid);
       const current = certificationsByDid.get(did);
 
-      // Une fleur Kelo est prioritaire visuellement si le compte possède aussi
-      // une certification ronde ou plusieurs records historiques.
       if (certification.status === "trusted-verifier" || !current) {
         certificationsByDid.set(did, certification.status);
       }
     }
+
+    const suppressedDids = new Set(
+      suppressions.map((suppression) => normalizeDid(suppression.subjectDid))
+    );
 
     const actors = (data.actors || [])
       .filter((actor) => actor.did && actor.handle)
       .map((actor) => {
         const did = normalizeDid(actor.did!);
         const keloStatus = certificationsByDid.get(did) || null;
+        const hiddenOnKelo = suppressedDids.has(did);
 
         const blueskyTrustedVerifier =
           actor.verification?.trustedVerifierStatus === "valid";
         const blueskyVerified =
           actor.verification?.verifiedStatus === "valid";
 
-        // Fusion Kelo + Bluesky :
-        // 1. toute fleur (Kelo ou Bluesky) est prioritaire ;
-        // 2. sinon un compte vérifié sur Kelo ou Bluesky reçoit le rond ;
-        // 3. sinon aucun badge.
-        let certificationStatus: CertificationStatus | null = null;
+        let sourceCertificationStatus: CertificationStatus | null = null;
 
-        if (
-          keloStatus === "trusted-verifier" ||
-          blueskyTrustedVerifier
-        ) {
-          certificationStatus = "trusted-verifier";
-        } else if (
-          keloStatus === "certified" ||
-          blueskyVerified
-        ) {
-          certificationStatus = "certified";
+        if (keloStatus === "trusted-verifier" || blueskyTrustedVerifier) {
+          sourceCertificationStatus = "trusted-verifier";
+        } else if (keloStatus === "certified" || blueskyVerified) {
+          sourceCertificationStatus = "certified";
         }
+
+        // La source reste intacte. Kelo applique ensuite sa propre politique
+        // d'affichage : un compte masqué conserve sa certification ailleurs,
+        // mais aucun rond/fleur n'est affiché dans Kelo Social.
+        const certificationStatus = hiddenOnKelo
+          ? null
+          : sourceCertificationStatus;
 
         return {
           did: actor.did!,
@@ -108,9 +113,11 @@ export async function GET(request: NextRequest) {
           displayName: actor.displayName || actor.handle!,
           avatar: actor.avatar || null,
           certificationStatus,
+          sourceCertificationStatus,
+          hiddenOnKelo,
           certificationSources: {
             kelo: keloStatus,
-            bluesky: {
+            atproto: {
               verified: blueskyVerified,
               trustedVerifier: blueskyTrustedVerifier,
             },
