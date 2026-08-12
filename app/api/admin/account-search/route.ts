@@ -100,12 +100,11 @@ export async function GET(request: NextRequest) {
           sourceCertificationStatus = "certified";
         }
 
-        // La source reste intacte. Kelo applique ensuite sa propre politique
-        // d'affichage : un compte masqué conserve sa certification ailleurs,
-        // mais aucun rond/fleur n'est affiché dans Kelo Social.
-        const certificationStatus = hiddenOnKelo
-          ? null
-          : sourceCertificationStatus;
+        // "none" est volontairement explicite : l'admin sait qu'une décision
+        // Kelo existe et ne retombe pas sur l'ancien fallback de certifications.
+        // Le statut source reste disponible séparément et n'est jamais modifié.
+        const certificationStatus: CertificationStatus | "none" | null =
+          hiddenOnKelo ? "none" : sourceCertificationStatus;
 
         return {
           did: actor.did!,
