@@ -68,6 +68,42 @@ function createPolicyAgent() {
   return new AtpAgent({ service: CERTIFICATION_POLICY_PDS_URL });
 }
 
+export async function listCertificationSuppressions(): Promise<
+  CertificationSuppressionRecord[]
+> {
+  const agent = createPolicyAgent();
+  const records: CertificationSuppressionRecord[] = [];
+  let cursor: string | undefined;
+
+  try {
+    do {
+      const response = await agent.api.com.atproto.repo.listRecords({
+        repo: CERTIFICATION_POLICY_REPO_HANDLE,
+        collection: CERTIFICATION_SUPPRESSION_COLLECTION,
+        limit: 100,
+        cursor,
+      });
+
+      for (const item of response.data.records) {
+        const parsed = parseSuppression(item.value);
+        if (!parsed) continue;
+
+        records.push(parsed);
+        cache.set(normalizeDid(parsed.subjectDid), {
+          value: parsed,
+          expiresAt: Date.now() + CACHE_DURATION,
+        });
+      }
+
+      cursor = response.data.cursor;
+    } while (cursor);
+  } catch {
+    return [];
+  }
+
+  return records;
+}
+
 export async function getCertificationSuppression(
   subjectDid: string
 ): Promise<CertificationSuppressionRecord | null> {
