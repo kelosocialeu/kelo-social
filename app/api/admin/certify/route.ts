@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { AtpAgent } from "@atproto/api";
 
+import { CERTIFICATION_SUPPRESSION_COLLECTION } from "@/lib/atproto/certification-suppressions";
+
 const CERTIFICATION_COLLECTION =
   "eu.kelosocial.certification";
 
@@ -184,13 +186,56 @@ async function requesterIsTrustedVerifier(
   repo: string,
   requesterDid: string
 ): Promise<boolean> {
-  // Les fleurs restent sur la clé historique = DID du compte.
   const record = await getRecordByKey(
     agent,
     repo,
     normalizeDid(requesterDid)
   );
   return record?.status === "trusted-verifier";
+}
+
+async function hideCertificationLocally(
+  agent: AtpAgent,
+  repo: string,
+  subjectDid: string,
+  subjectHandle: string,
+  requesterDid: string,
+  requesterHandle: string
+) {
+  const hiddenAt = new Date().toISOString();
+
+  await agent.api.com.atproto.repo.putRecord({
+    repo,
+    collection: CERTIFICATION_SUPPRESSION_COLLECTION,
+    rkey: subjectDid,
+    record: {
+      $type: CERTIFICATION_SUPPRESSION_COLLECTION,
+      subjectDid,
+      subjectHandle,
+      hiddenAt,
+      hiddenByDid: requesterDid,
+      hiddenByHandle: requesterHandle,
+    },
+    validate: false,
+  });
+
+  return hiddenAt;
+}
+
+async function makeCertificationVisibleLocally(
+  agent: AtpAgent,
+  repo: string,
+  subjectDid: string
+) {
+  try {
+    await agent.api.com.atproto.repo.deleteRecord({
+      repo,
+      collection: CERTIFICATION_SUPPRESSION_COLLECTION,
+      rkey: subjectDid,
+    });
+  } catch {
+    // Aucun record signifie déjà « visible sur Kelo ».
+  }
 }
 
 export async function POST(request: Request) {
@@ -266,9 +311,29 @@ export async function POST(request: Request) {
       );
     }
 
-    // Une fleur reste un record unique par compte. Une certification ronde est
-    // unique par paire (compte certifié, certificateur), ce qui permet aux
-    // certificateurs de confiance de s'accumuler sans s'écraser.
+    // Pour l'administrateur principal, « none » signifie désormais :
+    // masquer la certification uniquement dans Kelo Social. Le record source
+    // (Kelo ou autre réseau AT Protocol) reste intact et peut continuer à être
+    // affiché par les autres plateformes.
+    if (status === "none" && requesterIsAdmin) {
+      const hiddenAt = await hideCertificationLocally(
+        certificationRepo.agent,
+        certificationRepo.repoDid,
+        subjectDid,
+        targetHandle,
+        requester.did,
+        requester.handle
+      );
+
+      return NextResponse.json({
+        success: true,
+        action: "hidden-on-kelo",
+        subjectDid,
+        subjectHandle: targetHandle,
+        hiddenAt,
+      });
+    }
+
     const recordKey =
       status === "trusted-verifier"
         ? subjectDid
@@ -280,10 +345,9 @@ export async function POST(request: Request) {
       recordKey
     );
 
+    // Un certificateur de confiance qui retire sa propre certification Kelo
+    // continue à révoquer son propre record, puisqu'il en est la source.
     if (status === "none") {
-      // Pour une révocation, on retire d'abord la certification ronde propre
-      // au demandeur. Compatibilité : si elle n'existe pas, on essaie ensuite
-      // l'ancienne clé historique, utilisée avant le multi-certificateur.
       const ownRoundKey = roundRecordKey(subjectDid, requester.did);
       const ownRound = await getRecordByKey(
         certificationRepo.agent,
@@ -307,8 +371,6 @@ export async function POST(request: Request) {
           normalizeDid(legacy.issuerDid || certificationRepo.repoDid) === requester.did
         ) {
           recordToDelete = legacy;
-        } else if (requesterIsAdmin && legacy) {
-          recordToDelete = legacy;
         }
       }
 
@@ -321,7 +383,7 @@ export async function POST(request: Request) {
         });
       }
 
-      if (!requesterIsAdmin && recordToDelete.status === "trusted-verifier") {
+      if (recordToDelete.status === "trusted-verifier") {
         return NextResponse.json(
           { error: "Un certificateur de confiance ne peut pas retirer une fleur." },
           { status: 403 }
@@ -347,6 +409,16 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Un certificateur de confiance peut uniquement attribuer une certification ronde." },
         { status: 403 }
+      );
+    }
+
+    // Une nouvelle attribution explicite par l'admin réactive aussi l'affichage
+    // local si le compte avait précédemment été masqué dans Kelo.
+    if (requesterIsAdmin) {
+      await makeCertificationVisibleLocally(
+        certificationRepo.agent,
+        certificationRepo.repoDid,
+        subjectDid
       );
     }
 
