@@ -34,14 +34,11 @@ export default function KeloIdMobileLoginButton() {
         throw new Error(data.error || "Connexion Kelo ID impossible.");
       }
 
-      const keloIdUrl = (process.env.NEXT_PUBLIC_KELO_ID_URL || "https://keloid.eu").replace(/\/$/, "");
+      const keloIdUrl = (process.env.NEXT_PUBLIC_KELO_ID_URL || "https://kelo-id.eu").replace(/\/$/, "");
       const callback = new URL("/kelo-id/callback", window.location.origin);
       callback.searchParams.set("id", data.id);
       callback.searchParams.set("clientState", data.clientState);
 
-      // Conserver le challenge côté navigateur permet au callback mobile de
-      // récupérer le bon flux même si le navigateur ou Kelo ID retire des
-      // paramètres pendant la redirection.
       window.sessionStorage.setItem(
         PENDING_LOGIN_KEY,
         JSON.stringify({
@@ -55,8 +52,6 @@ export default function KeloIdMobileLoginButton() {
       authorize.searchParams.set("challenge", data.id);
       authorize.searchParams.set("returnTo", callback.toString());
 
-      // replace évite de revenir sur une ancienne URL /authorize avec un
-      // challenge déjà consommé lorsque l'utilisateur utilise Retour.
       window.location.replace(authorize.toString());
     } catch (loginError) {
       window.sessionStorage.removeItem(PENDING_LOGIN_KEY);
