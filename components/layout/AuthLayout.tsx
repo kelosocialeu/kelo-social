@@ -1,5 +1,4 @@
 import Logo from "@/components/ui/Logo";
-import KeloIdMobileLoginButton from "@/components/auth/KeloIdMobileLoginButton";
 
 interface AuthLayoutProps {
   title: string;
@@ -40,7 +39,6 @@ export default function AuthLayout({
               <p className="mt-4 text-center text-kelo-muted">{tagline}</p>
             </div>
 
-            <KeloIdMobileLoginButton />
             {children}
           </div>
         </div>
