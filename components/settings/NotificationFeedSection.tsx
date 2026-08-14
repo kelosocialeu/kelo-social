@@ -52,12 +52,7 @@ export default function NotificationFeedSection() {
   const [feedMessage, setFeedMessage] = useState("");
   const [systemEnabled, setSystemEnabled] = useState(false);
   const [systemStatus, setSystemStatus] = useState("");
-  const [systemSupport, setSystemSupport] = useState(() => ({
-    supported: false,
-    permission: "unsupported" as const | NotificationPermission,
-    isIos: false,
-    isStandalone: false,
-  }));
+  const [systemSupport, setSystemSupport] = useState(getSystemNotificationSupport);
 
   useEffect(() => {
     setNotifications(getKeloNotificationPreferences(did));
