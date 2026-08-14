@@ -128,6 +128,19 @@ export default function Sidebar({ handle, onLogout }: SidebarProps) {
               </Link>
 
               <Link
+                href="/admin/journal"
+                prefetch
+                className={`flex items-center gap-4 rounded-2xl p-3 ${
+                  isRouteActive(pathname, "/admin/journal")
+                    ? "bg-kelo-gradient text-white"
+                    : "text-kelo-secondary hover:bg-kelo-background"
+                }`}
+              >
+                <Newspaper className="h-5 w-5" />
+                Médias du Journal
+              </Link>
+
+              <Link
                 href="/admin/certifiers"
                 prefetch
                 className={`flex items-center gap-4 rounded-2xl p-3 ${
