@@ -12,6 +12,7 @@ import {
   Rocket,
   Bookmark,
   User,
+  Users,
   Settings,
   ShieldCheck,
   BadgeCheck,
@@ -110,6 +111,20 @@ export default function Sidebar({ handle, onLogout }: SidebarProps) {
                 <ShieldCheck className="h-5 w-5" />
                 Panneau Admin
               </Link>
+
+              <Link
+                href="/admin/people"
+                prefetch
+                className={`flex items-center gap-4 rounded-2xl p-3 ${
+                  isRouteActive(pathname, "/admin/people")
+                    ? "bg-kelo-gradient text-white"
+                    : "text-kelo-secondary hover:bg-kelo-background"
+                }`}
+              >
+                <Users className="h-5 w-5" />
+                Personnes
+              </Link>
+
               <Link
                 href="/admin/certifiers"
                 prefetch
