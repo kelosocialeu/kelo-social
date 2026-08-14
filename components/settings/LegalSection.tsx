@@ -6,6 +6,7 @@ import { ChevronRight, FileText } from "lucide-react";
 const documents=[
   {href:"/legal-notice",title:"Mentions légales",description:"Éditeur, hébergement, propriété intellectuelle, responsabilité et droit applicable."},
   {href:"/terms",title:"Conditions Générales d’Utilisation (CGU)",description:"Conditions d’accès, AT Protocol, contenus, modération, certifications, Journal et règles d’utilisation."},
+  {href:"/privacy",title:"Politique de confidentialité (RGPD)",description:"Données personnelles, AT Protocol/PDS, Kelo ID, prestataires, sécurité et droits RGPD."},
 ];
 
 export default function LegalSection(){
