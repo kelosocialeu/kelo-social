@@ -41,6 +41,18 @@ export async function listConversations(
   };
 }
 
+export async function getConversation(
+  convoId: string
+) {
+  const agent = await getChatAgent();
+  const response = await agent.api.chat.bsky.convo.getConvo(
+    { convoId },
+    { headers: CHAT_PROXY_HEADER }
+  );
+
+  return response.data.convo;
+}
+
 export async function getOrCreateConversation(
   memberDid: string
 ) {
