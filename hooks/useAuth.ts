@@ -19,6 +19,24 @@ import type {
   LoginCredentials,
 } from "@/types/auth";
 
+async function trackLoginActivity(
+  session: ReturnType<typeof authService.getStoredSession>,
+  method: "password" | "qr-kelo-id"
+) {
+  if (!session) return;
+
+  try {
+    await fetch("/api/login-activity", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session, method }),
+      keepalive: true,
+    });
+  } catch (error) {
+    console.warn("Suivi de connexion indisponible :", error);
+  }
+}
+
 export function useAuth() {
   const router = useRouter();
 
@@ -41,9 +59,11 @@ export function useAuth() {
       setError(null);
 
       try {
-        await authService.login(
+        const session = await authService.login(
           credentials
         );
+
+        await trackLoginActivity(session, "password");
 
         /*
          * La session vient d'être écrite dans localStorage. On synchronise
