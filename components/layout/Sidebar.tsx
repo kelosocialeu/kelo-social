@@ -18,6 +18,7 @@ import {
   BadgeCheck,
   PenSquare,
   LogOut,
+  Newspaper,
 } from "lucide-react";
 
 import Logo from "@/components/ui/Logo";
@@ -33,6 +34,7 @@ interface SidebarProps {
 const NAV_ITEMS = [
   { href: "/feed", label: "Accueil", icon: Home },
   { href: "/search", label: "Explorer", icon: Search },
+  { href: "/journal", label: "Journal", icon: Newspaper },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/messages", label: "Discussions", icon: MessageCircle },
   { href: "/feeds", label: "Fils d'actu", icon: Hash },
