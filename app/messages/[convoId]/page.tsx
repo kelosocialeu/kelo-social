@@ -20,6 +20,7 @@ import { useIdentityVerification } from "@/hooks/useIdentityVerification";
 import { useVisibleInterval } from "@/hooks/useVisibleInterval";
 
 import {
+  getConversation,
   getConversationMessages,
   sendConversationMessage,
   markConversationRead,
@@ -63,6 +64,7 @@ export default function ConversationPage() {
   const convoId = params?.convoId as string;
 
   const [myDid, setMyDid] = useState<string | null>(null);
+  const [conversationMember, setConversationMember] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -136,6 +138,36 @@ export default function ConversationPage() {
     void loadConversation(false);
   }, [checked, convoId, loadConversation]);
 
+  useEffect(() => {
+    if (!checked || !convoId) return;
+
+    let cancelled = false;
+
+    getConversation(convoId)
+      .then((conversation: any) => {
+        if (cancelled) return;
+
+        const session = getStoredSession();
+        const currentDid = session?.did || myDid;
+        const member =
+          conversation.members?.find(
+            (candidate: any) => candidate.did !== currentDid
+          ) || conversation.members?.[0] || null;
+
+        setConversationMember(member);
+      })
+      .catch((metadataError) => {
+        console.warn(
+          "Impossible de charger les informations du correspondant :",
+          metadataError
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checked, convoId, myDid]);
+
   useVisibleInterval(
     () => loadConversation(true),
     MESSAGE_REFRESH_MS,
@@ -150,6 +182,16 @@ export default function ConversationPage() {
   }, [messages, loading]);
 
   const otherUser = useMemo(() => {
+    if (conversationMember) {
+      return {
+        ...conversationMember,
+        displayName:
+          conversationMember.displayName ||
+          conversationMember.handle ||
+          "Utilisateur",
+      };
+    }
+
     const receivedMessage = messages.find(
       (message: any) =>
         message.sender?.did &&
@@ -165,7 +207,7 @@ export default function ConversationPage() {
         receivedMessage.sender.handle ||
         "Utilisateur",
     };
-  }, [messages, myDid]);
+  }, [conversationMember, messages, myDid]);
 
   const handleSend = async (
     event: React.FormEvent<HTMLFormElement>
@@ -218,7 +260,7 @@ export default function ConversationPage() {
       <Sidebar handle={handle} onLogout={handleLogout} />
 
       <main className="flex min-h-screen min-w-0 flex-1 flex-col border-x border-kelo-border bg-white shadow-kelo">
-        <header className="sticky top-0 z-20 flex min-h-[72px] items-center gap-3 border-b border-kelo-border bg-white/95 px-4 py-3 backdrop-blur-md sm:px-5 lg:px-6">
+        <header className="sticky top-0 z-20 flex min-h-[78px] items-center gap-3 border-b border-kelo-border bg-white/95 px-4 py-3 backdrop-blur-md sm:px-5 lg:px-6">
           <button
             type="button"
             onClick={() => router.push("/messages")}
@@ -252,6 +294,9 @@ export default function ConversationPage() {
                 </div>
                 <p className="truncate text-xs text-kelo-muted sm:text-sm">
                   @{otherUser.handle}
+                </p>
+                <p className="mt-0.5 text-[11px] text-kelo-muted sm:text-xs">
+                  Conversation privée
                 </p>
               </div>
             </Link>
