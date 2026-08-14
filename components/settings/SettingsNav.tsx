@@ -1,8 +1,8 @@
 "use client";
 
-import { Bell, ChevronRight, Eye, Globe2, Languages, Palette, Shield, SlidersHorizontal, UserRound } from "lucide-react";
+import { Bell, ChevronRight, Eye, FileText, Globe2, Languages, Palette, Shield, SlidersHorizontal, UserRound } from "lucide-react";
 
-export type SettingsSection = "account" | "identity" | "moderation" | "appearance" | "notifications" | "language" | "privacy";
+export type SettingsSection = "account" | "identity" | "moderation" | "appearance" | "notifications" | "language" | "privacy" | "legal";
 interface SettingsNavProps { active: SettingsSection; onChange: (section: SettingsSection) => void; }
 type SettingsItem = { key: SettingsSection; label: string; description: string; icon: React.ComponentType<{ className?: string }>; };
 const GROUPS: Array<{ title: string; items: SettingsItem[] }> = [
@@ -17,6 +17,7 @@ const GROUPS: Array<{ title: string; items: SettingsItem[] }> = [
     {key:"notifications",label:"Notifications et flux",description:"Notifications, fils et contenu affiché",icon:Bell},
   ]},
   { title:"Sécurité et contenu", items:[{key:"moderation",label:"Modération",description:"Comptes bloqués, masqués et contenu sensible",icon:Eye}]},
+  { title:"Informations", items:[{key:"legal",label:"Informations juridiques",description:"Mentions légales et documents applicables",icon:FileText}]},
 ];
 const COMPACT_ITEMS=GROUPS.flatMap(g=>g.items);
 export default function SettingsNav({active,onChange}:SettingsNavProps){return <>
