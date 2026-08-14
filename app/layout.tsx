@@ -6,6 +6,7 @@ import MobileOrientationLock from "@/components/layout/MobileOrientationLock";
 import DisplayPreferencesBootstrap from "@/components/layout/DisplayPreferencesBootstrap";
 import EmojiCompatibility from "@/components/layout/EmojiCompatibility";
 import SystemNotificationBootstrap from "@/components/layout/SystemNotificationBootstrap";
+import SystemNotificationWatcher from "@/components/layout/SystemNotificationWatcher";
 import BioMentionLinker from "@/components/profile/BioMentionLinker";
 import ProfileEditBridge from "@/components/profile/ProfileEditBridge";
 import { AuthProvider } from "@/components/providers/AuthProvider";
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <DisplayPreferencesBootstrap />
           <EmojiCompatibility />
           <SystemNotificationBootstrap />
+          <SystemNotificationWatcher />
           <MobileOrientationLock />
           <BioMentionLinker />
           <ProfileEditBridge />
