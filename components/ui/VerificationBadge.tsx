@@ -16,7 +16,7 @@ import {
 } from "@/lib/atproto/verification";
 import {
   CertificationRecord,
-  listCertifications,
+  getKeloCertification,
 } from "@/lib/atproto/certifications";
 import { isCertificationSuppressed } from "@/lib/atproto/certification-suppressions";
 
@@ -44,6 +44,7 @@ const badgeCache = new Map<
     nativeActor: any;
     nativeBadge: VerificationBadgeType;
     kelo: CertificationRecord[];
+    suppressed: boolean;
   }
 >();
 
@@ -66,13 +67,10 @@ export default function VerificationBadge({
   const [nativeActor, setNativeActor] = useState<any>(
     cached?.nativeActor ?? actor
   );
-  const [keloCertifications, setKeloCertifications] = useState<
-    CertificationRecord[]
-  >(cached?.kelo ?? []);
-  const [suppressed, setSuppressed] = useState<boolean | null>(
-    did ? null : false
+  const [keloCertifications, setKeloCertifications] = useState<CertificationRecord[]>(
+    cached?.kelo ?? []
   );
-  const [checking, setChecking] = useState(Boolean(did));
+  const [suppressed, setSuppressed] = useState<boolean>(cached?.suppressed ?? false);
   const [open, setOpen] = useState(false);
   const [issuers, setIssuers] = useState<IssuerProfile[]>([]);
   const [loadingIssuer, setLoadingIssuer] = useState(false);
@@ -83,14 +81,15 @@ export default function VerificationBadge({
 
     async function load() {
       try {
-        const [publicVerification, allKeloRecords, localSuppression] =
-          await Promise.all([
-            getPublicNativeVerification(actor),
-            did
-              ? listCertifications()
-              : Promise.resolve([] as CertificationRecord[]),
-            did ? isCertificationSuppressed(did) : Promise.resolve(false),
-          ]);
+        // Important : on ne recharge plus TOUTE la collection de certifications
+        // pour chaque compte affiché. Une seule lecture ciblée par DID suffit.
+        // De plus getPublicNativeVerification réutilise immédiatement le champ
+        // verification déjà inclus dans les objets actor de l'AppView.
+        const [publicVerification, keloRecord, localSuppression] = await Promise.all([
+          getPublicNativeVerification(actor),
+          did ? getKeloCertification(did) : Promise.resolve(null),
+          did ? isCertificationSuppressed(did) : Promise.resolve(false),
+        ]);
 
         if (cancelled) return;
 
@@ -98,9 +97,7 @@ export default function VerificationBadge({
           ? { ...actor, verification: publicVerification }
           : actor;
         const nextNative = getVerificationBadge(enriched);
-        const matching = allKeloRecords.filter(
-          (record) => normalizeDid(record.subjectDid) === normalizeDid(did)
-        );
+        const matching = keloRecord ? [keloRecord] : [];
 
         setNativeActor(enriched);
         setNativeBadge(nextNative);
@@ -112,6 +109,7 @@ export default function VerificationBadge({
             nativeActor: enriched,
             nativeBadge: nextNative,
             kelo: matching,
+            suppressed: localSuppression,
           });
         }
       } catch (error) {
@@ -119,13 +117,10 @@ export default function VerificationBadge({
           "Certification temporairement indisponible, conservation du dernier état connu.",
           error
         );
-        if (!cancelled) setSuppressed(false);
-      } finally {
-        if (!cancelled) setChecking(false);
       }
     }
 
-    load();
+    void load();
     return () => {
       cancelled = true;
     };
@@ -156,9 +151,9 @@ export default function VerificationBadge({
     return null;
   }, [nativeBadge, keloCertifications, suppressed]);
 
-  // Tant que la politique locale Kelo n'est pas connue, on n'affiche pas le
-  // badge. Cela évite qu'une certification masquée clignote brièvement.
-  if (checking || suppressed === null || !badgeType) return null;
+  // Un badge natif déjà fourni par l'AppView s'affiche immédiatement au rendu.
+  // Les données Kelo arrivent ensuite sans bloquer le profil ou la carte de post.
+  if (!badgeType) return null;
 
   const handleClick = async (event: React.MouseEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -199,8 +194,7 @@ export default function VerificationBadge({
           !!key &&
           all.findIndex(
             (candidate) =>
-              (candidate.did?.toLowerCase() || candidate.handle?.toLowerCase()) ===
-              key
+              (candidate.did?.toLowerCase() || candidate.handle?.toLowerCase()) === key
           ) === index
         );
       });
