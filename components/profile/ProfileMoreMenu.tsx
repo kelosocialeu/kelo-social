@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MoreHorizontal, Ban, Flag, EyeOff, Link2, BanIcon } from "lucide-react";
+import { MoreHorizontal, Ban, Flag, EyeOff, Link2 } from "lucide-react";
 import ReportDialog from "@/components/feed/ReportDialog";
 import {
   blockActor,
@@ -51,6 +51,7 @@ export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted }: Pro
     if (!blocked && !confirm(`Bloquer @${handle} ? Ce compte ne pourra plus interagir normalement avec vous et ses publications seront masquées sur Kelo Social.`)) return;
 
     setBlocking(true);
+    const nextBlocked = !blocked;
     try {
       if (blocked) {
         await unblockActorByDid(did);
@@ -60,7 +61,7 @@ export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted }: Pro
         setBlocked(true);
         onBlocked?.();
       }
-      window.dispatchEvent(new CustomEvent("kelo:blocklist-changed", { detail: { did, blocked: !blocked } }));
+      window.dispatchEvent(new CustomEvent("kelo:blocklist-changed", { detail: { did, blocked: nextBlocked } }));
     } catch (err) {
       console.error(err);
       alert(blocked ? "Impossible de débloquer ce compte." : "Impossible de bloquer ce compte.");
@@ -132,7 +133,7 @@ export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted }: Pro
               disabled={blocking}
               className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-kelo-danger transition-colors hover:bg-kelo-background disabled:opacity-50"
             >
-              {blocked ? <BanIcon className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+              <Ban className="h-4 w-4" />
               {blocking ? (blocked ? "Déblocage..." : "Blocage...") : (blocked ? "Débloquer cet utilisateur" : "Bloquer cet utilisateur")}
             </button>
           </div>
