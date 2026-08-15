@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import Avatar from "@/components/feed/Avatar";
+import LinkPreviewDraft from "@/components/feed/LinkPreviewDraft";
 import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
 import {
   OPEN_GLOBAL_COMPOSER_EVENT,
@@ -226,7 +227,9 @@ export default function Composer({
               </div>
             )}
 
-            <div className="mb-2 flex items-center gap-2 rounded-xl border border-kelo-border bg-white px-3 py-2">
+            <LinkPreviewDraft text={value} />
+
+            <div className="mb-2 mt-3 flex items-center gap-2 rounded-xl border border-kelo-border bg-white px-3 py-2">
               <ShieldAlert className="h-4 w-4 flex-shrink-0 text-kelo-primary" />
               <select
                 value={contentLabel}
