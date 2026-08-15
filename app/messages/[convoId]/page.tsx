@@ -30,24 +30,15 @@ import { getStoredSession } from "@/services/auth.service";
 
 const MESSAGE_REFRESH_MS = 5_000;
 
-function mergeMessages(
-  previous: any[],
-  incoming: any[]
-): any[] {
+function mergeMessages(previous: any[], incoming: any[]): any[] {
   const map = new Map<string, any>();
 
   for (const message of previous) {
-    map.set(
-      String(message.id || `${message.sentAt}-${message.text}`),
-      message
-    );
+    map.set(String(message.id || `${message.sentAt}-${message.text}`), message);
   }
 
   for (const message of incoming) {
-    map.set(
-      String(message.id || `${message.sentAt}-${message.text}`),
-      message
-    );
+    map.set(String(message.id || `${message.sentAt}-${message.text}`), message);
   }
 
   return Array.from(map.values()).sort((a, b) => {
@@ -81,6 +72,7 @@ export default function ConversationPage() {
   } = useIdentityVerification();
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const hasLoadedRef = useRef(false);
 
   const loadConversation = useCallback(
@@ -93,17 +85,11 @@ export default function ConversationPage() {
       if (!silent) setError(null);
 
       try {
-        const response = await getConversationMessages(
-          convoId,
-          50
-        );
-
+        const response = await getConversationMessages(convoId, 50);
         const ordered = [...response.items].reverse();
 
         setMessages((previous) =>
-          silent
-            ? mergeMessages(previous, ordered)
-            : ordered
+          silent ? mergeMessages(previous, ordered) : ordered
         );
 
         if (!hasLoadedRef.current) {
@@ -111,15 +97,10 @@ export default function ConversationPage() {
           await markConversationRead(convoId);
         }
       } catch (loadError) {
-        console.error(
-          "Impossible de charger la conversation :",
-          loadError
-        );
+        console.error("Impossible de charger la conversation :", loadError);
 
         if (!silent) {
-          setError(
-            "Impossible de charger cette conversation."
-          );
+          setError("Impossible de charger cette conversation.");
         }
       } finally {
         setLoading(false);
@@ -181,6 +162,13 @@ export default function ConversationPage() {
     });
   }, [messages, loading]);
 
+  useEffect(() => {
+    const textarea = composerRef.current;
+    if (!textarea) return;
+    textarea.style.height = "0px";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+  }, [text]);
+
   const otherUser = useMemo(() => {
     if (conversationMember) {
       return {
@@ -209,11 +197,7 @@ export default function ConversationPage() {
     };
   }, [conversationMember, messages, myDid]);
 
-  const handleSend = async (
-    event: React.FormEvent<HTMLFormElement>
-  ) => {
-    event.preventDefault();
-
+  const sendCurrentMessage = async () => {
     if (!requireVerification()) return;
 
     const trimmedText = text.trim();
@@ -222,23 +206,28 @@ export default function ConversationPage() {
     setSending(true);
 
     try {
-      const sentMessage = await sendConversationMessage(
-        convoId,
-        trimmedText
-      );
-
-      setMessages((previous) =>
-        mergeMessages(previous, [sentMessage])
-      );
+      const sentMessage = await sendConversationMessage(convoId, trimmedText);
+      setMessages((previous) => mergeMessages(previous, [sentMessage]));
       setText("");
     } catch (sendError) {
-      console.error(
-        "Impossible d’envoyer le message :",
-        sendError
-      );
+      console.error("Impossible d’envoyer le message :", sendError);
       alert("Impossible d'envoyer ce message.");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleSend = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await sendCurrentMessage();
+  };
+
+  const handleComposerKeyDown = async (
+    event: React.KeyboardEvent<HTMLTextAreaElement>
+  ) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      await sendCurrentMessage();
     }
   };
 
@@ -302,42 +291,30 @@ export default function ConversationPage() {
             </Link>
           ) : (
             <div className="min-w-0">
-              <h1 className="text-lg font-extrabold text-kelo-text">
-                Discussion
-              </h1>
-              <p className="text-xs text-kelo-muted">
-                Conversation privée
-              </p>
+              <h1 className="text-lg font-extrabold text-kelo-text">Discussion</h1>
+              <p className="text-xs text-kelo-muted">Conversation privée</p>
             </div>
           )}
 
           {refreshing && messages.length > 0 && (
-            <span className="ml-auto text-xs text-kelo-muted">
-              Actualisation…
-            </span>
+            <span className="ml-auto text-xs text-kelo-muted">Actualisation…</span>
           )}
         </header>
 
         <section className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-5 lg:px-6">
             {loading && messages.length === 0 && (
-              <p className="py-10 text-center text-sm text-kelo-muted">
-                Chargement...
-              </p>
+              <p className="py-10 text-center text-sm text-kelo-muted">Chargement...</p>
             )}
 
             {error && messages.length === 0 && (
-              <p className="py-10 text-center text-sm text-kelo-danger">
-                {error}
-              </p>
+              <p className="py-10 text-center text-sm text-kelo-danger">{error}</p>
             )}
 
             {messages.map((message: any, index: number) => {
               const isMine = message.sender?.did === myDid;
-              const senderHandle =
-                message.sender?.handle || otherUser?.handle;
-              const senderAvatar =
-                message.sender?.avatar || otherUser?.avatar;
+              const senderHandle = message.sender?.handle || otherUser?.handle;
+              const senderAvatar = message.sender?.avatar || otherUser?.avatar;
 
               return (
                 <div
@@ -360,7 +337,7 @@ export default function ConversationPage() {
                   )}
 
                   <div
-                    className={`max-w-[78%] break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm sm:max-w-[68%] lg:max-w-[60%] ${
+                    className={`max-w-[78%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm sm:max-w-[68%] lg:max-w-[60%] ${
                       isMine
                         ? "rounded-br-md bg-kelo-gradient text-white"
                         : "rounded-bl-md bg-kelo-background text-kelo-text"
@@ -376,12 +353,8 @@ export default function ConversationPage() {
               <div className="flex min-h-[50vh] items-center justify-center px-6">
                 <div className="max-w-sm text-center">
                   <div className="text-4xl" aria-hidden="true">💬</div>
-                  <h2 className="mt-4 text-lg font-bold text-kelo-text">
-                    Commencez la discussion
-                  </h2>
-                  <p className="mt-2 text-sm text-kelo-muted">
-                    Envoyez votre premier message.
-                  </p>
+                  <h2 className="mt-4 text-lg font-bold text-kelo-text">Commencez la discussion</h2>
+                  <p className="mt-2 text-sm text-kelo-muted">Envoyez votre premier message.</p>
                 </div>
               </div>
             )}
@@ -395,9 +368,7 @@ export default function ConversationPage() {
               onClick={requireVerification}
               className="border-t border-kelo-border bg-kelo-background px-4 py-3 text-left text-sm text-kelo-muted sm:px-5 lg:px-6"
             >
-              <span className="font-bold text-kelo-text">
-                Vérification requise :
-              </span>{" "}
+              <span className="font-bold text-kelo-text">Vérification requise :</span>{" "}
               vous pouvez lire cette discussion, mais pas envoyer de message.
             </button>
           )}
@@ -407,25 +378,33 @@ export default function ConversationPage() {
             className="sticky bottom-0 border-t border-kelo-border bg-white/95 px-3 py-3 backdrop-blur-md sm:px-5 lg:px-6"
           >
             <div className="flex items-end gap-2">
-              <input
-                type="text"
-                value={text}
-                onChange={(event) => {
-                  if (!requireVerification()) return;
-                  setText(event.target.value);
-                }}
-                onFocus={() => {
-                  if (!verified) requireVerification();
-                }}
-                readOnly={!verified}
-                placeholder={
-                  verified
-                    ? "Écrire un message..."
-                    : "Vérifiez votre compte pour répondre..."
-                }
-                autoComplete="off"
-                className="min-w-0 flex-1 rounded-full bg-kelo-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-kelo-primary read-only:cursor-not-allowed read-only:opacity-60"
-              />
+              <div className="min-w-0 flex-1">
+                <textarea
+                  ref={composerRef}
+                  value={text}
+                  onChange={(event) => {
+                    if (!requireVerification()) return;
+                    setText(event.target.value);
+                  }}
+                  onKeyDown={handleComposerKeyDown}
+                  onFocus={() => {
+                    if (!verified) requireVerification();
+                  }}
+                  readOnly={!verified}
+                  placeholder={
+                    verified
+                      ? "Écrire un message..."
+                      : "Vérifiez votre compte pour répondre..."
+                  }
+                  rows={1}
+                  className="max-h-40 min-h-[46px] w-full resize-none overflow-y-auto rounded-2xl bg-kelo-background px-4 py-3 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-kelo-primary read-only:cursor-not-allowed read-only:opacity-60"
+                />
+                {verified && (
+                  <p className="mt-1 px-1 text-[11px] text-kelo-muted">
+                    Entrée : nouvelle ligne · Ctrl/⌘ + Entrée : envoyer
+                  </p>
+                )}
+              </div>
 
               <button
                 type="submit"
@@ -439,10 +418,7 @@ export default function ConversationPage() {
         </section>
       </main>
 
-      <VerificationRequiredDialog
-        open={dialogOpen}
-        onClose={closeDialog}
-      />
+      <VerificationRequiredDialog open={dialogOpen} onClose={closeDialog} />
     </div>
   );
 }
