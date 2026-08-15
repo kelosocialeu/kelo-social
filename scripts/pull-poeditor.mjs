@@ -14,15 +14,14 @@ const OUTPUT_DIR = path.join(process.cwd(), "public", "locales");
 const REQUEST_DELAY_MS = 1200;
 const MAX_RETRIES = 5;
 
+const KELO_LANGUAGE_CODES = new Set([
+  "en","zh-CN","hi","es","ar","fr","bn","pt","ru","ur","id","de","ja","sw","mr","te","tr","ta","vi","ko","fa","ha","it","th","gu","pl","uk","pa","ml","kn","or","my","nl","ro","el","cs","hu","sv","az","uz","am","so","ne","si","km","lo","fil","ms","jv","su","yo","ig","zu","xh","rw","mg","af","he","bg","sr","hr","sk","da","fi","no","lt","lv","et","sl","bs","sq","mk","ka","hy","kk","ky","tg","tk","mn","ca"
+]);
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function post(endpoint, fields) {
-  const body = new URLSearchParams({
-    api_token: API_TOKEN,
-    id: PROJECT_ID,
-    ...fields,
-  });
-
+  const body = new URLSearchParams({ api_token: API_TOKEN, id: PROJECT_ID, ...fields });
   const response = await fetch(`${API}${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -30,9 +29,7 @@ async function post(endpoint, fields) {
   });
 
   let data = null;
-  try {
-    data = await response.json();
-  } catch {}
+  try { data = await response.json(); } catch {}
 
   if (!response.ok || data?.response?.status !== "success") {
     const message = data?.response?.message || `Erreur POEditor ${response.status}`;
@@ -51,9 +48,8 @@ function isRateLimit(error) {
 async function withRetry(label, task) {
   let attempt = 0;
   while (true) {
-    try {
-      return await task();
-    } catch (error) {
+    try { return await task(); }
+    catch (error) {
       if (!isRateLimit(error) || attempt >= MAX_RETRIES) throw error;
       attempt += 1;
       const waitMs = Math.min(60000, 5000 * 2 ** (attempt - 1));
@@ -67,14 +63,15 @@ async function main() {
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
 
   const languagesResponse = await withRetry("Liste des langues", () => post("/languages/list", {}));
-  const languages = languagesResponse?.result?.languages || [];
+  const configured = languagesResponse?.result?.languages || [];
+  const languages = configured.filter((language) => KELO_LANGUAGE_CODES.has(language.code));
 
   if (!languages.length) {
-    console.log("Aucune langue configurée dans POEditor.");
+    console.log("Aucune des 80 langues Kelo n'est configurée dans POEditor.");
     return;
   }
 
-  console.log(`${languages.length} langue(s) trouvée(s) dans POEditor.`);
+  console.log(`${configured.length} langue(s) présente(s) dans POEditor, ${languages.length} langue(s) retenue(s) pour Kelo Social.`);
   console.log(`Temporisation activée : ${REQUEST_DELAY_MS} ms entre les langues, avec reprise automatique sur erreur 429.`);
 
   let successCount = 0;
@@ -118,13 +115,11 @@ async function main() {
     await sleep(REQUEST_DELAY_MS);
   }
 
-  console.log(`Synchronisation POEditor terminée : ${successCount} export(s) réussi(s), ${failures.length} échec(s).`);
+  console.log(`Synchronisation Kelo terminée : ${successCount}/${languages.length} langue(s) exportée(s), ${failures.length} échec(s).`);
 
   if (failures.length) {
     console.log("Langues encore en échec :");
-    for (const failure of failures) {
-      console.log(`- ${failure.code}: ${failure.message}`);
-    }
+    for (const failure of failures) console.log(`- ${failure.code}: ${failure.message}`);
   }
 }
 
