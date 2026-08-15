@@ -150,8 +150,8 @@ export function saveKeloContentPreferences(
 
   const normalized: KeloContentPreferences = {
     interfaceLanguage: prefs.interfaceLanguage || "auto",
-    postLanguages: [...new Set(prefs.postLanguages || [])],
-    interests: [...new Set(prefs.interests || [])],
+    postLanguages: Array.from(new Set(prefs.postLanguages || [])),
+    interests: Array.from(new Set(prefs.interests || [])),
   };
 
   const serialized = JSON.stringify(normalized);
