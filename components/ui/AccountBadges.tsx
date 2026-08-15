@@ -44,7 +44,7 @@ const GAP_CLASSES = {
 
 export default function AccountBadges({
   actor,
-  certificationSize = 16,
+  certificationSize = 22,
   identitySize = "sm",
   showIdentityLabel = false,
   gap = "xs",
@@ -53,6 +53,11 @@ export default function AccountBadges({
   if (!actor) {
     return null;
   }
+
+  // Les certifications doivent rester bien lisibles dans les surfaces
+  // compactes (posts, messagerie, notifications). Les vues qui demandent
+  // déjà une taille plus grande, comme les profils, conservent leur valeur.
+  const renderedCertificationSize = Math.max(certificationSize, 22);
 
   return (
     <span
@@ -81,7 +86,7 @@ export default function AccountBadges({
        */}
       <VerificationBadge
         actor={actor}
-        size={certificationSize}
+        size={renderedCertificationSize}
       />
     </span>
   );
