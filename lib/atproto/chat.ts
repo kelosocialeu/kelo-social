@@ -14,6 +14,7 @@ const CHAT_PROXY_HEADER = {
 };
 
 const CHAT_DECLARATION_COLLECTION = "chat.bsky.actor.declaration";
+export const MAX_GROUP_PARTICIPANTS = 100;
 
 export type ChatPermission = "all" | "following" | "none";
 
@@ -72,6 +73,35 @@ export async function getOrCreateConversation(
   const response =
     await agent.api.chat.bsky.convo.getConvoForMembers(
       { members: [memberDid] },
+      { headers: CHAT_PROXY_HEADER }
+    );
+
+  return response.data.convo;
+}
+
+export async function getOrCreateGroupConversation(
+  memberDids: string[]
+) {
+  await requireIdentityVerification();
+
+  const uniqueMembers = Array.from(
+    new Set(memberDids.map((did) => did.trim()).filter(Boolean))
+  );
+
+  if (uniqueMembers.length < 2) {
+    throw new Error("Un groupe doit contenir au moins 3 participants, vous compris.");
+  }
+
+  if (uniqueMembers.length > MAX_GROUP_PARTICIPANTS - 1) {
+    throw new Error(
+      `Un groupe Kelo Social peut contenir au maximum ${MAX_GROUP_PARTICIPANTS} participants, créateur compris.`
+    );
+  }
+
+  const agent = await getChatAgent();
+  const response =
+    await agent.api.chat.bsky.convo.getConvoForMembers(
+      { members: uniqueMembers },
       { headers: CHAT_PROXY_HEADER }
     );
 
