@@ -7,7 +7,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Settings2, X } from "lucide-react";
+import { Settings2, UsersRound, X } from "lucide-react";
 
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
@@ -17,6 +17,7 @@ import AccountBadges from "@/components/ui/AccountBadges";
 import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
 import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
 import MessagingSection from "@/components/settings/MessagingSection";
+import GroupCreationDialog from "@/components/messages/GroupCreationDialog";
 
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
@@ -42,6 +43,7 @@ export default function MessagesPage() {
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [showMessagingSettings, setShowMessagingSettings] = useState(false);
+  const [showGroupCreation, setShowGroupCreation] = useState(false);
 
   const {
     checked: verificationChecked,
@@ -167,6 +169,19 @@ export default function MessagesPage() {
               )}
               <button
                 type="button"
+                onClick={() => {
+                  if (!requireVerification()) return;
+                  setShowGroupCreation(true);
+                }}
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-kelo-border px-3 text-sm font-bold text-kelo-text transition hover:bg-kelo-background"
+                aria-label="Créer un groupe"
+                title="Créer un groupe"
+              >
+                <UsersRound className="h-4 w-4" />
+                <span className="hidden sm:inline">Créer un groupe</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowMessagingSettings(true)}
                 className="inline-flex h-10 items-center gap-2 rounded-full border border-kelo-border px-3 text-sm font-bold text-kelo-text transition hover:bg-kelo-background"
                 aria-label="Paramètres de messagerie"
@@ -235,16 +250,18 @@ export default function MessagesPage() {
 
         <div className="divide-y divide-kelo-border">
           {conversations.map((conversation: any) => {
-            const otherMember =
-              conversation.members?.find(
-                (member: any) => member.did !== myDid
-              ) || conversation.members?.[0];
+            const otherMembers = (conversation.members || []).filter(
+              (member: any) => member.did !== myDid
+            );
+            const isGroup = otherMembers.length > 1;
+            const otherMember = otherMembers[0] || conversation.members?.[0];
 
             const lastText = conversation.lastMessage?.text || "";
-            const displayName =
-              otherMember?.displayName ||
-              otherMember?.handle ||
-              "Utilisateur";
+            const displayName = isGroup
+              ? `Groupe · ${(conversation.members || []).length} membres`
+              : otherMember?.displayName ||
+                otherMember?.handle ||
+                "Utilisateur";
 
             return (
               <Link
@@ -254,7 +271,7 @@ export default function MessagesPage() {
               >
                 <Avatar
                   src={otherMember?.avatar}
-                  fallback={otherMember?.handle?.[0]?.toUpperCase() || "U"}
+                  fallback={isGroup ? "G" : otherMember?.handle?.[0]?.toUpperCase() || "U"}
                 />
 
                 <div className="min-w-0 flex-grow">
@@ -264,19 +281,26 @@ export default function MessagesPage() {
                         <p className="max-w-full truncate font-bold text-kelo-text">
                           {displayName}
                         </p>
-                        <AccountBadges
-                          actor={otherMember}
-                          identitySize="sm"
-                          certificationSize={15}
-                          gap="xs"
-                        />
+                        {!isGroup && (
+                          <AccountBadges
+                            actor={otherMember}
+                            identitySize="sm"
+                            certificationSize={15}
+                            gap="xs"
+                          />
+                        )}
                       </div>
 
-                      {otherMember?.handle && (
+                      {isGroup ? (
+                        <p className="truncate text-xs text-kelo-muted">
+                          {otherMembers.slice(0, 3).map((member: any) => `@${member.handle}`).join(" · ")}
+                          {otherMembers.length > 3 ? ` · +${otherMembers.length - 3}` : ""}
+                        </p>
+                      ) : otherMember?.handle ? (
                         <p className="truncate text-xs text-kelo-muted">
                           @{otherMember.handle}
                         </p>
-                      )}
+                      ) : null}
                     </div>
 
                     {conversation.unreadCount > 0 && (
@@ -302,7 +326,7 @@ export default function MessagesPage() {
                   Aucune discussion
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-kelo-muted">
-                  Entrez le handle d’un utilisateur pour démarrer votre première conversation.
+                  Entrez le handle d’un utilisateur ou créez un groupe pour démarrer votre première conversation.
                 </p>
               </div>
             </div>
@@ -330,6 +354,15 @@ export default function MessagesPage() {
           />
         </div>
       </main>
+
+      <GroupCreationDialog
+        open={showGroupCreation}
+        onClose={() => setShowGroupCreation(false)}
+        onCreated={(conversationId) => {
+          setShowGroupCreation(false);
+          router.push(`/messages/${conversationId}`);
+        }}
+      />
 
       {showMessagingSettings && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => setShowMessagingSettings(false)}>
