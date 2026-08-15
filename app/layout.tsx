@@ -10,6 +10,7 @@ import SystemNotificationWatcher from "@/components/layout/SystemNotificationWat
 import BioMentionLinker from "@/components/profile/BioMentionLinker";
 import ProfileEditBridge from "@/components/profile/ProfileEditBridge";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { TranslationProvider } from "@/components/providers/TranslationProvider";
 
 const APP_NAME = "Kelo Social";
 const APP_DESCRIPTION = "Le réseau social européen décentralisé propulsé par AT Protocol";
@@ -41,14 +42,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr">
       <body className="min-h-[100dvh] overflow-x-hidden bg-[#faf9f6] font-sans text-gray-900 antialiased">
         <AuthProvider>
-          <DisplayPreferencesBootstrap />
-          <EmojiCompatibility />
-          <SystemNotificationBootstrap />
-          <SystemNotificationWatcher />
-          <MobileOrientationLock />
-          <BioMentionLinker />
-          <ProfileEditBridge />
-          <MobileNavigationShell>{children}</MobileNavigationShell>
+          <TranslationProvider>
+            <DisplayPreferencesBootstrap />
+            <EmojiCompatibility />
+            <SystemNotificationBootstrap />
+            <SystemNotificationWatcher />
+            <MobileOrientationLock />
+            <BioMentionLinker />
+            <ProfileEditBridge />
+            <MobileNavigationShell>{children}</MobileNavigationShell>
+          </TranslationProvider>
         </AuthProvider>
       </body>
     </html>
