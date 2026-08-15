@@ -1,4 +1,5 @@
 import {
+  getAuthenticatedAgent,
   getStoredSession,
   resumeAgentSession,
 } from "@/services/auth.service";
@@ -10,6 +11,15 @@ import {
 const CHAT_PROXY_HEADER = {
   "atproto-proxy":
     "did:web:api.bsky.chat#bsky_chat",
+};
+
+const CHAT_DECLARATION_COLLECTION = "chat.bsky.actor.declaration";
+
+export type ChatPermission = "all" | "following" | "none";
+
+export type MessagingPreferences = {
+  allowIncoming: ChatPermission;
+  allowGroupInvites: ChatPermission;
 };
 
 async function getChatAgent() {
@@ -66,6 +76,102 @@ export async function getOrCreateConversation(
     );
 
   return response.data.convo;
+}
+
+export async function getConversationAvailability(
+  memberDid: string
+): Promise<{ canChat: boolean; convo?: any }> {
+  const { session } = await getAuthenticatedAgent();
+  const pds = session.pdsUrl.replace(/\/$/, "");
+  const url = new URL(`${pds}/xrpc/chat.bsky.convo.getConvoAvailability`);
+  url.searchParams.append("members", memberDid);
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${session.accessJwt}`,
+      Accept: "application/json",
+      ...CHAT_PROXY_HEADER,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Impossible de vérifier la disponibilité de la messagerie.");
+  }
+
+  const data = await response.json();
+  return {
+    canChat: data?.canChat === true,
+    convo: data?.convo,
+  };
+}
+
+export async function getMessagingPreferences(): Promise<MessagingPreferences> {
+  const { agent, session } = await getAuthenticatedAgent();
+
+  try {
+    const current = await agent.api.com.atproto.repo.getRecord({
+      repo: session.did,
+      collection: CHAT_DECLARATION_COLLECTION,
+      rkey: "self",
+    });
+    const value = current.data.value as any;
+
+    return {
+      allowIncoming:
+        value?.allowIncoming === "all" ||
+        value?.allowIncoming === "none" ||
+        value?.allowIncoming === "following"
+          ? value.allowIncoming
+          : "following",
+      allowGroupInvites:
+        value?.allowGroupInvites === "all" ||
+        value?.allowGroupInvites === "none" ||
+        value?.allowGroupInvites === "following"
+          ? value.allowGroupInvites
+          : "following",
+    };
+  } catch (error: any) {
+    if (error?.status !== 404) throw error;
+    return {
+      allowIncoming: "following",
+      allowGroupInvites: "following",
+    };
+  }
+}
+
+export async function setMessagingPreferences(
+  preferences: MessagingPreferences
+): Promise<void> {
+  const { agent, session } = await getAuthenticatedAgent();
+
+  let currentRecord: Record<string, unknown> = {
+    $type: CHAT_DECLARATION_COLLECTION,
+  };
+
+  try {
+    const current = await agent.api.com.atproto.repo.getRecord({
+      repo: session.did,
+      collection: CHAT_DECLARATION_COLLECTION,
+      rkey: "self",
+    });
+    currentRecord = current.data.value as Record<string, unknown>;
+  } catch (error: any) {
+    if (error?.status !== 404) throw error;
+  }
+
+  await agent.api.com.atproto.repo.putRecord({
+    repo: session.did,
+    collection: CHAT_DECLARATION_COLLECTION,
+    rkey: "self",
+    record: {
+      ...currentRecord,
+      $type: CHAT_DECLARATION_COLLECTION,
+      allowIncoming: preferences.allowIncoming,
+      allowGroupInvites: preferences.allowGroupInvites,
+    } as any,
+  });
 }
 
 export async function getConversationMessages(
