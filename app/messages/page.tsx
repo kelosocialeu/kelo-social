@@ -7,6 +7,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Settings2, X } from "lucide-react";
 
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
@@ -15,6 +16,7 @@ import Button from "@/components/ui/Button";
 import AccountBadges from "@/components/ui/AccountBadges";
 import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
 import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
+import MessagingSection from "@/components/settings/MessagingSection";
 
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
@@ -39,6 +41,7 @@ export default function MessagesPage() {
   const [newHandle, setNewHandle] = useState("");
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [showMessagingSettings, setShowMessagingSettings] = useState(false);
 
   const {
     checked: verificationChecked,
@@ -156,11 +159,23 @@ export default function MessagesPage() {
               </p>
             </div>
 
-            {refreshing && conversations.length > 0 && (
-              <span className="text-xs text-kelo-muted">
-                Actualisation…
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {refreshing && conversations.length > 0 && (
+                <span className="hidden text-xs text-kelo-muted sm:inline">
+                  Actualisation…
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowMessagingSettings(true)}
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-kelo-border px-3 text-sm font-bold text-kelo-text transition hover:bg-kelo-background"
+                aria-label="Paramètres de messagerie"
+                title="Paramètres de messagerie"
+              >
+                <Settings2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Paramètres</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -315,6 +330,34 @@ export default function MessagesPage() {
           />
         </div>
       </main>
+
+      {showMessagingSettings && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => setShowMessagingSettings(false)}>
+          <div
+            className="max-h-[90vh] w-full overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:max-w-2xl sm:rounded-3xl"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="messaging-settings-title"
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-kelo-border bg-white/95 px-4 py-4 backdrop-blur sm:px-6">
+              <div>
+                <h2 id="messaging-settings-title" className="text-lg font-extrabold text-kelo-text">Paramètres de messagerie</h2>
+                <p className="mt-0.5 text-xs text-kelo-muted">Les mêmes réglages que dans Paramètres, synchronisés avec AT Protocol.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMessagingSettings(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-kelo-background"
+                aria-label="Fermer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <MessagingSection />
+          </div>
+        </div>
+      )}
 
       <VerificationRequiredDialog
         open={dialogOpen}
