@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "i18n:push": "node scripts/push-poeditor.mjs",
     "i18n:pull": "node scripts/pull-poeditor.mjs"
   },
   "dependencies": {
