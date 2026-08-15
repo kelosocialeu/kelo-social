@@ -78,8 +78,8 @@ function mergeWithoutDuplicates(
   });
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function storageKey(cacheKey: string) {
@@ -156,7 +156,8 @@ export function useInfiniteFeed(
   const hasMoreRef = useRef(initialCache?.hasMore ?? true);
   const loadingMoreRef = useRef(false);
   const requestIdRef = useRef(0);
-  const retryTimerRef = useRef<number | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshRef = useRef<() => Promise<void>>(async () => {});
 
   fetcherRef.current = fetcher;
 
@@ -225,7 +226,9 @@ export function useInfiniteFeed(
           }
         }
       }
-      throw lastError;
+      throw lastError instanceof Error
+        ? lastError
+        : new Error("Le fil est temporairement indisponible.");
     })();
 
     pendingFirstPages.set(cacheKey, request);
@@ -236,7 +239,7 @@ export function useInfiniteFeed(
     }
   }, [cacheKey]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<void> => {
     const requestId = ++requestIdRef.current;
     setRefreshing(true);
     setError(null);
@@ -248,7 +251,10 @@ export function useInfiniteFeed(
     } catch (refreshError) {
       if (requestId !== requestIdRef.current) return;
 
-      console.warn("Rafraîchissement temporairement indisponible, conservation du dernier fil :", refreshError);
+      console.warn(
+        "Rafraîchissement temporairement indisponible, conservation du dernier fil :",
+        refreshError
+      );
 
       const persistent = readPersistentCache(cacheKey);
       if (itemsRef.current.length === 0 && persistent?.items?.length) {
@@ -261,11 +267,10 @@ export function useInfiniteFeed(
         setHasMore(persistent.hasMore);
       }
 
-      // Pas de message rouge : Kelo réessaie automatiquement en arrière-plan.
       setError(null);
-      if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
-      retryTimerRef.current = window.setTimeout(() => {
-        void refresh();
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = setTimeout(() => {
+        void refreshRef.current();
       }, BACKGROUND_RETRY_MS);
     } finally {
       if (requestId === requestIdRef.current) {
@@ -274,6 +279,8 @@ export function useInfiniteFeed(
       }
     }
   }, [applyPage, cacheKey, fetchFirstPage]);
+
+  refreshRef.current = refresh;
 
   const reset = useCallback(async () => {
     cache.delete(cacheKey);
@@ -296,7 +303,10 @@ export function useInfiniteFeed(
       const page = await fetcherRef.current(cursorRef.current);
       applyPage(page, "append");
     } catch (loadMoreError) {
-      console.warn("Chargement supplémentaire temporairement indisponible :", loadMoreError);
+      console.warn(
+        "Chargement supplémentaire temporairement indisponible :",
+        loadMoreError
+      );
       setError(null);
     } finally {
       loadingMoreRef.current = false;
@@ -319,17 +329,17 @@ export function useInfiniteFeed(
       setInitialLoading(false);
 
       if (Date.now() - persistentCached.updatedAt >= staleTimeMs) {
-        void refresh();
+        void refreshRef.current();
       }
     } else {
       setInitialLoading(true);
-      void refresh();
+      void refreshRef.current();
     }
 
     return () => {
       requestIdRef.current += 1;
       if (retryTimerRef.current) {
-        window.clearTimeout(retryTimerRef.current);
+        clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
       }
     };
@@ -343,7 +353,7 @@ export function useInfiniteFeed(
     const triggerRefresh = () => {
       const cached = cache.get(cacheKey);
       if (!cached || Date.now() - cached.updatedAt >= staleTimeMs) {
-        void refresh();
+        void refreshRef.current();
       }
     };
 
@@ -353,7 +363,7 @@ export function useInfiniteFeed(
       window.removeEventListener("focus", triggerRefresh);
       window.removeEventListener("online", triggerRefresh);
     };
-  }, [cacheKey, refresh, refreshOnFocus, staleTimeMs]);
+  }, [cacheKey, refreshOnFocus, staleTimeMs]);
 
   return {
     items,
