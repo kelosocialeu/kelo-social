@@ -16,6 +16,8 @@
   "nav.certifiers": "Gérer les certificateurs",
   "nav.verifier": "Panneau certificateur",
   "nav.writePost": "Écrire un post",
+  "nav.createPost": "Créer une publication",
+  "nav.mobile": "Navigation mobile",
   "nav.connectedAs": "Connecté :",
   "nav.guest": "invité",
   "nav.logout": "Déconnexion",
