@@ -9,7 +9,8 @@
     "lint": "next lint",
     "i18n:add-languages": "node scripts/add-poeditor-languages.mjs",
     "i18n:push": "node scripts/push-poeditor.mjs",
-    "i18n:pull": "node scripts/pull-poeditor.mjs"
+    "i18n:pull": "node scripts/pull-poeditor.mjs",
+    "i18n:translate80": "node scripts/translate-poeditor-80.mjs"
   },
   "dependencies": {
     "@atproto/api": "^0.12.0",
