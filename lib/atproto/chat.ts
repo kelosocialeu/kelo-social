@@ -84,28 +84,37 @@ export async function getOrCreateGroupConversation(
 ) {
   await requireIdentityVerification();
 
-  const uniqueMembers = Array.from(
-    new Set(memberDids.map((did) => did.trim()).filter(Boolean))
-  );
-
+  const uniqueMembers = Array.from(new Set(memberDids.filter(Boolean)));
   if (uniqueMembers.length < 2) {
-    throw new Error("Un groupe doit contenir au moins 3 participants, vous compris.");
+    throw new Error("Sélectionnez au moins 2 autres personnes pour créer un groupe.");
   }
-
-  if (uniqueMembers.length > MAX_GROUP_PARTICIPANTS - 1) {
-    throw new Error(
-      `Un groupe Kelo Social peut contenir au maximum ${MAX_GROUP_PARTICIPANTS} participants, créateur compris.`
-    );
+  if (uniqueMembers.length + 1 > MAX_GROUP_PARTICIPANTS) {
+    throw new Error(`Un groupe Kelo Social peut contenir au maximum ${MAX_GROUP_PARTICIPANTS} participants.`);
   }
 
   const agent = await getChatAgent();
-  const response =
-    await agent.api.chat.bsky.convo.getConvoForMembers(
-      { members: uniqueMembers },
-      { headers: CHAT_PROXY_HEADER }
-    );
+  const response = await agent.api.chat.bsky.convo.getConvoForMembers(
+    { members: uniqueMembers },
+    { headers: CHAT_PROXY_HEADER }
+  );
 
   return response.data.convo;
+}
+
+export async function searchChatAccounts(
+  query: string,
+  limit = 15
+): Promise<any[]> {
+  const cleanQuery = query.trim().replace(/^@/, "");
+  if (!cleanQuery) return [];
+
+  const agent = await getReadAgent();
+  const response = await agent.api.app.bsky.actor.searchActorsTypeahead({
+    q: cleanQuery,
+    limit,
+  });
+
+  return response.data.actors || [];
 }
 
 export async function getConversationAvailability(
