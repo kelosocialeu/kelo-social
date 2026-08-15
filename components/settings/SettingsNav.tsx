@@ -1,8 +1,8 @@
 "use client";
 
-import { Bell, ChevronRight, Eye, FileText, Globe2, Languages, Palette, Shield, SlidersHorizontal, UserRound } from "lucide-react";
+import { Bell, ChevronRight, Eye, FileText, Globe2, Languages, MessageCircleMore, Palette, Shield, SlidersHorizontal, UserRound } from "lucide-react";
 
-export type SettingsSection = "account" | "identity" | "moderation" | "appearance" | "notifications" | "language" | "privacy" | "legal";
+export type SettingsSection = "account" | "identity" | "moderation" | "appearance" | "notifications" | "language" | "privacy" | "messaging" | "legal";
 interface SettingsNavProps { active: SettingsSection; onChange: (section: SettingsSection) => void; }
 type SettingsItem = { key: SettingsSection; label: string; description: string; icon: React.ComponentType<{ className?: string }>; };
 const GROUPS: Array<{ title: string; items: SettingsItem[] }> = [
@@ -15,6 +15,7 @@ const GROUPS: Array<{ title: string; items: SettingsItem[] }> = [
     {key:"appearance",label:"Affichage",description:"Thème, couleurs, taille du texte et animations",icon:Palette},
     {key:"language",label:"Langues et centres d’intérêt",description:"Langue de Kelo Social, langues du fil et sujets préférés",icon:Languages},
     {key:"notifications",label:"Notifications et flux",description:"Notifications, fils et contenu affiché",icon:Bell},
+    {key:"messaging",label:"Messagerie",description:"Messages privés et invitations de groupe",icon:MessageCircleMore},
   ]},
   { title:"Sécurité et contenu", items:[{key:"moderation",label:"Modération",description:"Comptes bloqués, masqués et contenu sensible",icon:Eye}]},
   { title:"Informations", items:[{key:"legal",label:"Informations juridiques",description:"Mentions légales et documents applicables",icon:FileText}]},
