@@ -10,16 +10,76 @@ export const KELO_LANGUAGES = [
 
 export const KELO_INTERESTS = ["Actualités", "Art", "Cinéma", "Culture", "Éducation", "Environnement", "Finance", "Gaming", "Histoire", "Humour", "Livres", "Musique", "Politique", "Sciences", "Sport", "Technologie", "Voyage"];
 
-const key = (did?: string | null) => `kelo-content-preferences:${did || "guest"}`;
+const DEFAULT_PREFERENCES: KeloContentPreferences = {
+  interfaceLanguage: "auto",
+  postLanguages: [],
+  interests: [],
+};
 
-export function getKeloContentPreferences(did?: string | null): KeloContentPreferences {
-  const fallback: KeloContentPreferences = { interfaceLanguage: "auto", postLanguages: [], interests: [] };
-  if (typeof window === "undefined") return fallback;
-  try { return { ...fallback, ...JSON.parse(localStorage.getItem(key(did)) || "{}") }; } catch { return fallback; }
+const accountKey = (did?: string | null) =>
+  `kelo-content-preferences:${did?.trim() || "guest"}`;
+
+// Copie de secours indépendante du chargement de la session. Cela évite que
+// l'interface repasse brièvement sur les valeurs par défaut lorsque le DID est
+// encore vide au démarrage de l'application.
+const LAST_PREFERENCES_KEY = "kelo-content-preferences:last";
+
+function parsePreferences(raw: string | null): KeloContentPreferences | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<KeloContentPreferences>;
+    return {
+      interfaceLanguage:
+        typeof parsed.interfaceLanguage === "string"
+          ? parsed.interfaceLanguage
+          : DEFAULT_PREFERENCES.interfaceLanguage,
+      postLanguages: Array.isArray(parsed.postLanguages)
+        ? parsed.postLanguages.filter((value): value is string => typeof value === "string")
+        : [],
+      interests: Array.isArray(parsed.interests)
+        ? parsed.interests.filter((value): value is string => typeof value === "string")
+        : [],
+    };
+  } catch {
+    return null;
+  }
 }
 
-export function saveKeloContentPreferences(did: string | null | undefined, prefs: KeloContentPreferences) {
-  if (typeof window !== "undefined") localStorage.setItem(key(did), JSON.stringify(prefs));
+export function getKeloContentPreferences(
+  did?: string | null
+): KeloContentPreferences {
+  if (typeof window === "undefined") return { ...DEFAULT_PREFERENCES };
+
+  const account = parsePreferences(localStorage.getItem(accountKey(did)));
+  if (account) return account;
+
+  const last = parsePreferences(localStorage.getItem(LAST_PREFERENCES_KEY));
+
+  // Si la session vient seulement de charger, on réassocie automatiquement la
+  // dernière préférence connue au compte afin qu'elle reste stable au retour.
+  if (last && did) {
+    localStorage.setItem(accountKey(did), JSON.stringify(last));
+    return last;
+  }
+
+  return last || { ...DEFAULT_PREFERENCES };
+}
+
+export function saveKeloContentPreferences(
+  did: string | null | undefined,
+  prefs: KeloContentPreferences
+) {
+  if (typeof window === "undefined") return;
+
+  const normalized: KeloContentPreferences = {
+    interfaceLanguage: prefs.interfaceLanguage || "auto",
+    postLanguages: [...new Set(prefs.postLanguages || [])],
+    interests: [...new Set(prefs.interests || [])],
+  };
+
+  const serialized = JSON.stringify(normalized);
+  localStorage.setItem(accountKey(did), serialized);
+  localStorage.setItem(LAST_PREFERENCES_KEY, serialized);
 }
 
 export function resolvedInterfaceLanguage(value: string) {
