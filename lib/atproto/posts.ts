@@ -43,6 +43,13 @@ export interface PostMediaInput {
   labels?: PostContentLabel[];
 }
 
+type DetectedExternalLink = {
+  text: string;
+  uri: string;
+  start: number;
+  end: number;
+};
+
 function validateStrongRef(
   ref: StrongRef,
   label: string
@@ -85,12 +92,140 @@ function buildSelfLabels(labels?: PostContentLabel[]) {
   };
 }
 
+function stripTrailingUrlPunctuation(value: string): string {
+  return value.replace(/[.,!?;:)}\]]+$/g, "");
+}
+
+function normalizeExternalUrl(value: string): string | null {
+  const cleaned = stripTrailingUrlPunctuation(value.trim());
+  if (!cleaned) return null;
+
+  const candidate = /^https?:\/\//i.test(cleaned)
+    ? cleaned
+    : `https://${cleaned}`;
+
+  try {
+    const parsed = new URL(candidate);
+    if (!["http:", "https:"].includes(parsed.protocol)) return null;
+    if (!parsed.hostname.includes(".")) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function detectExternalLinks(text: string): DetectedExternalLink[] {
+  const regex = /https?:\/\/[^\s<>"']+|(?:www\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?:\/[^^\s<>"']*)?/gi;
+  const results: DetectedExternalLink[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    const raw = stripTrailingUrlPunctuation(match[0]);
+    const start = match.index;
+    const previous = start > 0 ? text[start - 1] : "";
+
+    // Ne transforme pas la partie domaine d'une adresse e-mail en aperçu.
+    if (previous === "@") continue;
+
+    const uri = normalizeExternalUrl(raw);
+    if (!uri) continue;
+
+    results.push({
+      text: raw,
+      uri,
+      start,
+      end: start + raw.length,
+    });
+  }
+
+  return results;
+}
+
+function addBareDomainFacets(text: string, richText: RichText) {
+  const links = detectExternalLinks(text).filter(
+    (link) => !/^https?:\/\//i.test(link.text)
+  );
+
+  if (!links.length) return;
+
+  const encoder = new TextEncoder();
+  const existing = Array.isArray((richText as any).facets)
+    ? [...((richText as any).facets as any[])]
+    : [];
+
+  for (const link of links) {
+    const byteStart = encoder.encode(text.slice(0, link.start)).length;
+    const byteEnd = encoder.encode(text.slice(0, link.end)).length;
+    const overlaps = existing.some((facet) => {
+      const index = facet?.index;
+      if (!index) return false;
+      return byteStart < index.byteEnd && byteEnd > index.byteStart;
+    });
+
+    if (overlaps) continue;
+
+    existing.push({
+      index: { byteStart, byteEnd },
+      features: [
+        {
+          $type: "app.bsky.richtext.facet#link",
+          uri: link.uri,
+        },
+      ],
+    });
+  }
+
+  existing.sort((a, b) => (a?.index?.byteStart || 0) - (b?.index?.byteStart || 0));
+  (richText as any).facets = existing;
+}
+
 async function buildRichText(text: string, agent: any, hasMedia = false) {
   const cleanText = validatePostText(text, hasMedia);
   const richText = new RichText({ text: cleanText });
 
-  if (cleanText) await richText.detectFacets(agent);
+  if (cleanText) {
+    await richText.detectFacets(agent);
+    addBareDomainFacets(cleanText, richText);
+  }
   return richText;
+}
+
+async function buildExternalEmbed(text: string): Promise<any | undefined> {
+  const first = detectExternalLinks(text)[0];
+  if (!first) return undefined;
+
+  let title = "";
+  let description = "";
+  let uri = first.uri;
+
+  try {
+    const response = await fetch(`/api/link-preview?url=${encodeURIComponent(first.uri)}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (typeof data?.uri === "string" && data.uri) uri = data.uri;
+      if (typeof data?.title === "string") title = data.title.trim();
+      if (typeof data?.description === "string") description = data.description.trim();
+    }
+  } catch (error) {
+    console.warn("Métadonnées du lien indisponibles :", error);
+  }
+
+  if (!title) {
+    try {
+      title = new URL(uri).hostname.replace(/^www\./, "");
+    } catch {
+      title = first.text;
+    }
+  }
+
+  return {
+    $type: "app.bsky.embed.external",
+    external: {
+      uri,
+      title: title.slice(0, 300),
+      description: description.slice(0, 1000),
+    },
+  };
 }
 
 function normalizeMimeType(value: string): string {
@@ -187,7 +322,8 @@ export async function createPost(
   const { agent, session } = await getAuthenticatedAgent();
   const hasMedia = Boolean(media?.files?.length);
   const richText = await buildRichText(text, agent, hasMedia);
-  const embed = await buildMediaEmbed(agent, media);
+  const mediaEmbed = await buildMediaEmbed(agent, media);
+  const embed = mediaEmbed || await buildExternalEmbed(richText.text);
   const explicitLabels = media?.labels;
   const effectiveLabels = explicitLabels !== undefined
     ? explicitLabels
@@ -232,12 +368,14 @@ export async function replyToPost(
 
   const { agent, session } = await getAuthenticatedAgent();
   const richText = await buildRichText(text, agent);
+  const embed = await buildExternalEmbed(richText.text);
 
   const result = await agent.api.app.bsky.feed.post.create(
     { repo: session.did },
     {
       text: richText.text,
       facets: richText.facets,
+      ...(embed ? { embed } : {}),
       reply: {
         root,
         parent: {
@@ -255,6 +393,7 @@ export async function replyToPost(
     cid: result.cid,
     text: richText.text,
     facets: richText.facets,
+    embed,
     reply: {
       root,
       parent: {
