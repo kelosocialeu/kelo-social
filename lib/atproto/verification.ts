@@ -76,8 +76,10 @@ export function getVerificationBadge(
 /**
  * Récupère les données de vérification natives depuis l’AppView publique.
  *
- * Cette fonction sert lorsque le PDS de l’utilisateur ne renvoie pas les
- * champs enrichis trustedVerifierStatus / verifiedStatus.
+ * Les objets actor retournés par l'AppView contiennent souvent déjà le champ
+ * verification. Dans ce cas on l'utilise immédiatement, sans requête réseau
+ * supplémentaire. C'est important sur les feeds/explorer/recherche où des
+ * dizaines de badges sont affichés en même temps.
  */
 export async function getPublicNativeVerification(
   actor: any
@@ -86,6 +88,14 @@ export async function getPublicNativeVerification(
 
   if (!key) {
     return null;
+  }
+
+  if (actor?.verification) {
+    nativeVerificationCache.set(key, {
+      verification: actor.verification,
+      expiresAt: Date.now() + CACHE_DURATION,
+    });
+    return actor.verification;
   }
 
   const cached =
