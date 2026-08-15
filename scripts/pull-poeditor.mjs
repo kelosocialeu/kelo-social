@@ -45,29 +45,48 @@ async function main() {
 
   console.log(`${languages.length} langue(s) trouvée(s) dans POEditor.`);
 
+  let successCount = 0;
+  const failures = [];
+
   for (const language of languages) {
     const code = language.code;
     process.stdout.write(`Export ${code}... `);
 
-    const exportResponse = await post("/projects/export", {
-      language: code,
-      type: "key_value_json",
-      fallback_language: "fr",
-    });
+    try {
+      const exportResponse = await post("/projects/export", {
+        language: code,
+        type: "key_value_json",
+        fallback_language: "fr",
+      });
 
-    const downloadUrl = exportResponse?.result?.url;
-    if (!downloadUrl) throw new Error(`URL d'export absente pour ${code}`);
+      const downloadUrl = exportResponse?.result?.url;
+      if (!downloadUrl) throw new Error(`URL d'export absente pour ${code}`);
 
-    const fileResponse = await fetch(downloadUrl);
-    if (!fileResponse.ok) throw new Error(`Téléchargement impossible pour ${code}`);
+      const fileResponse = await fetch(downloadUrl);
+      if (!fileResponse.ok) {
+        throw new Error(`Téléchargement impossible pour ${code} (${fileResponse.status})`);
+      }
 
-    const content = await fileResponse.text();
-    JSON.parse(content);
-    await fs.writeFile(path.join(OUTPUT_DIR, `${code}.json`), content, "utf8");
-    console.log("OK");
+      const content = await fileResponse.text();
+      JSON.parse(content);
+      await fs.writeFile(path.join(OUTPUT_DIR, `${code}.json`), content, "utf8");
+      successCount += 1;
+      console.log("OK");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      failures.push({ code, message });
+      console.log(`ÉCHEC — ${message}`);
+    }
   }
 
-  console.log("Synchronisation POEditor terminée.");
+  console.log(`Synchronisation POEditor terminée : ${successCount} export(s) réussi(s), ${failures.length} échec(s).`);
+
+  if (failures.length) {
+    console.log("Langues ignorées :");
+    for (const failure of failures) {
+      console.log(`- ${failure.code}: ${failure.message}`);
+    }
+  }
 }
 
 main().catch((error) => {
