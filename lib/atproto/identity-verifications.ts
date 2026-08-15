@@ -50,6 +50,14 @@ const identityVerificationCache = new Map<
   IdentityVerificationCacheEntry
 >();
 
+// Cache global : sur un feed il peut y avoir 20 à 50 comptes visibles.
+// Faire getRecord pour chacun provoquait autant de requêtes vers le PDS Kelo.
+// On charge désormais la petite collection une seule fois puis chaque badge
+// lit le résultat en mémoire.
+let allRecordsCache: IdentityVerificationRecord[] | null = null;
+let allRecordsExpiresAt = 0;
+let pendingAllRecords: Promise<IdentityVerificationRecord[]> | null = null;
+
 function normalizeDid(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -97,9 +105,7 @@ function parseIdentityVerificationRecord(
     typeof record.subjectHandle !== "string" ||
     !isIdentityVerificationType(record.verificationType) ||
     !isIdentityVerificationSource(record.source) ||
-    !isIdentityVerificationAssignmentMode(
-      record.assignmentMode
-    ) ||
+    !isIdentityVerificationAssignmentMode(record.assignmentMode) ||
     typeof record.issuedAt !== "string"
   ) {
     return null;
@@ -133,116 +139,83 @@ function createIdentityVerificationAgent(): AtpAgent {
   });
 }
 
-function isMissingRecordError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-
-  const candidate = error as {
-    status?: number;
-    error?: string;
-    message?: string;
-  };
-
-  const text = `${candidate.error || ""} ${candidate.message || ""}`.toLowerCase();
-
-  return (
-    candidate.status === 404 ||
-    text.includes("recordnotfound") ||
-    text.includes("record not found") ||
-    text.includes("could not locate record")
-  );
-}
-
-export async function listIdentityVerifications(): Promise<
-  IdentityVerificationRecord[]
-> {
+async function fetchAllIdentityVerifications(): Promise<IdentityVerificationRecord[]> {
   const agent = createIdentityVerificationAgent();
   const results: IdentityVerificationRecord[] = [];
-
   let cursor: string | undefined;
 
   do {
-    const response =
-      await agent.api.com.atproto.repo.listRecords({
-        repo: IDENTITY_VERIFICATION_REPO_HANDLE,
-        collection: IDENTITY_VERIFICATION_COLLECTION,
-        limit: 100,
-        cursor,
-      });
+    const response = await agent.api.com.atproto.repo.listRecords({
+      repo: IDENTITY_VERIFICATION_REPO_HANDLE,
+      collection: IDENTITY_VERIFICATION_COLLECTION,
+      limit: 100,
+      cursor,
+    });
 
     for (const item of response.data.records) {
-      const parsed = parseIdentityVerificationRecord(
-        item.value
-      );
-
-      if (!parsed) {
-        continue;
-      }
+      const parsed = parseIdentityVerificationRecord(item.value);
+      if (!parsed) continue;
 
       results.push(parsed);
-
-      identityVerificationCache.set(
-        normalizeDid(parsed.subjectDid),
-        {
-          value: parsed,
-          expiresAt: Date.now() + CACHE_DURATION_MS,
-        }
-      );
+      identityVerificationCache.set(normalizeDid(parsed.subjectDid), {
+        value: parsed,
+        expiresAt: Date.now() + CACHE_DURATION_MS,
+      });
     }
 
     cursor = response.data.cursor;
   } while (cursor);
 
+  // On mémorise aussi les absences : après ce chargement complet, si un DID
+  // n'est pas dans la collection il n'est simplement pas vérifié.
+  allRecordsCache = results;
+  allRecordsExpiresAt = Date.now() + CACHE_DURATION_MS;
   return results;
+}
+
+export async function listIdentityVerifications(): Promise<
+  IdentityVerificationRecord[]
+> {
+  if (allRecordsCache && allRecordsExpiresAt > Date.now()) {
+    return allRecordsCache;
+  }
+
+  if (pendingAllRecords) return pendingAllRecords;
+
+  pendingAllRecords = fetchAllIdentityVerifications().finally(() => {
+    pendingAllRecords = null;
+  });
+
+  return pendingAllRecords;
 }
 
 export async function getIdentityVerification(
   subjectDid: string
 ): Promise<IdentityVerificationRecord | null> {
   const normalizedDid = normalizeDid(subjectDid);
+  if (!normalizedDid) return null;
 
-  if (!normalizedDid) {
-    return null;
-  }
-
-  const cached =
-    identityVerificationCache.get(normalizedDid);
-
+  const cached = identityVerificationCache.get(normalizedDid);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.value;
   }
 
-  const agent = createIdentityVerificationAgent();
-
   try {
-    const response =
-      await agent.api.com.atproto.repo.getRecord({
-        repo: IDENTITY_VERIFICATION_REPO_HANDLE,
-        collection: IDENTITY_VERIFICATION_COLLECTION,
-        rkey: normalizedDid,
-      });
-
-    const parsed = parseIdentityVerificationRecord(
-      response.data.value
-    );
+    const records = await listIdentityVerifications();
+    const found =
+      records.find((record) => normalizeDid(record.subjectDid) === normalizedDid) || null;
 
     identityVerificationCache.set(normalizedDid, {
-      value: parsed,
+      value: found,
       expiresAt: Date.now() + CACHE_DURATION_MS,
     });
 
-    return parsed;
+    return found;
   } catch (error) {
-    // Une absence réelle peut être mémorisée. Une panne réseau, un timeout,
-    // un 429 ou une erreur 5xx doit au contraire remonter jusqu'au hook afin
-    // qu'il conserve le dernier statut de certification connu.
-    if (isMissingRecordError(error)) {
-      identityVerificationCache.set(normalizedDid, {
-        value: null,
-        expiresAt: Date.now() + CACHE_DURATION_MS,
-      });
-      return null;
-    }
-
+    // Si le PDS est temporairement indisponible, on garde une éventuelle
+    // ancienne valeur en cache plutôt que de faire clignoter le badge.
+    const stale = identityVerificationCache.get(normalizedDid);
+    if (stale) return stale.value;
     throw error;
   }
 }
@@ -285,11 +258,13 @@ export function clearIdentityVerificationCache(
   subjectDid?: string
 ): void {
   if (subjectDid) {
-    identityVerificationCache.delete(
-      normalizeDid(subjectDid)
-    );
-    return;
+    identityVerificationCache.delete(normalizeDid(subjectDid));
+  } else {
+    identityVerificationCache.clear();
   }
 
-  identityVerificationCache.clear();
+  // Une modification administrative peut rendre le snapshot global obsolète.
+  allRecordsCache = null;
+  allRecordsExpiresAt = 0;
+  pendingAllRecords = null;
 }
