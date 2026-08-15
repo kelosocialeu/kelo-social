@@ -14,22 +14,43 @@ function stripTrailingPunctuation(value: string) {
   return value.replace(/[.,!?;:)}\]]+$/g, "");
 }
 
+function normalizeCandidate(rawValue: string): string | null {
+  const raw = stripTrailingPunctuation(rawValue.trim());
+  if (!raw) return null;
+
+  const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    if (!parsed.hostname.includes(".")) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 function detectFirstLink(text: string): string | null {
-  const regex = /https?:\/\/[^\s<>"']+|(?:www\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?:\/[^\s<>"']*)?/gi;
-  let match: RegExpExecArray | null;
+  // Les URL complètes sont traitées en priorité. Cette détection accepte les
+  // chemins, paramètres (?x=y), ancres (#section) et domaines Unicode encodés.
+  const fullUrl = text.match(/https?:\/\/[^\s<>"']+/i)?.[0];
+  if (fullUrl) {
+    const normalized = normalizeCandidate(fullUrl);
+    if (normalized) return normalized;
+  }
 
-  while ((match = regex.exec(text)) !== null) {
-    const raw = stripTrailingPunctuation(match[0]);
-    const previous = match.index > 0 ? text[match.index - 1] : "";
-    if (previous === "@") continue;
-
-    const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-    try {
-      const parsed = new URL(candidate);
-      if ((parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.hostname.includes(".")) {
-        return parsed.toString();
-      }
-    } catch {}
+  // Ensuite on cherche les domaines écrits sans protocole, par ex. example.com/path.
+  // On découpe le texte en jetons pour éviter qu'une regex trop stricte rate
+  // certains liens légitimes collés dans le compositeur.
+  const tokens = text.split(/\s+/).filter(Boolean);
+  for (const token of tokens) {
+    const cleaned = stripTrailingPunctuation(token.replace(/^[([{<"']+/, ""));
+    if (!cleaned || cleaned.includes("@")) continue;
+    if (!/^(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,63}(?:[/:?#].*)?$/i.test(cleaned)) {
+      continue;
+    }
+    const normalized = normalizeCandidate(cleaned);
+    if (normalized) return normalized;
   }
 
   return null;
@@ -58,8 +79,15 @@ export default function LinkPreviewDraft({ text, hidden = false }: { text: strin
     let cancelled = false;
     const controller = new AbortController();
 
+    // Affiche immédiatement une carte dès qu'un lien est reconnu. Les
+    // métadonnées viennent l'enrichir ensuite, mais une panne du serveur de
+    // preview ne peut plus rendre la détection invisible.
+    setPreview({
+      uri: detectedUrl,
+      title: hostname(detectedUrl),
+      description: "",
+    });
     setLoading(true);
-    setPreview(null);
 
     const timeout = window.setTimeout(async () => {
       try {
@@ -68,12 +96,7 @@ export default function LinkPreviewDraft({ text, hidden = false }: { text: strin
           cache: "no-store",
         });
 
-        if (!response.ok) {
-          if (!cancelled) {
-            setPreview({ uri: detectedUrl, title: hostname(detectedUrl), description: "" });
-          }
-          return;
-        }
+        if (!response.ok) return;
 
         const data = await response.json();
         if (cancelled) return;
@@ -85,13 +108,11 @@ export default function LinkPreviewDraft({ text, hidden = false }: { text: strin
           image: typeof data?.image === "string" && data.image ? data.image : undefined,
         });
       } catch {
-        if (!cancelled) {
-          setPreview({ uri: detectedUrl, title: hostname(detectedUrl), description: "" });
-        }
+        // La carte minimale reste affichée si les métadonnées sont indisponibles.
       } finally {
         if (!cancelled) setLoading(false);
       }
-    }, 450);
+    }, 250);
 
     return () => {
       cancelled = true;
@@ -100,18 +121,7 @@ export default function LinkPreviewDraft({ text, hidden = false }: { text: strin
     };
   }, [detectedUrl, hidden]);
 
-  if (hidden || !detectedUrl) return null;
-
-  if (loading && !preview) {
-    return (
-      <div className="mt-3 flex items-center gap-2 rounded-2xl border border-kelo-border bg-white px-3 py-3 text-sm text-kelo-muted">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Chargement de l’aperçu du lien…
-      </div>
-    );
-  }
-
-  if (!preview) return null;
+  if (hidden || !detectedUrl || !preview) return null;
 
   return (
     <a
@@ -126,8 +136,13 @@ export default function LinkPreviewDraft({ text, hidden = false }: { text: strin
       )}
       <div className="p-3">
         <div className="flex items-center gap-1.5 text-xs text-kelo-muted">
-          <ExternalLink className="h-3.5 w-3.5" />
+          {loading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <ExternalLink className="h-3.5 w-3.5" />
+          )}
           <span className="truncate">{hostname(preview.uri)}</span>
+          {loading && <span className="ml-1">Chargement…</span>}
         </div>
         <p className="mt-1 line-clamp-2 text-sm font-bold text-kelo-text">{preview.title}</p>
         {preview.description && (
