@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ChevronLeft, Copy, Globe2, Loader2 } from "lucide-react";
+import { BadgeCheck, CheckCircle2, ChevronLeft, Copy, ExternalLink, Globe2, Loader2 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { getSessionInfo, updateHandle } from "@/lib/atproto/account";
@@ -37,7 +37,6 @@ async function getPdsHandleDomain(): Promise<string> {
       }
     }
 
-    // Fallback uniquement si le PDS ne publie pas availableUserDomains.
     return new URL(pdsUrl).hostname;
   } catch {
     return "";
@@ -137,6 +136,29 @@ export default function IdentitySection() {
       <section>
         <h3 className="text-lg font-extrabold text-kelo-text">Nom d’utilisateur</h3>
         <p className="mt-1 text-sm text-kelo-muted">Actuellement <strong className="text-kelo-text">@{session?.handle || "—"}</strong></p>
+      </section>
+
+      <section className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-4 sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-sm">
+              <BadgeCheck className="h-6 w-6" />
+            </span>
+            <div className="min-w-0">
+              <h4 className="font-extrabold text-kelo-text">Demander une certification</h4>
+              <p className="mt-1 text-sm leading-5 text-kelo-muted">Envoyez une demande de certification pour votre compte Kelo Social.</p>
+            </div>
+          </div>
+          <a
+            href="https://kelo-social-certification.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 text-sm font-extrabold text-white shadow-sm transition hover:scale-[1.02] hover:shadow-md"
+          >
+            Demander une certification
+            <ExternalLink className="h-4 w-4" />
+          </a>
+        </div>
       </section>
 
       {mode === "choice" && (
