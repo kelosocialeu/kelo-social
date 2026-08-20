@@ -13,20 +13,40 @@ import { AuthProvider } from "@/components/providers/AuthProvider";
 import { TranslationProvider } from "@/components/providers/TranslationProvider";
 
 const APP_NAME = "Kelo Social";
-const APP_DESCRIPTION = "Le réseau social européen décentralisé propulsé par AT Protocol";
+const APP_TITLE = "Kelo Social — Le réseau social européen, libre et vérifié";
+const APP_DESCRIPTION = "Kelo Social est un réseau social européen décentralisé basé sur AT Protocol. Gardez le contrôle de vos données, vérifiez votre profil avec Kelo ID et rejoignez une communauté moderne, sans publicité.";
 const APP_LOGO = "https://kelosocial.sirv.com/logo.png";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.kelosocial.eu"),
   applicationName: APP_NAME,
-  title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
+  title: { default: APP_TITLE, template: `%s · ${APP_NAME}` },
   description: APP_DESCRIPTION,
+  alternates: { canonical: "/" },
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "default" },
   other: { "mobile-web-app-capable": "yes" },
   formatDetection: { telephone: false },
   icons: { icon: APP_LOGO, shortcut: APP_LOGO, apple: APP_LOGO },
-  openGraph: { type: "website", siteName: APP_NAME, title: APP_NAME, description: APP_DESCRIPTION, images: [APP_LOGO] },
-  twitter: { card: "summary", title: APP_NAME, description: APP_DESCRIPTION, images: [APP_LOGO] },
+  openGraph: {
+    type: "website",
+    url: "https://www.kelosocial.eu/",
+    siteName: APP_NAME,
+    title: APP_TITLE,
+    description: APP_DESCRIPTION,
+    images: [{ url: APP_LOGO, alt: "Logo Kelo Social" }],
+  },
+  twitter: {
+    card: "summary",
+    title: APP_TITLE,
+    description: APP_DESCRIPTION,
+    images: [APP_LOGO],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true },
+  },
 };
 
 export const viewport: Viewport = {
