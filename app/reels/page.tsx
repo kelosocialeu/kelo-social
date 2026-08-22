@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Heart, Home, MessageCircle, Play, Repeat2, RotateCcw, Share2, Volume2, VolumeX } from "lucide-react";
+import { Heart, Home, MessageCircle, Play, Repeat2, RotateCcw, Share2 } from "lucide-react";
 
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
@@ -92,7 +92,6 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
   const lastTapRef = useRef(0);
   const singleTapTimerRef = useRef<number | null>(null);
   const heartIdRef = useRef(0);
-  const [muted, setMuted] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [ready, setReady] = useState(false);
   const [busyAction, setBusyAction] = useState<"like" | "repost" | null>(null);
@@ -111,6 +110,7 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
     setReady(false);
     setPlaying(false);
     setVideoError(null);
+    video.muted = false;
 
     const attachVideo = async () => {
       try {
@@ -184,9 +184,12 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
 
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting && entry.intersectionRatio >= 0.65 && !commentsOpen) {
-        video.muted = true;
-        setMuted(true);
-        video.play().catch(() => undefined);
+        video.muted = false;
+        video.play().catch(() => {
+          // Certains navigateurs bloquent l'autoplay avec son tant que l'utilisateur
+          // n'a pas interagi avec la page. Dans ce cas, le bouton lecture reste visible.
+          setPlaying(false);
+        });
       } else {
         video.pause();
       }
@@ -204,21 +207,12 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
     const video = videoRef.current;
     if (!video || videoError) return;
     try {
+      video.muted = false;
       if (video.paused) await video.play();
       else video.pause();
     } catch (error) {
       console.error("Lecture du réel impossible", error);
-      setVideoError("La lecture n’a pas pu démarrer. Réessayez.");
-    }
-  };
-
-  const toggleMute = async () => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.muted = !video.muted;
-    setMuted(video.muted);
-    if (video.paused) {
-      try { await video.play(); } catch {}
+      setActionError("Touchez une nouvelle fois la vidéo pour démarrer le son.");
     }
   };
 
@@ -351,7 +345,7 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
 
   return (
     <section ref={rootRef} className="relative h-[100dvh] w-full snap-start overflow-hidden bg-black text-white">
-      <video ref={videoRef} poster={post.embed.thumbnail} playsInline loop muted={muted} preload="metadata" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onClick={handleVideoTap} className="absolute inset-0 h-full w-full select-none bg-black object-contain" />
+      <video ref={videoRef} poster={post.embed.thumbnail} playsInline loop preload="metadata" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onClick={handleVideoTap} className="absolute inset-0 h-full w-full select-none bg-black object-contain" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/80" />
 
       {hearts.map((heart) => (
@@ -363,10 +357,9 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
       {videoError ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center px-8 text-center"><div className="flex max-w-sm flex-col items-center gap-3 rounded-2xl bg-black/70 px-5 py-4 text-sm font-semibold text-white backdrop-blur-md"><span>{videoError}</span><button type="button" onClick={() => setRetryKey((value) => value + 1)} className="flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-bold"><RotateCcw className="h-4 w-4" />Réessayer</button></div></div>
       ) : !playing && ready && !commentsOpen && (
-        <button type="button" onClick={togglePlay} aria-label="Lire la vidéo" className="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md"><Play className="ml-1 h-8 w-8" fill="currentColor" /></button>
+        <button type="button" onClick={togglePlay} aria-label="Lire la vidéo avec le son" className="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md"><Play className="ml-1 h-8 w-8" fill="currentColor" /></button>
       )}
 
-      <button type="button" onClick={toggleMute} aria-label={muted ? "Activer le son" : "Couper le son"} className="absolute right-4 top-[max(18px,env(safe-area-inset-top))] z-30 flex h-11 w-11 items-center justify-center rounded-full bg-black/45 backdrop-blur-md active:scale-95">{muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}</button>
       {actionError && <div className="absolute left-1/2 top-20 z-40 max-w-[80vw] -translate-x-1/2 rounded-full bg-black/70 px-4 py-2 text-center text-xs font-semibold text-white backdrop-blur-md">{actionError}</div>}
 
       <div className="absolute bottom-[max(22px,env(safe-area-inset-bottom))] left-0 right-0 z-20 flex items-end gap-4 px-4 pb-3 sm:px-6 md:bottom-8">
