@@ -22,18 +22,10 @@ const PUBLIC_ROUTES = [
   "/kelo-id/callback",
 ];
 
-const PRIMARY_APP_ROUTES = [
-  "/feed",
-  "/reels",
-  "/search",
-  "/messages",
-  "/notifications",
-  "/bookmarks",
-  "/feeds",
-  "/lists",
-  "/starter-packs",
-  "/settings",
-];
+// On ne précharge que les destinations les plus utilisées. L'ancienne version
+// préchargeait presque toute l'application après chaque changement de page,
+// ce qui pouvait provoquer des pics réseau/CPU et rendre la navigation moins fluide.
+const HIGH_PRIORITY_ROUTES = ["/feed", "/reels", "/messages"];
 
 function matchesRoute(pathname: string, route: string): boolean {
   if (route === "/") return pathname === "/";
@@ -60,20 +52,36 @@ export default function MobileNavigationShell({ children }: MobileNavigationShel
   useEffect(() => {
     if (!checked || !session) return;
 
-    const routes = handle
-      ? [...PRIMARY_APP_ROUTES, `/profile/${handle}`]
-      : PRIMARY_APP_ROUTES;
+    let cancelled = false;
 
-    const timeoutId = globalThis.setTimeout(() => {
-      routes.forEach((route) => {
-        if (!matchesRoute(pathname, route)) {
-          router.prefetch(route);
-        }
-      });
-    }, 200);
+    const prefetchCoreRoutes = () => {
+      if (cancelled) return;
+      HIGH_PRIORITY_ROUTES.forEach((route) => router.prefetch(route));
+      if (handle) router.prefetch(`/profile/${handle}`);
+    };
 
-    return () => globalThis.clearTimeout(timeoutId);
-  }, [checked, session, handle, pathname, router]);
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    let idleId: number | null = null;
+    let timeoutId: number | null = null;
+
+    if (typeof idleWindow.requestIdleCallback === "function") {
+      idleId = idleWindow.requestIdleCallback(prefetchCoreRoutes, { timeout: 1800 });
+    } else {
+      timeoutId = window.setTimeout(prefetchCoreRoutes, 900);
+    }
+
+    return () => {
+      cancelled = true;
+      if (idleId !== null && typeof idleWindow.cancelIdleCallback === "function") {
+        idleWindow.cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+    };
+  }, [checked, session, handle, router]);
 
   const isConversation = pathname.startsWith("/messages/");
   const isReels = pathname === "/reels" || pathname.startsWith("/reels/");
@@ -87,7 +95,7 @@ export default function MobileNavigationShell({ children }: MobileNavigationShel
 
   const handleLogout = () => {
     logout();
-    window.location.href = "/login";
+    router.replace("/login");
   };
 
   return (
