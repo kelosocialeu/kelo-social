@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, Search, Bell, MessageCircle, Hash, ListChecks, Rocket, Bookmark,
-  User, Users, Settings, ShieldCheck, BadgeCheck, PenSquare, LogOut, Newspaper,
+  User, Users, Settings, ShieldCheck, BadgeCheck, PenSquare, LogOut, Newspaper, Clapperboard,
 } from "lucide-react";
 
 import Logo from "@/components/ui/Logo";
@@ -17,6 +17,7 @@ interface SidebarProps { handle: string; onLogout: () => void; }
 
 const NAV_ITEMS = [
   { href: "/feed", key: "nav.home", fallback: "Accueil", icon: Home },
+  { href: "/reels", key: "nav.reels", fallback: "Réels", icon: Clapperboard },
   { href: "/search", key: "nav.explore", fallback: "Explorer", icon: Search },
   { href: "/journal", key: "nav.journal", fallback: "Journal", icon: Newspaper },
   { href: "/notifications", key: "nav.notifications", fallback: "Notifications", icon: Bell },
