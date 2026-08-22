@@ -78,6 +78,15 @@ function mergeWithoutDuplicates(
   });
 }
 
+function shuffleItems(items: any[]): any[] {
+  const next = [...items];
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+  }
+  return next;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -106,6 +115,10 @@ function writePersistentCache(cacheKey: string, entry: InfiniteFeedCacheEntry) {
   } catch {
     // Le cache mémoire continue de fonctionner si localStorage est indisponible.
   }
+}
+
+function isReelsRoute(): boolean {
+  return typeof window !== "undefined" && window.location.pathname.startsWith("/reels");
 }
 
 export function clearInfiniteFeedCache(cacheKey?: string): void {
@@ -190,7 +203,17 @@ export function useInfiniteFeed(
 
   const applyPage = useCallback(
     (page: FeedPage, mode: "replace" | "append") => {
-      const pageItems = page.items || [];
+      let pageItems = page.items || [];
+
+      // Le fil Réels doit sembler réellement renouvelé à chaque visite. Le
+      // générateur AT Protocol peut renvoyer les mêmes vidéos populaires dans
+      // le même ordre pendant un certain temps : lors d'un rafraîchissement,
+      // on mélange donc uniquement la nouvelle première page. La pagination
+      // suivante reste, elle, dans l'ordre fourni par le serveur.
+      if (mode === "replace" && isReelsRoute() && pageItems.length > 1) {
+        pageItems = shuffleItems(pageItems);
+      }
+
       const nextItems =
         mode === "replace"
           ? mergeWithoutDuplicates([], pageItems, getItemKey)
@@ -320,25 +343,47 @@ export function useInfiniteFeed(
   }, [applyPage]);
 
   useEffect(() => {
-    const memoryCached = cache.get(cacheKey);
-    const persistentCached = memoryCached || readPersistentCache(cacheKey);
+    const forceFresh = isReelsRoute();
 
-    if (persistentCached) {
-      cache.set(cacheKey, persistentCached);
-      itemsRef.current = persistentCached.items;
-      cursorRef.current = persistentCached.cursor;
-      hasMoreRef.current = persistentCached.hasMore;
-      setItemsState(persistentCached.items);
-      setCursor(persistentCached.cursor);
-      setHasMore(persistentCached.hasMore);
-      setInitialLoading(false);
+    // Contrairement aux fils texte, Réels ne doit pas rouvrir une ancienne
+    // liste enregistrée dans localStorage. On garde le cache pour les autres
+    // écrans, mais on force une requête réseau dès que /reels est ouvert.
+    if (forceFresh) {
+      cache.delete(cacheKey);
+      pendingFirstPages.delete(cacheKey);
+      try {
+        window.localStorage.removeItem(storageKey(cacheKey));
+      } catch {}
 
-      if (Date.now() - persistentCached.updatedAt >= staleTimeMs) {
-        void refreshRef.current();
-      }
-    } else {
+      itemsRef.current = [];
+      cursorRef.current = undefined;
+      hasMoreRef.current = true;
+      setItemsState([]);
+      setCursor(undefined);
+      setHasMore(true);
       setInitialLoading(true);
       void refreshRef.current();
+    } else {
+      const memoryCached = cache.get(cacheKey);
+      const persistentCached = memoryCached || readPersistentCache(cacheKey);
+
+      if (persistentCached) {
+        cache.set(cacheKey, persistentCached);
+        itemsRef.current = persistentCached.items;
+        cursorRef.current = persistentCached.cursor;
+        hasMoreRef.current = persistentCached.hasMore;
+        setItemsState(persistentCached.items);
+        setCursor(persistentCached.cursor);
+        setHasMore(persistentCached.hasMore);
+        setInitialLoading(false);
+
+        if (Date.now() - persistentCached.updatedAt >= staleTimeMs) {
+          void refreshRef.current();
+        }
+      } else {
+        setInitialLoading(true);
+        void refreshRef.current();
+      }
     }
 
     return () => {
@@ -356,6 +401,11 @@ export function useInfiniteFeed(
     if (!refreshOnFocus) return;
 
     const triggerRefresh = () => {
+      if (isReelsRoute()) {
+        void refreshRef.current();
+        return;
+      }
+
       const cached = cache.get(cacheKey);
       if (!cached || Date.now() - cached.updatedAt >= staleTimeMs) {
         void refreshRef.current();
