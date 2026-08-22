@@ -196,7 +196,12 @@ export function useInfiniteFeed(
           ? mergeWithoutDuplicates([], pageItems, getItemKey)
           : mergeWithoutDuplicates(itemsRef.current, pageItems, getItemKey);
       const nextCursor = page.cursor;
-      const nextHasMore = !!nextCursor && pageItems.length > 0;
+
+      // Un fil filtré peut recevoir une page sans élément visible tout en ayant
+      // encore un curseur AT Protocol. C'est notamment le cas des Réels, qui
+      // éliminent les publications sans vidéo. Tant que le serveur fournit un
+      // curseur, on continue donc la pagination au lieu d'arrêter le fil.
+      const nextHasMore = !!nextCursor;
 
       itemsRef.current = nextItems;
       cursorRef.current = nextCursor;
