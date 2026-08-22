@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Heart, Home, MessageCircle, Play, Repeat2, Share2, Volume2, VolumeX } from "lucide-react";
 
@@ -12,6 +13,40 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
 import { getDiscoverFeed } from "@/lib/atproto/feed";
 import { likePost, unlikePost, repostPost, undoRepost } from "@/lib/atproto/posts";
+
+declare global {
+  interface Window {
+    Hls?: any;
+    __keloHlsPromise?: Promise<any>;
+  }
+}
+
+const HLS_JS_URL = "https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js";
+
+function ensureHlsJs(): Promise<any> {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  if (window.Hls) return Promise.resolve(window.Hls);
+  if (window.__keloHlsPromise) return window.__keloHlsPromise;
+
+  window.__keloHlsPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${HLS_JS_URL}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve(window.Hls), { once: true });
+      existing.addEventListener("error", reject, { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = HLS_JS_URL;
+    script.async = true;
+    script.crossOrigin = "anonymous";
+    script.onload = () => resolve(window.Hls);
+    script.onerror = () => reject(new Error("Impossible de charger le lecteur vidéo HLS."));
+    document.head.appendChild(script);
+  });
+
+  return window.__keloHlsPromise;
+}
 
 function formatVideoPosts(feed: any[]) {
   return feed
@@ -31,11 +66,83 @@ function formatVideoPosts(feed: any[]) {
 }
 
 function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: Record<string, unknown>) => void }) {
+  const router = useRouter();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const hlsRef = useRef<any>(null);
   const [muted, setMuted] = useState(true);
   const [playing, setPlaying] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [busyAction, setBusyAction] = useState<"like" | "repost" | null>(null);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    let cancelled = false;
+
+    const attachVideo = async () => {
+      setVideoError(null);
+      setReady(false);
+
+      // Safari/iOS sait lire HLS directement. Chrome/Android a besoin de hls.js.
+      if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = post.embed.playlist;
+        video.load();
+        return;
+      }
+
+      try {
+        const Hls = await ensureHlsJs();
+        if (cancelled || !video) return;
+        if (!Hls?.isSupported?.()) throw new Error("Ce navigateur ne prend pas en charge cette vidéo.");
+
+        const hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: false,
+          backBufferLength: 30,
+          maxBufferLength: 30,
+        });
+        hlsRef.current = hls;
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MEDIA_ATTACHED, () => hls.loadSource(post.embed.playlist));
+        hls.on(Hls.Events.MANIFEST_PARSED, () => setReady(true));
+        hls.on(Hls.Events.ERROR, (_event: unknown, data: any) => {
+          if (!data?.fatal) return;
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            try { hls.startLoad(); } catch {}
+            return;
+          }
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            try { hls.recoverMediaError(); } catch {}
+            return;
+          }
+          setVideoError("Impossible de lire cette vidéo.");
+        });
+      } catch (error) {
+        console.error("Erreur HLS Réels", error);
+        setVideoError("Impossible de préparer le lecteur vidéo.");
+      }
+    };
+
+    const onCanPlay = () => setReady(true);
+    const onError = () => setVideoError("Impossible de lire cette vidéo.");
+    video.addEventListener("canplay", onCanPlay);
+    video.addEventListener("error", onError);
+    attachVideo();
+
+    return () => {
+      cancelled = true;
+      video.removeEventListener("canplay", onCanPlay);
+      video.removeEventListener("error", onError);
+      try { hlsRef.current?.destroy?.(); } catch {}
+      hlsRef.current = null;
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    };
+  }, [post.embed.playlist]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -44,6 +151,8 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
 
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting && entry.intersectionRatio >= 0.65) {
+        video.muted = true;
+        setMuted(true);
         video.play().catch(() => undefined);
       } else {
         video.pause();
@@ -52,25 +161,34 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
 
     observer.observe(root);
     return () => observer.disconnect();
-  }, []);
+  }, [ready]);
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
     const video = videoRef.current;
-    if (!video) return;
-    if (video.paused) video.play().catch(() => undefined);
-    else video.pause();
+    if (!video || videoError) return;
+    try {
+      if (video.paused) await video.play();
+      else video.pause();
+    } catch (error) {
+      console.error("Lecture du réel impossible", error);
+      setVideoError("La lecture n’a pas pu démarrer. Réessayez.");
+    }
   };
 
-  const toggleMute = () => {
+  const toggleMute = async () => {
     const video = videoRef.current;
     if (!video) return;
     video.muted = !video.muted;
     setMuted(video.muted);
+    if (video.paused) {
+      try { await video.play(); } catch {}
+    }
   };
 
   const toggleLike = async () => {
-    if (busy) return;
-    setBusy(true);
+    if (busyAction) return;
+    setBusyAction("like");
+    setActionError(null);
     try {
       if (post.viewer?.like) {
         await unlikePost(post.viewer.like);
@@ -81,14 +199,16 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
       }
     } catch (error) {
       console.error("Impossible de modifier le like du réel", error);
+      setActionError("Impossible de mettre J’aime pour le moment.");
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
   const toggleRepost = async () => {
-    if (busy) return;
-    setBusy(true);
+    if (busyAction) return;
+    setBusyAction("repost");
+    setActionError(null);
     try {
       if (post.viewer?.repost) {
         await undoRepost(post.viewer.repost);
@@ -99,17 +219,24 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
       }
     } catch (error) {
       console.error("Impossible de modifier le repost du réel", error);
+      setActionError("Impossible de republier pour le moment.");
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
   const share = async () => {
     const url = `${window.location.origin}/post?uri=${encodeURIComponent(post.uri)}`;
     try {
-      if (navigator.share) await navigator.share({ title: post.author?.displayName || "Kelo Social", url });
-      else await navigator.clipboard.writeText(url);
-    } catch {}
+      if (navigator.share) await navigator.share({ title: post.author?.displayName || "Kelo Social", text: post.record?.text || "", url });
+      else {
+        await navigator.clipboard.writeText(url);
+        setActionError("Lien copié dans le presse-papiers.");
+        window.setTimeout(() => setActionError(null), 1800);
+      }
+    } catch (error: any) {
+      if (error?.name !== "AbortError") setActionError("Impossible de partager cette publication.");
+    }
   };
 
   const text = typeof post.record?.text === "string" ? post.record.text : "";
@@ -118,7 +245,6 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
     <section ref={rootRef} className="relative h-[100dvh] w-full snap-start overflow-hidden bg-black text-white">
       <video
         ref={videoRef}
-        src={post.embed.playlist}
         poster={post.embed.thumbnail}
         playsInline
         loop
@@ -132,19 +258,25 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
 
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/80" />
 
-      {!playing && (
+      {videoError ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center px-8 text-center">
+          <div className="rounded-2xl bg-black/65 px-5 py-4 text-sm font-semibold text-white backdrop-blur-md">{videoError}</div>
+        </div>
+      ) : !playing && (
         <button type="button" onClick={togglePlay} aria-label="Lire la vidéo" className="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md">
           <Play className="ml-1 h-8 w-8" fill="currentColor" />
         </button>
       )}
 
-      <button type="button" onClick={toggleMute} aria-label={muted ? "Activer le son" : "Couper le son"} className="absolute right-4 top-[max(18px,env(safe-area-inset-top))] z-20 flex h-11 w-11 items-center justify-center rounded-full bg-black/40 backdrop-blur-md">
+      <button type="button" onClick={toggleMute} aria-label={muted ? "Activer le son" : "Couper le son"} className="absolute right-4 top-[max(18px,env(safe-area-inset-top))] z-30 flex h-11 w-11 items-center justify-center rounded-full bg-black/45 backdrop-blur-md active:scale-95">
         {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
       </button>
 
+      {actionError && <div className="absolute left-1/2 top-20 z-40 max-w-[80vw] -translate-x-1/2 rounded-full bg-black/70 px-4 py-2 text-center text-xs font-semibold text-white backdrop-blur-md">{actionError}</div>}
+
       <div className="absolute bottom-[max(22px,env(safe-area-inset-bottom))] left-0 right-0 z-20 flex items-end gap-4 px-4 pb-3 sm:px-6 md:bottom-8">
         <div className="min-w-0 flex-1 pb-1">
-          <Link href={`/profile/${post.author?.handle}`} className="mb-3 flex w-fit items-center gap-3">
+          <button type="button" onClick={() => router.push(`/profile/${post.author?.handle}`)} className="mb-3 flex w-fit items-center gap-3 text-left">
             <Avatar src={post.author?.avatar} fallback={(post.author?.handle || "K")[0].toUpperCase()} size="sm" />
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -153,23 +285,23 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
               </div>
               <span className="block max-w-[58vw] truncate text-xs text-white/75 md:max-w-md">@{post.author?.handle}</span>
             </div>
-          </Link>
+          </button>
           {text && <p className="line-clamp-3 max-w-xl whitespace-pre-wrap text-sm leading-5 text-white drop-shadow-md sm:text-[15px]">{text}</p>}
         </div>
 
         <div className="flex flex-col items-center gap-4 pb-1">
-          <ActionButton label="J’aime" count={post.likeCount} active={!!post.viewer?.like} onClick={toggleLike}><Heart className="h-7 w-7" fill={post.viewer?.like ? "currentColor" : "none"} /></ActionButton>
-          <Link href={`/post?uri=${encodeURIComponent(post.uri)}`} className="flex flex-col items-center gap-1" aria-label="Commentaires"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/35 backdrop-blur-md"><MessageCircle className="h-7 w-7" /></span><span className="text-[11px] font-bold">{post.replyCount || 0}</span></Link>
-          <ActionButton label="Republier" count={post.repostCount} active={!!post.viewer?.repost} onClick={toggleRepost}><Repeat2 className="h-7 w-7" /></ActionButton>
-          <button type="button" onClick={share} aria-label="Partager" className="flex h-12 w-12 items-center justify-center rounded-full bg-black/35 backdrop-blur-md"><Share2 className="h-7 w-7" /></button>
+          <ActionButton label="J’aime" count={post.likeCount} active={!!post.viewer?.like} disabled={!!busyAction} onClick={toggleLike}><Heart className="h-7 w-7" fill={post.viewer?.like ? "currentColor" : "none"} /></ActionButton>
+          <button type="button" onClick={() => router.push(`/post?uri=${encodeURIComponent(post.uri)}`)} className="flex flex-col items-center gap-1" aria-label="Commentaires"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><MessageCircle className="h-7 w-7" /></span><span className="text-[11px] font-bold">{post.replyCount || 0}</span></button>
+          <ActionButton label="Republier" count={post.repostCount} active={!!post.viewer?.repost} disabled={!!busyAction} onClick={toggleRepost}><Repeat2 className="h-7 w-7" /></ActionButton>
+          <button type="button" onClick={share} aria-label="Partager" className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-md active:scale-95"><Share2 className="h-7 w-7" /></button>
         </div>
       </div>
     </section>
   );
 }
 
-function ActionButton({ children, count, active, label, onClick }: { children: React.ReactNode; count: number; active?: boolean; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} aria-label={label} className={`flex flex-col items-center gap-1 ${active ? "text-fuchsia-400" : "text-white"}`}><span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/35 backdrop-blur-md">{children}</span><span className="text-[11px] font-bold text-white">{count || 0}</span></button>;
+function ActionButton({ children, count, active, label, onClick, disabled }: { children: React.ReactNode; count: number; active?: boolean; label: string; onClick: () => void; disabled?: boolean }) {
+  return <button type="button" disabled={disabled} onClick={onClick} aria-label={label} className={`flex flex-col items-center gap-1 active:scale-95 disabled:opacity-60 ${active ? "text-fuchsia-400" : "text-white"}`}><span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-md">{children}</span><span className="text-[11px] font-bold text-white">{count || 0}</span></button>;
 }
 
 export default function ReelsPage() {
@@ -206,7 +338,7 @@ export default function ReelsPage() {
     <div className="min-h-[100dvh] bg-black">
       <Sidebar handle={handle} onLogout={handleLogout} />
 
-      <main className="relative md:ml-0">
+      <main className="relative">
         <div className="fixed left-4 top-[max(18px,env(safe-area-inset-top))] z-40 md:left-[calc(18rem+1rem)]">
           <Link href="/feed" aria-label="Retour au fil d’actualité" className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md md:hidden"><Home className="h-5 w-5" /></Link>
         </div>
