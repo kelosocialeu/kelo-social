@@ -24,6 +24,7 @@ const PUBLIC_ROUTES = [
 
 const PRIMARY_APP_ROUTES = [
   "/feed",
+  "/reels",
   "/search",
   "/messages",
   "/notifications",
@@ -59,9 +60,6 @@ export default function MobileNavigationShell({ children }: MobileNavigationShel
   useEffect(() => {
     if (!checked || !session) return;
 
-    // Précharge le code des destinations principales une fois la session
-    // disponible. Les clics de navigation deviennent alors de simples
-    // transitions client au lieu d'attendre le chargement du prochain écran.
     const routes = handle
       ? [...PRIMARY_APP_ROUTES, `/profile/${handle}`]
       : PRIMARY_APP_ROUTES;
@@ -78,8 +76,9 @@ export default function MobileNavigationShell({ children }: MobileNavigationShel
   }, [checked, session, handle, pathname, router]);
 
   const isConversation = pathname.startsWith("/messages/");
+  const isReels = pathname === "/reels" || pathname.startsWith("/reels/");
   const isPublicRoute = PUBLIC_ROUTES.some((route) => matchesRoute(pathname, route));
-  const shouldShowNavigation = checked && !!session && !isPublicRoute && !isConversation;
+  const shouldShowNavigation = checked && !!session && !isPublicRoute && !isConversation && !isReels;
 
   const handleCreatePost = () => {
     setMenuOpen(false);
@@ -103,7 +102,7 @@ export default function MobileNavigationShell({ children }: MobileNavigationShel
         {children}
       </div>
 
-      {checked && session && !isPublicRoute && <GlobalPostComposer />}
+      {checked && session && !isPublicRoute && !isReels && <GlobalPostComposer />}
 
       {shouldShowNavigation && (
         <>
