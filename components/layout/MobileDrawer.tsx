@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BadgeCheck, Bell, Bookmark, Hash, Home, ListChecks, LogOut, MessageCircle, PenSquare, Rocket, Search, Settings, ShieldCheck, User, X } from "lucide-react";
+import { BadgeCheck, Bell, Bookmark, Clapperboard, Hash, Home, ListChecks, LogOut, MessageCircle, PenSquare, Rocket, Search, Settings, ShieldCheck, User, X } from "lucide-react";
 import Logo from "@/components/ui/Logo";
 import { useAdminRole } from "@/hooks/useAdminRole";
 
 interface MobileDrawerProps { open: boolean; handle: string; onClose: () => void; onLogout: () => void; onCreatePost: () => void; }
 
 const NAV_ITEMS = [
-  { href: "/feed", label: "Accueil", icon: Home }, { href: "/search", label: "Explorer", icon: Search },
+  { href: "/feed", label: "Accueil", icon: Home }, { href: "/reels", label: "Réels", icon: Clapperboard }, { href: "/search", label: "Explorer", icon: Search },
   { href: "/notifications", label: "Notifications", icon: Bell }, { href: "/messages", label: "Discussions", icon: MessageCircle },
   { href: "/feeds", label: "Fils d'actu", icon: Hash }, { href: "/lists", label: "Listes", icon: ListChecks },
   { href: "/starter-packs", label: "Kits de démarrage", icon: Rocket }, { href: "/bookmarks", label: "Conservés", icon: Bookmark },
