@@ -9,6 +9,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
 import AccountBadges from "@/components/ui/AccountBadges";
 import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
+import ReelsCommentsSheet from "@/components/reels/ReelsCommentsSheet";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
 import { getDiscoverFeed } from "@/lib/atproto/feed";
@@ -22,6 +23,16 @@ declare global {
 }
 
 const HLS_JS_URL = "https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js";
+
+type FloatingHeart = {
+  id: number;
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
+  scale: number;
+  rotate: number;
+};
 
 function ensureHlsJs(): Promise<any> {
   if (typeof window === "undefined") return Promise.resolve(null);
@@ -78,6 +89,9 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
   const rootRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<any>(null);
+  const lastTapRef = useRef(0);
+  const singleTapTimerRef = useRef<number | null>(null);
+  const heartIdRef = useRef(0);
   const [muted, setMuted] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [ready, setReady] = useState(false);
@@ -85,6 +99,8 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
   const [videoError, setVideoError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [hearts, setHearts] = useState<FloatingHeart[]>([]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -167,7 +183,7 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
     if (!root || !video || !ready) return;
 
     const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && entry.intersectionRatio >= 0.65) {
+      if (entry.isIntersecting && entry.intersectionRatio >= 0.65 && !commentsOpen) {
         video.muted = true;
         setMuted(true);
         video.play().catch(() => undefined);
@@ -178,7 +194,11 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
 
     observer.observe(root);
     return () => observer.disconnect();
-  }, [ready]);
+  }, [ready, commentsOpen]);
+
+  useEffect(() => () => {
+    if (singleTapTimerRef.current) window.clearTimeout(singleTapTimerRef.current);
+  }, []);
 
   const togglePlay = async () => {
     const video = videoRef.current;
@@ -222,6 +242,66 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
     }
   };
 
+  const likeFromDoubleTap = async () => {
+    if (post.viewer?.like || busyAction) return;
+    setBusyAction("like");
+    setActionError(null);
+    try {
+      const likeUri = await likePost({ uri: post.uri, cid: post.cid });
+      onStateChange({ viewer: { ...post.viewer, like: likeUri }, likeCount: post.likeCount + 1 });
+    } catch (error) {
+      console.error("Impossible de liker le Réel avec le double tap", error);
+      setActionError("Impossible de mettre J’aime pour le moment.");
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const spawnHearts = (clientX: number, clientY: number) => {
+    const root = rootRef.current;
+    if (!root) return;
+    const rect = root.getBoundingClientRect();
+    const baseX = clientX - rect.left;
+    const baseY = clientY - rect.top;
+    const created = Array.from({ length: 6 }, (_, index): FloatingHeart => ({
+      id: ++heartIdRef.current,
+      x: baseX + (index - 2.5) * 7,
+      y: baseY + (index % 2) * 6,
+      dx: (Math.random() - 0.5) * 90,
+      dy: -90 - Math.random() * 90,
+      scale: 0.8 + Math.random() * 0.8,
+      rotate: -25 + Math.random() * 50,
+    }));
+    setHearts((current) => [...current, ...created]);
+    window.setTimeout(() => {
+      const ids = new Set(created.map((heart) => heart.id));
+      setHearts((current) => current.filter((heart) => !ids.has(heart.id)));
+    }, 950);
+  };
+
+  const handleVideoTap = (event: React.MouseEvent<HTMLVideoElement>) => {
+    if (commentsOpen) return;
+    const now = Date.now();
+    const elapsed = now - lastTapRef.current;
+
+    if (elapsed > 0 && elapsed < 330) {
+      lastTapRef.current = 0;
+      if (singleTapTimerRef.current) {
+        window.clearTimeout(singleTapTimerRef.current);
+        singleTapTimerRef.current = null;
+      }
+      spawnHearts(event.clientX, event.clientY);
+      void likeFromDoubleTap();
+      return;
+    }
+
+    lastTapRef.current = now;
+    singleTapTimerRef.current = window.setTimeout(() => {
+      void togglePlay();
+      singleTapTimerRef.current = null;
+    }, 300);
+  };
+
   const toggleRepost = async () => {
     if (busyAction) return;
     setBusyAction("repost");
@@ -244,28 +324,45 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
 
   const share = async () => {
     const url = `${window.location.origin}/post?uri=${encodeURIComponent(post.uri)}`;
+    const shareData = {
+      title: post.author?.displayName ? `${post.author.displayName} sur Kelo Social` : "Kelo Social",
+      text: typeof post.record?.text === "string" ? post.record.text : "Découvrez ce Réel sur Kelo Social",
+      url,
+    };
     try {
-      if (navigator.share) await navigator.share({ title: post.author?.displayName || "Kelo Social", text: post.record?.text || "", url });
-      else {
+      if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
+        await navigator.share(shareData);
+      } else {
         await navigator.clipboard.writeText(url);
-        setActionError("Lien copié dans le presse-papiers.");
-        window.setTimeout(() => setActionError(null), 1800);
+        setActionError("Lien copié. Vous pouvez le partager dans l’application de votre choix.");
+        window.setTimeout(() => setActionError(null), 2200);
       }
     } catch (error: any) {
-      if (error?.name !== "AbortError") setActionError("Impossible de partager cette publication.");
+      if (error?.name !== "AbortError") setActionError("Impossible d’ouvrir le menu de partage.");
     }
+  };
+
+  const openComments = () => {
+    videoRef.current?.pause();
+    setCommentsOpen(true);
   };
 
   const text = typeof post.record?.text === "string" ? post.record.text : "";
 
   return (
     <section ref={rootRef} className="relative h-[100dvh] w-full snap-start overflow-hidden bg-black text-white">
-      <video ref={videoRef} poster={post.embed.thumbnail} playsInline loop muted={muted} preload="metadata" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onClick={togglePlay} className="absolute inset-0 h-full w-full bg-black object-contain" />
+      <video ref={videoRef} poster={post.embed.thumbnail} playsInline loop muted={muted} preload="metadata" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onClick={handleVideoTap} className="absolute inset-0 h-full w-full select-none bg-black object-contain" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/80" />
+
+      {hearts.map((heart) => (
+        <div key={heart.id} className="pointer-events-none absolute z-40 text-fuchsia-500" style={{ left: heart.x, top: heart.y, transform: `translate(-50%, -50%) scale(${heart.scale}) rotate(${heart.rotate}deg)`, animation: "kelo-reel-heart 900ms cubic-bezier(.2,.8,.2,1) forwards", ["--heart-dx" as any]: `${heart.dx}px`, ["--heart-dy" as any]: `${heart.dy}px` }}>
+          <Heart className="h-14 w-14 drop-shadow-[0_5px_16px_rgba(0,0,0,.45)]" fill="currentColor" strokeWidth={0} />
+        </div>
+      ))}
 
       {videoError ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center px-8 text-center"><div className="flex max-w-sm flex-col items-center gap-3 rounded-2xl bg-black/70 px-5 py-4 text-sm font-semibold text-white backdrop-blur-md"><span>{videoError}</span><button type="button" onClick={() => setRetryKey((value) => value + 1)} className="flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-bold"><RotateCcw className="h-4 w-4" />Réessayer</button></div></div>
-      ) : !playing && ready && (
+      ) : !playing && ready && !commentsOpen && (
         <button type="button" onClick={togglePlay} aria-label="Lire la vidéo" className="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md"><Play className="ml-1 h-8 w-8" fill="currentColor" /></button>
       )}
 
@@ -280,11 +377,21 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
 
         <div className="flex flex-col items-center gap-4 pb-1">
           <ActionButton label="J’aime" count={post.likeCount} active={!!post.viewer?.like} disabled={!!busyAction} onClick={toggleLike}><Heart className="h-7 w-7" fill={post.viewer?.like ? "currentColor" : "none"} /></ActionButton>
-          <button type="button" onClick={() => router.push(`/post?uri=${encodeURIComponent(post.uri)}`)} className="flex flex-col items-center gap-1" aria-label="Commentaires"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><MessageCircle className="h-7 w-7" /></span><span className="text-[11px] font-bold">{post.replyCount || 0}</span></button>
+          <button type="button" onClick={openComments} className="flex flex-col items-center gap-1" aria-label="Commentaires"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><MessageCircle className="h-7 w-7" /></span><span className="text-[11px] font-bold">{post.replyCount || 0}</span></button>
           <ActionButton label="Republier" count={post.repostCount} active={!!post.viewer?.repost} disabled={!!busyAction} onClick={toggleRepost}><Repeat2 className="h-7 w-7" /></ActionButton>
-          <button type="button" onClick={share} aria-label="Partager" className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-md active:scale-95"><Share2 className="h-7 w-7" /></button>
+          <button type="button" onClick={share} aria-label="Partager avec vos applications" className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-md active:scale-95"><Share2 className="h-7 w-7" /></button>
         </div>
       </div>
+
+      <ReelsCommentsSheet open={commentsOpen} post={post} onClose={() => setCommentsOpen(false)} onReplyAdded={() => onStateChange({ replyCount: (post.replyCount || 0) + 1 })} />
+
+      <style jsx>{`
+        @keyframes kelo-reel-heart {
+          0% { opacity: 0; transform: translate(-50%, -50%) scale(.3) rotate(0deg); }
+          20% { opacity: 1; }
+          100% { opacity: 0; transform: translate(calc(-50% + var(--heart-dx)), calc(-50% + var(--heart-dy))) scale(1.25) rotate(12deg); }
+        }
+      `}</style>
     </section>
   );
 }
