@@ -22,9 +22,8 @@ interface ReelTapGestureLayerProps {
   onError?: (message: string) => void;
 }
 
-const DOUBLE_TAP_MS = 270;
-const DOUBLE_TAP_DISTANCE = 90;
-const SINGLE_TAP_DELAY_MS = 285;
+const DOUBLE_TAP_MS = 330;
+const SINGLE_TAP_DELAY_MS = 345;
 
 export default function ReelTapGestureLayer({
   post,
@@ -33,7 +32,7 @@ export default function ReelTapGestureLayer({
   onStateChange,
   onError,
 }: ReelTapGestureLayerProps) {
-  const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
+  const lastTapRef = useRef<{ time: number } | null>(null);
   const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const likeRequestRef = useRef(false);
   const heartIdRef = useRef(0);
@@ -46,14 +45,14 @@ export default function ReelTapGestureLayer({
   }, []);
 
   const spawnHearts = (x: number, y: number) => {
-    const created = Array.from({ length: 4 }, (_, index): FloatingHeart => ({
+    const created = Array.from({ length: 5 }, (_, index): FloatingHeart => ({
       id: ++heartIdRef.current,
-      x: x + (index - 1.5) * 8,
+      x: x + (index - 2) * 8,
       y: y + (index % 2) * 5,
-      dx: (Math.random() - 0.5) * 72,
-      dy: -78 - Math.random() * 82,
-      scale: 0.9 + Math.random() * 0.55,
-      rotate: -20 + Math.random() * 40,
+      dx: (Math.random() - 0.5) * 84,
+      dy: -82 - Math.random() * 88,
+      scale: 0.9 + Math.random() * 0.6,
+      rotate: -22 + Math.random() * 44,
     }));
 
     setHearts((current) => [...current, ...created]);
@@ -70,8 +69,6 @@ export default function ReelTapGestureLayer({
     const previousViewer = post.viewer || {};
     const previousCount = post.likeCount || 0;
 
-    // Le cœur et le compteur changent immédiatement : le réseau ne bloque jamais
-    // l'animation du double tap.
     onStateChange({
       viewer: { ...previousViewer, like: "__kelo_pending_like__" },
       likeCount: previousCount + 1,
@@ -102,10 +99,9 @@ export default function ReelTapGestureLayer({
     const now = performance.now();
     const previous = lastTapRef.current;
 
-    const isDoubleTap =
-      !!previous &&
-      now - previous.time <= DOUBLE_TAP_MS &&
-      Math.hypot(x - previous.x, y - previous.y) <= DOUBLE_TAP_DISTANCE;
+    // Comme TikTok/Instagram : les deux taps n'ont pas besoin d'être au même
+    // endroit. Tant qu'ils arrivent rapidement sur la zone vidéo, c'est un like.
+    const isDoubleTap = !!previous && now - previous.time <= DOUBLE_TAP_MS;
 
     if (isDoubleTap) {
       lastTapRef.current = null;
@@ -114,13 +110,12 @@ export default function ReelTapGestureLayer({
         singleTapTimerRef.current = null;
       }
 
-      // L'animation part dans la même frame que le deuxième tap.
       spawnHearts(x, y);
       void likeOptimistically();
       return;
     }
 
-    lastTapRef.current = { time: now, x, y };
+    lastTapRef.current = { time: now };
     if (singleTapTimerRef.current) clearTimeout(singleTapTimerRef.current);
     singleTapTimerRef.current = setTimeout(() => {
       lastTapRef.current = null;
@@ -134,7 +129,7 @@ export default function ReelTapGestureLayer({
       <div
         role="button"
         tabIndex={-1}
-        aria-label="Touchez pour lire ou mettre en pause, touchez deux fois pour aimer"
+        aria-label="Touchez pour lire ou mettre en pause, touchez deux fois n’importe où pour aimer"
         onPointerUp={handlePointerUp}
         onContextMenu={(event) => event.preventDefault()}
         className="absolute inset-0 z-[6] select-none touch-manipulation"
