@@ -9,6 +9,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
 import AccountBadges from "@/components/ui/AccountBadges";
 import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
+import ReelTapGestureLayer from "@/components/reels/ReelTapGestureLayer";
 import ReelsCommentsSheet from "@/components/reels/ReelsCommentsSheet";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
@@ -25,16 +26,6 @@ declare global {
 const HLS_JS_URL = "https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js";
 let reelAudioUnlocked = false;
 
-type FloatingHeart = {
-  id: number;
-  x: number;
-  y: number;
-  dx: number;
-  dy: number;
-  scale: number;
-  rotate: number;
-};
-
 function ensureHlsJs(): Promise<any> {
   if (typeof window === "undefined") return Promise.resolve(null);
   if (window.Hls) return Promise.resolve(window.Hls);
@@ -48,6 +39,7 @@ function ensureHlsJs(): Promise<any> {
       existing.addEventListener("error", reject, { once: true });
       return;
     }
+
     const script = document.createElement("script");
     script.src = HLS_JS_URL;
     script.async = true;
@@ -64,6 +56,7 @@ function canUseMseH264(): boolean {
   const scope = window as any;
   const MediaSourceCtor = scope.ManagedMediaSource || scope.MediaSource || scope.WebKitMediaSource;
   if (!MediaSourceCtor?.isTypeSupported) return false;
+
   return MediaSourceCtor.isTypeSupported('video/mp4; codecs="avc1.42E01E"') &&
     MediaSourceCtor.isTypeSupported('audio/mp4; codecs="mp4a.40.2"');
 }
@@ -123,9 +116,7 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
   const rootRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<any>(null);
-  const lastTapRef = useRef(0);
-  const singleTapTimerRef = useRef<number | null>(null);
-  const heartIdRef = useRef(0);
+
   const [playing, setPlaying] = useState(false);
   const [ready, setReady] = useState(false);
   const [busyAction, setBusyAction] = useState<"like" | "repost" | null>(null);
@@ -134,7 +125,6 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
   const [retryKey, setRetryKey] = useState(0);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [needsAudioUnlock, setNeedsAudioUnlock] = useState(false);
-  const [hearts, setHearts] = useState<FloatingHeart[]>([]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -163,22 +153,26 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
             backBufferLength: 20,
             startLevel: -1,
           });
+
           hlsRef.current = hls;
           hls.attachMedia(video);
           hls.on(Hls.Events.MEDIA_ATTACHED, () => hls.loadSource(post.embed.playlist));
           hls.on(Hls.Events.MANIFEST_PARSED, () => setReady(true));
           hls.on(Hls.Events.ERROR, (_event: unknown, data: any) => {
             if (!data?.fatal) return;
+
             if (data.type === Hls.ErrorTypes.NETWORK_ERROR && recoveryCount < 3) {
               recoveryCount += 1;
               try { hls.startLoad(); } catch {}
               return;
             }
+
             if (data.type === Hls.ErrorTypes.MEDIA_ERROR && recoveryCount < 3) {
               recoveryCount += 1;
               try { hls.recoverMediaError(); } catch {}
               return;
             }
+
             console.error("Erreur HLS fatale Réels", data);
             setVideoError("Impossible de lire cette vidéo sur cet appareil.");
           });
@@ -228,10 +222,7 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
           await video.play();
           setNeedsAudioUnlock(false);
           return;
-        } catch {
-          // Si le navigateur refuse malgré une interaction précédente, on passe
-          // au mode autoplay silencieux afin que la vidéo démarre quand même.
-        }
+        } catch {}
       }
 
       video.muted = false;
@@ -263,10 +254,6 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
     return () => observer.disconnect();
   }, [ready, commentsOpen]);
 
-  useEffect(() => () => {
-    if (singleTapTimerRef.current) window.clearTimeout(singleTapTimerRef.current);
-  }, []);
-
   const togglePlay = async () => {
     const video = videoRef.current;
     if (!video || videoError) return;
@@ -289,16 +276,23 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
   };
 
   const toggleLike = async () => {
-    if (busyAction) return;
+    if (busyAction || post.viewer?.like === "__kelo_pending_like__") return;
     setBusyAction("like");
     setActionError(null);
+
     try {
       if (post.viewer?.like) {
         await unlikePost(post.viewer.like);
-        onStateChange({ viewer: { ...post.viewer, like: undefined }, likeCount: Math.max(0, post.likeCount - 1) });
+        onStateChange({
+          viewer: { ...post.viewer, like: undefined },
+          likeCount: Math.max(0, post.likeCount - 1),
+        });
       } else {
         const likeUri = await likePost({ uri: post.uri, cid: post.cid });
-        onStateChange({ viewer: { ...post.viewer, like: likeUri }, likeCount: post.likeCount + 1 });
+        onStateChange({
+          viewer: { ...post.viewer, like: likeUri },
+          likeCount: post.likeCount + 1,
+        });
       }
     } catch (error) {
       console.error("Impossible de modifier le like du réel", error);
@@ -308,77 +302,24 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
     }
   };
 
-  const likeFromDoubleTap = async () => {
-    if (post.viewer?.like || busyAction) return;
-    setBusyAction("like");
-    setActionError(null);
-    try {
-      const likeUri = await likePost({ uri: post.uri, cid: post.cid });
-      onStateChange({ viewer: { ...post.viewer, like: likeUri }, likeCount: post.likeCount + 1 });
-    } catch (error) {
-      console.error("Impossible de liker le Réel avec le double tap", error);
-      setActionError("Impossible de mettre J’aime pour le moment.");
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const spawnHearts = (clientX: number, clientY: number) => {
-    const root = rootRef.current;
-    if (!root) return;
-    const rect = root.getBoundingClientRect();
-    const baseX = clientX - rect.left;
-    const baseY = clientY - rect.top;
-    const created = Array.from({ length: 6 }, (_, index): FloatingHeart => ({
-      id: ++heartIdRef.current,
-      x: baseX + (index - 2.5) * 7,
-      y: baseY + (index % 2) * 6,
-      dx: (Math.random() - 0.5) * 90,
-      dy: -90 - Math.random() * 90,
-      scale: 0.8 + Math.random() * 0.8,
-      rotate: -25 + Math.random() * 50,
-    }));
-    setHearts((current) => [...current, ...created]);
-    window.setTimeout(() => {
-      const ids = new Set(created.map((heart) => heart.id));
-      setHearts((current) => current.filter((heart) => !ids.has(heart.id)));
-    }, 950);
-  };
-
-  const handleVideoTap = (event: React.MouseEvent<HTMLVideoElement>) => {
-    if (commentsOpen) return;
-    const now = Date.now();
-    const elapsed = now - lastTapRef.current;
-
-    if (elapsed > 0 && elapsed < 330) {
-      lastTapRef.current = 0;
-      if (singleTapTimerRef.current) {
-        window.clearTimeout(singleTapTimerRef.current);
-        singleTapTimerRef.current = null;
-      }
-      spawnHearts(event.clientX, event.clientY);
-      void likeFromDoubleTap();
-      return;
-    }
-
-    lastTapRef.current = now;
-    singleTapTimerRef.current = window.setTimeout(() => {
-      void togglePlay();
-      singleTapTimerRef.current = null;
-    }, 300);
-  };
-
   const toggleRepost = async () => {
     if (busyAction) return;
     setBusyAction("repost");
     setActionError(null);
+
     try {
       if (post.viewer?.repost) {
         await undoRepost(post.viewer.repost);
-        onStateChange({ viewer: { ...post.viewer, repost: undefined }, repostCount: Math.max(0, post.repostCount - 1) });
+        onStateChange({
+          viewer: { ...post.viewer, repost: undefined },
+          repostCount: Math.max(0, post.repostCount - 1),
+        });
       } else {
         const repostUri = await repostPost({ uri: post.uri, cid: post.cid });
-        onStateChange({ viewer: { ...post.viewer, repost: repostUri }, repostCount: post.repostCount + 1 });
+        onStateChange({
+          viewer: { ...post.viewer, repost: repostUri },
+          repostCount: post.repostCount + 1,
+        });
       }
     } catch (error) {
       console.error("Impossible de modifier le repost du réel", error);
@@ -395,6 +336,7 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
       text: typeof post.record?.text === "string" ? post.record.text : "Découvrez ce Réel sur Kelo Social",
       url,
     };
+
     try {
       if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
         await navigator.share(shareData);
@@ -425,16 +367,18 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
         preload="metadata"
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
-        onClick={handleVideoTap}
         className="absolute inset-0 h-full w-full select-none bg-black object-contain"
       />
+
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/80" />
 
-      {hearts.map((heart) => (
-        <div key={heart.id} className="pointer-events-none absolute z-40 text-fuchsia-500" style={{ left: heart.x, top: heart.y, transform: `translate(-50%, -50%) scale(${heart.scale}) rotate(${heart.rotate}deg)`, animation: "kelo-reel-heart 900ms cubic-bezier(.2,.8,.2,1) forwards", ["--heart-dx" as any]: `${heart.dx}px`, ["--heart-dy" as any]: `${heart.dy}px` }}>
-          <Heart className="h-14 w-14 drop-shadow-[0_5px_16px_rgba(0,0,0,.45)]" fill="currentColor" strokeWidth={0} />
-        </div>
-      ))}
+      <ReelTapGestureLayer
+        post={post}
+        disabled={commentsOpen || !!videoError}
+        onSingleTap={togglePlay}
+        onStateChange={onStateChange}
+        onError={setActionError}
+      />
 
       {videoError ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center px-8 text-center">
@@ -471,22 +415,19 @@ function ReelVideo({ post, onStateChange }: { post: any; onStateChange: (patch: 
         </div>
 
         <div className="flex flex-col items-center gap-4 pb-1">
-          <ActionButton label="J’aime" count={post.likeCount} active={!!post.viewer?.like} disabled={!!busyAction} onClick={toggleLike}><Heart className="h-7 w-7" fill={post.viewer?.like ? "currentColor" : "none"} /></ActionButton>
+          <ActionButton label="J’aime" count={post.likeCount} active={!!post.viewer?.like} disabled={!!busyAction || post.viewer?.like === "__kelo_pending_like__"} onClick={toggleLike}><Heart className="h-7 w-7" fill={post.viewer?.like ? "currentColor" : "none"} /></ActionButton>
           <button type="button" onClick={openComments} className="flex flex-col items-center gap-1" aria-label="Commentaires"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"><MessageCircle className="h-7 w-7" /></span><span className="text-[11px] font-bold">{post.replyCount || 0}</span></button>
           <ActionButton label="Republier" count={post.repostCount} active={!!post.viewer?.repost} disabled={!!busyAction} onClick={toggleRepost}><Repeat2 className="h-7 w-7" /></ActionButton>
           <button type="button" onClick={share} aria-label="Partager avec vos applications" className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-md active:scale-95"><Share2 className="h-7 w-7" /></button>
         </div>
       </div>
 
-      <ReelsCommentsSheet open={commentsOpen} post={post} onClose={() => setCommentsOpen(false)} onReplyAdded={() => onStateChange({ replyCount: (post.replyCount || 0) + 1 })} />
-
-      <style jsx>{`
-        @keyframes kelo-reel-heart {
-          0% { opacity: 0; transform: translate(-50%, -50%) scale(.3) rotate(0deg); }
-          20% { opacity: 1; }
-          100% { opacity: 0; transform: translate(calc(-50% + var(--heart-dx)), calc(-50% + var(--heart-dy))) scale(1.25) rotate(12deg); }
-        }
-      `}</style>
+      <ReelsCommentsSheet
+        open={commentsOpen}
+        post={post}
+        onClose={() => setCommentsOpen(false)}
+        onReplyAdded={() => onStateChange({ replyCount: (post.replyCount || 0) + 1 })}
+      />
     </section>
   );
 }
