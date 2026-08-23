@@ -1,14 +1,9 @@
 import { AtpAgent } from "@atproto/api";
 
-export const IDENTITY_VERIFICATION_COLLECTION =
-  "eu.kelosocial.identityverification";
-
-export const IDENTITY_VERIFICATION_REPO_HANDLE =
-  "kelosocial.eu";
-
+export const IDENTITY_VERIFICATION_COLLECTION = "eu.kelosocial.identityverification";
+export const IDENTITY_VERIFICATION_REPO_HANDLE = "kelosocial.eu";
 export const IDENTITY_VERIFICATION_PDS_URL =
-  process.env.NEXT_PUBLIC_IDENTITY_VERIFICATION_PDS_URL ||
-  "https://eurosky.social";
+  process.env.NEXT_PUBLIC_IDENTITY_VERIFICATION_PDS_URL || "https://eurosky.social";
 
 export type IdentityVerificationType =
   | "human"
@@ -18,13 +13,8 @@ export type IdentityVerificationType =
   | "association"
   | "institution";
 
-export type IdentityVerificationSource =
-  | "kelo-id"
-  | "kelo-verify";
-
-export type IdentityVerificationAssignmentMode =
-  | "automatic"
-  | "manual";
+export type IdentityVerificationSource = "kelo-id" | "kelo-verify";
+export type IdentityVerificationAssignmentMode = "automatic" | "manual";
 
 export interface IdentityVerificationRecord {
   subjectDid: string;
@@ -44,16 +34,7 @@ interface IdentityVerificationCacheEntry {
 }
 
 const CACHE_DURATION_MS = 5 * 60 * 1000;
-
-const identityVerificationCache = new Map<
-  string,
-  IdentityVerificationCacheEntry
->();
-
-// Cache global : sur un feed il peut y avoir 20 à 50 comptes visibles.
-// Faire getRecord pour chacun provoquait autant de requêtes vers le PDS Kelo.
-// On charge désormais la petite collection une seule fois puis chaque badge
-// lit le résultat en mémoire.
+const identityVerificationCache = new Map<string, IdentityVerificationCacheEntry>();
 let allRecordsCache: IdentityVerificationRecord[] | null = null;
 let allRecordsExpiresAt = 0;
 let pendingAllRecords: Promise<IdentityVerificationRecord[]> | null = null;
@@ -66,40 +47,21 @@ function normalizeHandle(value: string): string {
   return value.trim().replace(/^@/, "").toLowerCase();
 }
 
-function isIdentityVerificationType(
-  value: unknown
-): value is IdentityVerificationType {
-  return (
-    value === "human" ||
-    value === "enterprise" ||
-    value === "media" ||
-    value === "university" ||
-    value === "association" ||
-    value === "institution"
-  );
+function isIdentityVerificationType(value: unknown): value is IdentityVerificationType {
+  return ["human", "enterprise", "media", "university", "association", "institution"].includes(String(value));
 }
 
-function isIdentityVerificationSource(
-  value: unknown
-): value is IdentityVerificationSource {
+function isIdentityVerificationSource(value: unknown): value is IdentityVerificationSource {
   return value === "kelo-id" || value === "kelo-verify";
 }
 
-function isIdentityVerificationAssignmentMode(
-  value: unknown
-): value is IdentityVerificationAssignmentMode {
+function isIdentityVerificationAssignmentMode(value: unknown): value is IdentityVerificationAssignmentMode {
   return value === "automatic" || value === "manual";
 }
 
-function parseIdentityVerificationRecord(
-  value: unknown
-): IdentityVerificationRecord | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
+function parseIdentityVerificationRecord(value: unknown): IdentityVerificationRecord | null {
+  if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
-
   if (
     typeof record.subjectDid !== "string" ||
     typeof record.subjectHandle !== "string" ||
@@ -107,9 +69,7 @@ function parseIdentityVerificationRecord(
     !isIdentityVerificationSource(record.source) ||
     !isIdentityVerificationAssignmentMode(record.assignmentMode) ||
     typeof record.issuedAt !== "string"
-  ) {
-    return null;
-  }
+  ) return null;
 
   return {
     subjectDid: normalizeDid(record.subjectDid),
@@ -118,29 +78,25 @@ function parseIdentityVerificationRecord(
     source: record.source,
     assignmentMode: record.assignmentMode,
     issuedAt: record.issuedAt,
-    issuerDid:
-      typeof record.issuerDid === "string"
-        ? normalizeDid(record.issuerDid)
-        : undefined,
-    issuerHandle:
-      typeof record.issuerHandle === "string"
-        ? normalizeHandle(record.issuerHandle)
-        : undefined,
-    schemaVersion:
-      typeof record.schemaVersion === "number"
-        ? record.schemaVersion
-        : 1,
+    issuerDid: typeof record.issuerDid === "string" ? normalizeDid(record.issuerDid) : undefined,
+    issuerHandle: typeof record.issuerHandle === "string" ? normalizeHandle(record.issuerHandle) : undefined,
+    schemaVersion: typeof record.schemaVersion === "number" ? record.schemaVersion : 1,
   };
 }
 
-function createIdentityVerificationAgent(): AtpAgent {
-  return new AtpAgent({
-    service: IDENTITY_VERIFICATION_PDS_URL,
-  });
+function cacheRecords(records: IdentityVerificationRecord[]) {
+  for (const record of records) {
+    identityVerificationCache.set(normalizeDid(record.subjectDid), {
+      value: record,
+      expiresAt: Date.now() + CACHE_DURATION_MS,
+    });
+  }
+  allRecordsCache = records;
+  allRecordsExpiresAt = Date.now() + CACHE_DURATION_MS;
 }
 
-async function fetchAllIdentityVerifications(): Promise<IdentityVerificationRecord[]> {
-  const agent = createIdentityVerificationAgent();
+async function fetchAllIdentityVerificationsDirect(): Promise<IdentityVerificationRecord[]> {
+  const agent = new AtpAgent({ service: IDENTITY_VERIFICATION_PDS_URL });
   const results: IdentityVerificationRecord[] = [];
   let cursor: string | undefined;
 
@@ -151,69 +107,69 @@ async function fetchAllIdentityVerifications(): Promise<IdentityVerificationReco
       limit: 100,
       cursor,
     });
-
     for (const item of response.data.records) {
       const parsed = parseIdentityVerificationRecord(item.value);
-      if (!parsed) continue;
-
-      results.push(parsed);
-      identityVerificationCache.set(normalizeDid(parsed.subjectDid), {
-        value: parsed,
-        expiresAt: Date.now() + CACHE_DURATION_MS,
-      });
+      if (parsed) results.push(parsed);
     }
-
     cursor = response.data.cursor;
   } while (cursor);
 
-  // On mémorise aussi les absences : après ce chargement complet, si un DID
-  // n'est pas dans la collection il n'est simplement pas vérifié.
-  allRecordsCache = results;
-  allRecordsExpiresAt = Date.now() + CACHE_DURATION_MS;
+  cacheRecords(results);
   return results;
 }
 
-export async function listIdentityVerifications(): Promise<
-  IdentityVerificationRecord[]
-> {
-  if (allRecordsCache && allRecordsExpiresAt > Date.now()) {
-    return allRecordsCache;
+async function fetchAllIdentityVerifications(): Promise<IdentityVerificationRecord[]> {
+  if (typeof window !== "undefined") {
+    const response = await fetch("/api/kelo/identity-verifications", {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data?.error || "Impossible de charger les vérifications d’identité.");
+    }
+    const records = Array.isArray(data?.records)
+      ? data.records.map(parseIdentityVerificationRecord).filter(Boolean) as IdentityVerificationRecord[]
+      : [];
+    cacheRecords(records);
+    return records;
   }
 
+  return fetchAllIdentityVerificationsDirect();
+}
+
+export async function listIdentityVerifications(): Promise<IdentityVerificationRecord[]> {
+  if (allRecordsCache && allRecordsExpiresAt > Date.now()) return allRecordsCache;
   if (pendingAllRecords) return pendingAllRecords;
 
-  pendingAllRecords = fetchAllIdentityVerifications().finally(() => {
-    pendingAllRecords = null;
-  });
+  pendingAllRecords = fetchAllIdentityVerifications()
+    .catch((error) => {
+      if (allRecordsCache) return allRecordsCache;
+      throw error;
+    })
+    .finally(() => {
+      pendingAllRecords = null;
+    });
 
   return pendingAllRecords;
 }
 
-export async function getIdentityVerification(
-  subjectDid: string
-): Promise<IdentityVerificationRecord | null> {
+export async function getIdentityVerification(subjectDid: string): Promise<IdentityVerificationRecord | null> {
   const normalizedDid = normalizeDid(subjectDid);
   if (!normalizedDid) return null;
 
   const cached = identityVerificationCache.get(normalizedDid);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.value;
-  }
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
 
   try {
     const records = await listIdentityVerifications();
-    const found =
-      records.find((record) => normalizeDid(record.subjectDid) === normalizedDid) || null;
-
+    const found = records.find((record) => normalizeDid(record.subjectDid) === normalizedDid) || null;
     identityVerificationCache.set(normalizedDid, {
       value: found,
       expiresAt: Date.now() + CACHE_DURATION_MS,
     });
-
     return found;
   } catch (error) {
-    // Si le PDS est temporairement indisponible, on garde une éventuelle
-    // ancienne valeur en cache plutôt que de faire clignoter le badge.
     const stale = identityVerificationCache.get(normalizedDid);
     if (stale) return stale.value;
     throw error;
@@ -225,19 +181,10 @@ export function findIdentityVerification(
   subjectDid: string
 ): IdentityVerificationRecord | null {
   const normalizedDid = normalizeDid(subjectDid);
-
-  return (
-    records.find(
-      (record) =>
-        normalizeDid(record.subjectDid) === normalizedDid
-    ) || null
-  );
+  return records.find((record) => normalizeDid(record.subjectDid) === normalizedDid) || null;
 }
 
-export const IDENTITY_VERIFICATION_LABELS: Record<
-  IdentityVerificationType,
-  string
-> = {
+export const IDENTITY_VERIFICATION_LABELS: Record<IdentityVerificationType, string> = {
   human: "Humain vérifié",
   enterprise: "Entreprise vérifiée",
   media: "Média vérifié",
@@ -246,24 +193,14 @@ export const IDENTITY_VERIFICATION_LABELS: Record<
   institution: "Institution vérifiée",
 };
 
-export const IDENTITY_VERIFICATION_SOURCE_LABELS: Record<
-  IdentityVerificationSource,
-  string
-> = {
+export const IDENTITY_VERIFICATION_SOURCE_LABELS: Record<IdentityVerificationSource, string> = {
   "kelo-id": "Kelo ID",
   "kelo-verify": "Kelo Verify",
 };
 
-export function clearIdentityVerificationCache(
-  subjectDid?: string
-): void {
-  if (subjectDid) {
-    identityVerificationCache.delete(normalizeDid(subjectDid));
-  } else {
-    identityVerificationCache.clear();
-  }
-
-  // Une modification administrative peut rendre le snapshot global obsolète.
+export function clearIdentityVerificationCache(subjectDid?: string): void {
+  if (subjectDid) identityVerificationCache.delete(normalizeDid(subjectDid));
+  else identityVerificationCache.clear();
   allRecordsCache = null;
   allRecordsExpiresAt = 0;
   pendingAllRecords = null;
