@@ -25,15 +25,35 @@ async function trackLoginActivity(
 ) {
   if (!session) return;
 
-  try {
-    await fetch("/api/login-activity", {
+  const send = async () => {
+    const response = await fetch("/api/login-activity", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session, method }),
       keepalive: true,
+      cache: "no-store",
     });
-  } catch (error) {
-    console.warn("Suivi de connexion indisponible :", error);
+
+    if (!response.ok) {
+      let message = `HTTP ${response.status}`;
+      try {
+        const data = await response.json();
+        if (data?.error) message = data.error;
+      } catch {}
+      throw new Error(message);
+    }
+  };
+
+  try {
+    await send();
+  } catch (firstError) {
+    console.warn("Premier enregistrement de connexion échoué, nouvelle tentative :", firstError);
+    try {
+      await new Promise((resolve) => window.setTimeout(resolve, 350));
+      await send();
+    } catch (secondError) {
+      console.error("Suivi de connexion indisponible après deux tentatives :", secondError);
+    }
   }
 }
 
