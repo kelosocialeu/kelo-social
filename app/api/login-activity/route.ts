@@ -48,7 +48,7 @@ function getSessionVerificationServices(pdsUrl: string): string[] {
     }
   } catch {}
 
-  return [...new Set(services)];
+  return Array.from(new Set(services));
 }
 
 async function verifySession(session: RequestSession) {
