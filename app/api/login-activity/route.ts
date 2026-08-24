@@ -37,16 +37,58 @@ function normalizeService(value: string) {
   return value.trim().replace(/\/$/, "");
 }
 
+function isPrivateIpv4(hostname: string) {
+  const parts = hostname.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+  const [a, b] = parts;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
+}
+
+function assertSafePdsService(value: string) {
+  const url = new URL(value);
+  const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+
+  if (url.protocol !== "https:") {
+    throw new Error("Le PDS doit utiliser HTTPS.");
+  }
+  if (url.username || url.password) {
+    throw new Error("URL de PDS invalide.");
+  }
+  if (url.port && url.port !== "443") {
+    throw new Error("Port de PDS non autorisé.");
+  }
+  if (
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local") ||
+    hostname === "::1" ||
+    hostname.startsWith("fc") ||
+    hostname.startsWith("fd") ||
+    hostname.startsWith("fe80:") ||
+    isPrivateIpv4(hostname)
+  ) {
+    throw new Error("Adresse de PDS privée ou locale interdite.");
+  }
+}
+
 function getSessionVerificationServices(pdsUrl: string): string[] {
   const normalized = normalizeService(pdsUrl);
+  assertSafePdsService(normalized);
   const services = [normalized];
 
-  try {
-    const hostname = new URL(normalized).hostname.toLowerCase();
-    if (hostname === "bsky.social" || hostname.endsWith(".host.bsky.network")) {
-      services.unshift(BLUESKY_ENTRYWAY_URL);
-    }
-  } catch {}
+  const hostname = new URL(normalized).hostname.toLowerCase();
+  if (hostname === "bsky.social" || hostname.endsWith(".host.bsky.network")) {
+    services.unshift(BLUESKY_ENTRYWAY_URL);
+  }
 
   return Array.from(new Set(services));
 }
@@ -136,7 +178,7 @@ export async function POST(request: Request) {
         $type: LOGIN_ACTIVITY_COLLECTION,
         subjectDid: verified.did,
         subjectHandle: verified.handle,
-        pdsUrl: session.pdsUrl,
+        pdsUrl: normalizeService(session.pdsUrl),
         method,
         device,
         connectedAt,
@@ -151,12 +193,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("[login-activity]", error);
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? `Impossible d’enregistrer la connexion : ${error.message}`
-            : "Impossible d’enregistrer la connexion.",
-      },
+      { error: "Impossible d’enregistrer la connexion." },
       { status: 500 }
     );
   }
