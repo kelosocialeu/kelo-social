@@ -23,7 +23,10 @@ interface CertificationCacheEntry {
   expiresAt: number;
 }
 
-const CACHE_DURATION = 2 * 60 * 1000;
+// Les badges changent depuis le panneau admin pendant que d'autres pages sont
+// déjà ouvertes. Un cache long donnait l'impression que Kelo ignorait les
+// nouvelles certifications alors que le record AT Protocol existait bien.
+const CACHE_DURATION = 20 * 1000;
 const certificationCache = new Map<string, CertificationCacheEntry>();
 let allRecordsCache: CertificationRecord[] | null = null;
 let allRecordsExpiresAt = 0;
@@ -71,18 +74,25 @@ function parseCertificationRecord(value: unknown): CertificationRecord | null {
 }
 
 function cacheRecords(records: CertificationRecord[]) {
+  const now = Date.now();
+
+  // On reconstruit le cache ciblé à partir du snapshot frais. Cela évite de
+  // conserver un ancien statut lorsqu'une certification vient d'être modifiée.
+  certificationCache.clear();
+
   for (const record of records) {
     const key = normalizeDid(record.subjectDid);
     const current = certificationCache.get(key)?.value;
     if (!current || record.status === "trusted-verifier") {
       certificationCache.set(key, {
         value: record,
-        expiresAt: Date.now() + CACHE_DURATION,
+        expiresAt: now + CACHE_DURATION,
       });
     }
   }
+
   allRecordsCache = records;
-  allRecordsExpiresAt = Date.now() + CACHE_DURATION;
+  allRecordsExpiresAt = now + CACHE_DURATION;
 }
 
 async function fetchAllRecordsDirect(): Promise<CertificationRecord[]> {
@@ -110,8 +120,6 @@ async function fetchAllRecordsDirect(): Promise<CertificationRecord[]> {
 
 async function fetchAllRecords(): Promise<CertificationRecord[]> {
   if (typeof window !== "undefined") {
-    // Le nonce empêche tout cache intermédiaire de resservir un ancien compteur
-    // dans le panneau admin, même après une nouvelle certification.
     const response = await fetch(`/api/kelo/certifications?ts=${Date.now()}`, {
       cache: "no-store",
       headers: {
@@ -137,10 +145,6 @@ export async function listCertifications(): Promise<CertificationRecord[]> {
   const isAdminView =
     typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
 
-  // L'administration doit toujours voir la vérité du dépôt central. Avant,
-  // le cache mémoire de 2 minutes (et son fallback silencieux) pouvait rester
-  // affiché à 174 alors que les nouvelles certifications étaient bien écrites.
-  // Sur /admin on force donc une lecture fraîche à chaque actualisation.
   if (isAdminView) {
     pendingAllRecords = null;
     return fetchAllRecords();
