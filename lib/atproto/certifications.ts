@@ -23,10 +23,8 @@ interface CertificationCacheEntry {
   expiresAt: number;
 }
 
-// Les badges changent depuis le panneau admin pendant que d'autres pages sont
-// déjà ouvertes. Un cache long donnait l'impression que Kelo ignorait les
-// nouvelles certifications alors que le record AT Protocol existait bien.
 const CACHE_DURATION = 20 * 1000;
+const NEGATIVE_CACHE_DURATION = 2 * 1000;
 const certificationCache = new Map<string, CertificationCacheEntry>();
 let allRecordsCache: CertificationRecord[] | null = null;
 let allRecordsExpiresAt = 0;
@@ -46,16 +44,13 @@ function isCertificationStatus(value: unknown): value is CertificationStatus {
 
 function parseCertificationRecord(value: unknown): CertificationRecord | null {
   if (!value || typeof value !== "object") return null;
-
   const record = value as Record<string, unknown>;
   if (
     typeof record.subjectDid !== "string" ||
     typeof record.subjectHandle !== "string" ||
     !isCertificationStatus(record.status) ||
     typeof record.issuedAt !== "string"
-  ) {
-    return null;
-  }
+  ) return null;
 
   return {
     subjectDid: record.subjectDid.trim(),
@@ -75,9 +70,6 @@ function parseCertificationRecord(value: unknown): CertificationRecord | null {
 
 function cacheRecords(records: CertificationRecord[]) {
   const now = Date.now();
-
-  // On reconstruit le cache ciblé à partir du snapshot frais. Cela évite de
-  // conserver un ancien statut lorsqu'une certification vient d'être modifiée.
   certificationCache.clear();
 
   for (const record of records) {
@@ -132,7 +124,7 @@ async function fetchAllRecords(): Promise<CertificationRecord[]> {
       throw new Error(data?.error || "Impossible de charger les certifications Kelo Social.");
     }
     const records = Array.isArray(data?.records)
-      ? data.records.map(parseCertificationRecord).filter(Boolean) as CertificationRecord[]
+      ? (data.records.map(parseCertificationRecord).filter(Boolean) as CertificationRecord[])
       : [];
     cacheRecords(records);
     return records;
@@ -141,11 +133,13 @@ async function fetchAllRecords(): Promise<CertificationRecord[]> {
   return fetchAllRecordsDirect();
 }
 
-export async function listCertifications(): Promise<CertificationRecord[]> {
+export async function listCertifications(forceRefresh = false): Promise<CertificationRecord[]> {
   const isAdminView =
     typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
 
-  if (isAdminView) {
+  if (forceRefresh || isAdminView) {
+    allRecordsCache = null;
+    allRecordsExpiresAt = 0;
     pendingAllRecords = null;
     return fetchAllRecords();
   }
@@ -181,15 +175,20 @@ export async function listCertificationsByIssuer(issuerDid: string): Promise<Cer
   );
 }
 
-export async function getKeloCertification(subjectDid: string): Promise<CertificationRecord | null> {
+export async function getKeloCertification(
+  subjectDid: string,
+  forceRefresh = false
+): Promise<CertificationRecord | null> {
   const normalizedDid = normalizeDid(subjectDid);
   if (!normalizedDid) return null;
 
-  const cached = certificationCache.get(normalizedDid);
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  if (!forceRefresh) {
+    const cached = certificationCache.get(normalizedDid);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+  }
 
   try {
-    const records = await listCertifications();
+    const records = await listCertifications(forceRefresh);
     let match: CertificationRecord | null = null;
     for (const record of records) {
       if (normalizeDid(record.subjectDid) !== normalizedDid) continue;
@@ -198,7 +197,7 @@ export async function getKeloCertification(subjectDid: string): Promise<Certific
     }
     certificationCache.set(normalizedDid, {
       value: match,
-      expiresAt: Date.now() + CACHE_DURATION,
+      expiresAt: Date.now() + (match ? CACHE_DURATION : NEGATIVE_CACHE_DURATION),
     });
     return match;
   } catch (error) {
