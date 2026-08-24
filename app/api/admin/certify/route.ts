@@ -3,25 +3,12 @@ import { AtpAgent } from "@atproto/api";
 
 import { CERTIFICATION_SUPPRESSION_COLLECTION } from "@/lib/atproto/certification-suppressions";
 
-const CERTIFICATION_COLLECTION =
-  "eu.kelosocial.certification";
+const CERTIFICATION_COLLECTION = "eu.kelosocial.certification";
+const CERTIFICATION_REPO_IDENTIFIER = process.env.CERTIFICATION_REPO_IDENTIFIER?.trim() || "kelosocial.eu";
+const CERTIFICATION_REPO_PDS_URL = process.env.CERTIFICATION_REPO_PDS_URL?.trim() || "https://eurosky.social";
+const CERTIFICATION_REPO_APP_PASSWORD = process.env.CERTIFICATION_REPO_APP_PASSWORD?.trim() || "";
 
-const CERTIFICATION_REPO_IDENTIFIER =
-  process.env.CERTIFICATION_REPO_IDENTIFIER?.trim() ||
-  "kelosocial.eu";
-
-const CERTIFICATION_REPO_PDS_URL =
-  process.env.CERTIFICATION_REPO_PDS_URL?.trim() ||
-  "https://eurosky.social";
-
-const CERTIFICATION_REPO_APP_PASSWORD =
-  process.env.CERTIFICATION_REPO_APP_PASSWORD?.trim() ||
-  "";
-
-type CertificationStatus =
-  | "certified"
-  | "trusted-verifier"
-  | "none";
+type CertificationStatus = "certified" | "trusted-verifier" | "none";
 
 interface StoredCertificationRecord {
   subjectDid: string;
@@ -49,72 +36,69 @@ function normalizeDid(value: string): string {
 }
 
 function getAdminHandles(): string[] {
-  return (process.env.ADMIN_HANDLES || "")
-    .split(",")
-    .map(normalizeHandle)
-    .filter(Boolean);
+  return (process.env.ADMIN_HANDLES || "").split(",").map(normalizeHandle).filter(Boolean);
 }
 
 function getAdminDids(): string[] {
-  return (process.env.ADMIN_DIDS || "")
-    .split(",")
-    .map(normalizeDid)
-    .filter(Boolean);
+  return (process.env.ADMIN_DIDS || "").split(",").map(normalizeDid).filter(Boolean);
+}
+
+function isPrivateIpv4(hostname: string) {
+  const parts = hostname.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+  const [a, b] = parts;
+  return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+}
+
+function assertSafePdsService(value: string) {
+  const url = new URL(value);
+  const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (url.protocol !== "https:") throw new Error("Le PDS doit utiliser HTTPS.");
+  if (url.username || url.password) throw new Error("URL de PDS invalide.");
+  if (url.port && url.port !== "443") throw new Error("Port de PDS non autorisé.");
+  if (
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local") ||
+    hostname === "::1" ||
+    hostname.startsWith("fc") ||
+    hostname.startsWith("fd") ||
+    hostname.startsWith("fe80:") ||
+    isPrivateIpv4(hostname)
+  ) {
+    throw new Error("Adresse de PDS privée ou locale interdite.");
+  }
+  return url.origin;
 }
 
 function isValidStatus(value: unknown): value is CertificationStatus {
-  return (
-    value === "certified" ||
-    value === "trusted-verifier" ||
-    value === "none"
-  );
+  return value === "certified" || value === "trusted-verifier" || value === "none";
 }
 
 function isValidSession(value: unknown): value is RequestSession {
   if (!value || typeof value !== "object") return false;
   const session = value as Partial<RequestSession>;
-  return (
-    typeof session.accessJwt === "string" && !!session.accessJwt &&
-    typeof session.pdsUrl === "string" && !!session.pdsUrl &&
-    typeof session.handle === "string" && !!session.handle &&
-    typeof session.did === "string" && !!session.did
-  );
+  return typeof session.accessJwt === "string" && !!session.accessJwt && typeof session.pdsUrl === "string" && !!session.pdsUrl && typeof session.handle === "string" && !!session.handle && typeof session.did === "string" && !!session.did;
 }
 
 function parseStoredCertification(value: unknown): StoredCertificationRecord | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
-
-  if (
-    typeof record.subjectDid !== "string" ||
-    typeof record.subjectHandle !== "string" ||
-    (record.status !== "certified" && record.status !== "trusted-verifier") ||
-    typeof record.issuedAt !== "string"
-  ) {
-    return null;
-  }
-
+  if (typeof record.subjectDid !== "string" || typeof record.subjectHandle !== "string" || (record.status !== "certified" && record.status !== "trusted-verifier") || typeof record.issuedAt !== "string") return null;
   return {
     subjectDid: record.subjectDid,
     subjectHandle: normalizeHandle(record.subjectHandle),
     status: record.status,
     issuedAt: record.issuedAt,
-    issuerDid:
-      typeof record.issuerDid === "string" && record.issuerDid.trim()
-        ? normalizeDid(record.issuerDid)
-        : undefined,
-    issuerHandle:
-      typeof record.issuerHandle === "string" && record.issuerHandle.trim()
-        ? normalizeHandle(record.issuerHandle)
-        : undefined,
+    issuerDid: typeof record.issuerDid === "string" && record.issuerDid.trim() ? normalizeDid(record.issuerDid) : undefined,
+    issuerHandle: typeof record.issuerHandle === "string" && record.issuerHandle.trim() ? normalizeHandle(record.issuerHandle) : undefined,
   };
 }
 
 function isMainAdmin(did: string, handle: string): boolean {
-  return (
-    getAdminDids().includes(normalizeDid(did)) ||
-    getAdminHandles().includes(normalizeHandle(handle))
-  );
+  const adminDids = getAdminDids();
+  if (adminDids.length > 0) return adminDids.includes(normalizeDid(did));
+  return getAdminHandles().includes(normalizeHandle(handle));
 }
 
 function roundRecordKey(subjectDid: string, issuerDid: string): string {
@@ -122,344 +106,106 @@ function roundRecordKey(subjectDid: string, issuerDid: string): string {
 }
 
 async function authenticateRequester(session: RequestSession) {
-  const agent = new AtpAgent({ service: session.pdsUrl });
-  await agent.resumeSession({
-    accessJwt: session.accessJwt,
-    refreshJwt: session.refreshJwt || "",
-    active: true,
-    handle: session.handle,
-    did: session.did,
-  });
+  const service = assertSafePdsService(session.pdsUrl);
+  const agent = new AtpAgent({ service });
+  await agent.resumeSession({ accessJwt: session.accessJwt, refreshJwt: session.refreshJwt || "", active: true, handle: session.handle, did: session.did });
   const response = await agent.api.com.atproto.server.getSession();
-  return {
-    agent,
-    did: normalizeDid(response.data.did || ""),
-    handle: normalizeHandle(response.data.handle || ""),
-  };
+  const did = normalizeDid(response.data.did || "");
+  const handle = normalizeHandle(response.data.handle || "");
+  if (!did || did !== normalizeDid(session.did)) throw new Error("Session AT Protocol incohérente.");
+  return { agent, did, handle };
 }
 
 async function authenticateCertificationRepo() {
-  if (!CERTIFICATION_REPO_APP_PASSWORD) {
-    throw new Error(
-      "Configuration serveur incomplète : CERTIFICATION_REPO_APP_PASSWORD est manquant."
-    );
-  }
-
+  if (!CERTIFICATION_REPO_APP_PASSWORD) throw new Error("Configuration serveur incomplète.");
   const agent = new AtpAgent({ service: CERTIFICATION_REPO_PDS_URL });
-  await agent.login({
-    identifier: CERTIFICATION_REPO_IDENTIFIER,
-    password: CERTIFICATION_REPO_APP_PASSWORD,
-  });
-
-  if (!agent.session?.did) {
-    throw new Error("Impossible d’authentifier le dépôt central de certification.");
-  }
-
-  return {
-    agent,
-    repoDid: normalizeDid(agent.session.did),
-    repoHandle: normalizeHandle(
-      agent.session.handle || CERTIFICATION_REPO_IDENTIFIER
-    ),
-  };
+  await agent.login({ identifier: CERTIFICATION_REPO_IDENTIFIER, password: CERTIFICATION_REPO_APP_PASSWORD });
+  if (!agent.session?.did) throw new Error("Impossible d’authentifier le dépôt central de certification.");
+  return { agent, repoDid: normalizeDid(agent.session.did), repoHandle: normalizeHandle(agent.session.handle || CERTIFICATION_REPO_IDENTIFIER) };
 }
 
-async function getRecordByKey(
-  agent: AtpAgent,
-  repo: string,
-  rkey: string
-): Promise<StoredCertificationRecord | null> {
+async function getRecordByKey(agent: AtpAgent, repo: string, rkey: string): Promise<StoredCertificationRecord | null> {
   try {
-    const response = await agent.api.com.atproto.repo.getRecord({
-      repo,
-      collection: CERTIFICATION_COLLECTION,
-      rkey,
-    });
+    const response = await agent.api.com.atproto.repo.getRecord({ repo, collection: CERTIFICATION_COLLECTION, rkey });
     return parseStoredCertification(response.data.value);
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-async function requesterIsTrustedVerifier(
-  agent: AtpAgent,
-  repo: string,
-  requesterDid: string
-): Promise<boolean> {
-  const record = await getRecordByKey(
-    agent,
-    repo,
-    normalizeDid(requesterDid)
-  );
+async function requesterIsTrustedVerifier(agent: AtpAgent, repo: string, requesterDid: string): Promise<boolean> {
+  const record = await getRecordByKey(agent, repo, normalizeDid(requesterDid));
   return record?.status === "trusted-verifier";
 }
 
-async function hideCertificationLocally(
-  agent: AtpAgent,
-  repo: string,
-  subjectDid: string,
-  subjectHandle: string,
-  requesterDid: string,
-  requesterHandle: string
-) {
+async function hideCertificationLocally(agent: AtpAgent, repo: string, subjectDid: string, subjectHandle: string, requesterDid: string, requesterHandle: string) {
   const hiddenAt = new Date().toISOString();
-
-  await agent.api.com.atproto.repo.putRecord({
-    repo,
-    collection: CERTIFICATION_SUPPRESSION_COLLECTION,
-    rkey: subjectDid,
-    record: {
-      $type: CERTIFICATION_SUPPRESSION_COLLECTION,
-      subjectDid,
-      subjectHandle,
-      hiddenAt,
-      hiddenByDid: requesterDid,
-      hiddenByHandle: requesterHandle,
-    },
-    validate: false,
-  });
-
+  await agent.api.com.atproto.repo.putRecord({ repo, collection: CERTIFICATION_SUPPRESSION_COLLECTION, rkey: subjectDid, record: { $type: CERTIFICATION_SUPPRESSION_COLLECTION, subjectDid, subjectHandle, hiddenAt, hiddenByDid: requesterDid, hiddenByHandle: requesterHandle }, validate: false });
   return hiddenAt;
 }
 
-async function makeCertificationVisibleLocally(
-  agent: AtpAgent,
-  repo: string,
-  subjectDid: string
-) {
-  try {
-    await agent.api.com.atproto.repo.deleteRecord({
-      repo,
-      collection: CERTIFICATION_SUPPRESSION_COLLECTION,
-      rkey: subjectDid,
-    });
-  } catch {
-    // Aucun record signifie déjà « visible sur Kelo ».
-  }
+async function makeCertificationVisibleLocally(agent: AtpAgent, repo: string, subjectDid: string) {
+  try { await agent.api.com.atproto.repo.deleteRecord({ repo, collection: CERTIFICATION_SUPPRESSION_COLLECTION, rkey: subjectDid }); } catch {}
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const session = body?.session;
-    const rawTargetHandle =
-      typeof body?.targetHandle === "string" ? body.targetHandle : "";
+    const rawTargetHandle = typeof body?.targetHandle === "string" ? body.targetHandle : "";
     const status = body?.status;
 
-    if (!isValidSession(session)) {
-      return NextResponse.json(
-        { error: "Session invalide ou incomplète. Reconnectez-vous." },
-        { status: 401 }
-      );
-    }
-    if (!rawTargetHandle.trim()) {
-      return NextResponse.json(
-        { error: "Handle du compte cible manquant." },
-        { status: 400 }
-      );
-    }
-    if (!isValidStatus(status)) {
-      return NextResponse.json(
-        { error: "Statut de certification invalide." },
-        { status: 400 }
-      );
-    }
+    if (!isValidSession(session)) return NextResponse.json({ error: "Session invalide ou incomplète. Reconnectez-vous." }, { status: 401 });
+    if (!rawTargetHandle.trim()) return NextResponse.json({ error: "Handle du compte cible manquant." }, { status: 400 });
+    if (!isValidStatus(status)) return NextResponse.json({ error: "Statut de certification invalide." }, { status: 400 });
 
     const requester = await authenticateRequester(session);
-    if (!requester.did || !requester.handle) {
-      return NextResponse.json(
-        { error: "Impossible de vérifier l’identité du compte connecté." },
-        { status: 401 }
-      );
-    }
+    if (!requester.did || !requester.handle) return NextResponse.json({ error: "Impossible de vérifier l’identité du compte connecté." }, { status: 401 });
 
     const certificationRepo = await authenticateCertificationRepo();
     const requesterIsAdmin = isMainAdmin(requester.did, requester.handle);
-    const requesterHasFlower = await requesterIsTrustedVerifier(
-      certificationRepo.agent,
-      certificationRepo.repoDid,
-      requester.did
-    );
+    const requesterHasFlower = await requesterIsTrustedVerifier(certificationRepo.agent, certificationRepo.repoDid, requester.did);
 
-    if (!requesterIsAdmin && !requesterHasFlower) {
-      return NextResponse.json(
-        {
-          error:
-            "Accès refusé : vous n’êtes ni administrateur Kelo Social ni certificateur de confiance.",
-        },
-        { status: 403 }
-      );
-    }
-
-    if (status === "trusted-verifier" && !requesterIsAdmin) {
-      return NextResponse.json(
-        { error: "Seul l’administrateur principal Kelo Social peut attribuer une fleur." },
-        { status: 403 }
-      );
-    }
+    if (!requesterIsAdmin && !requesterHasFlower) return NextResponse.json({ error: "Accès refusé : vous n’êtes ni administrateur Kelo Social ni certificateur de confiance." }, { status: 403 });
+    if (status === "trusted-verifier" && !requesterIsAdmin) return NextResponse.json({ error: "Seul l’administrateur principal Kelo Social peut attribuer une fleur." }, { status: 403 });
 
     const targetHandle = normalizeHandle(rawTargetHandle);
-    const resolved = await requester.agent.api.com.atproto.identity.resolveHandle({
-      handle: targetHandle,
-    });
+    if (targetHandle.length > 253 || !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(targetHandle)) return NextResponse.json({ error: "Handle cible invalide." }, { status: 400 });
+
+    const resolved = await requester.agent.api.com.atproto.identity.resolveHandle({ handle: targetHandle });
     const subjectDid = normalizeDid(resolved.data.did || "");
+    if (!subjectDid) return NextResponse.json({ error: "Impossible de trouver le DID du compte cible." }, { status: 404 });
 
-    if (!subjectDid) {
-      return NextResponse.json(
-        { error: "Impossible de trouver le DID du compte cible." },
-        { status: 404 }
-      );
-    }
-
-    // Pour l'administrateur principal, « none » signifie désormais :
-    // masquer la certification uniquement dans Kelo Social. Le record source
-    // (Kelo ou autre réseau AT Protocol) reste intact et peut continuer à être
-    // affiché par les autres plateformes.
     if (status === "none" && requesterIsAdmin) {
-      const hiddenAt = await hideCertificationLocally(
-        certificationRepo.agent,
-        certificationRepo.repoDid,
-        subjectDid,
-        targetHandle,
-        requester.did,
-        requester.handle
-      );
-
-      return NextResponse.json({
-        success: true,
-        action: "hidden-on-kelo",
-        subjectDid,
-        subjectHandle: targetHandle,
-        hiddenAt,
-      });
+      const hiddenAt = await hideCertificationLocally(certificationRepo.agent, certificationRepo.repoDid, subjectDid, targetHandle, requester.did, requester.handle);
+      return NextResponse.json({ success: true, action: "hidden-on-kelo", subjectDid, subjectHandle: targetHandle, hiddenAt });
     }
 
-    const recordKey =
-      status === "trusted-verifier"
-        ? subjectDid
-        : roundRecordKey(subjectDid, requester.did);
+    const recordKey = status === "trusted-verifier" ? subjectDid : roundRecordKey(subjectDid, requester.did);
+    const existingOwnRecord = await getRecordByKey(certificationRepo.agent, certificationRepo.repoDid, recordKey);
 
-    const existingOwnRecord = await getRecordByKey(
-      certificationRepo.agent,
-      certificationRepo.repoDid,
-      recordKey
-    );
-
-    // Un certificateur de confiance qui retire sa propre certification Kelo
-    // continue à révoquer son propre record, puisqu'il en est la source.
     if (status === "none") {
       const ownRoundKey = roundRecordKey(subjectDid, requester.did);
-      const ownRound = await getRecordByKey(
-        certificationRepo.agent,
-        certificationRepo.repoDid,
-        ownRoundKey
-      );
-
+      const ownRound = await getRecordByKey(certificationRepo.agent, certificationRepo.repoDid, ownRoundKey);
       let keyToDelete = ownRound ? ownRoundKey : subjectDid;
       let recordToDelete = ownRound;
-
       if (!recordToDelete) {
-        const legacy = await getRecordByKey(
-          certificationRepo.agent,
-          certificationRepo.repoDid,
-          subjectDid
-        );
-
-        if (
-          legacy &&
-          legacy.status === "certified" &&
-          normalizeDid(legacy.issuerDid || certificationRepo.repoDid) === requester.did
-        ) {
-          recordToDelete = legacy;
-        }
+        const legacy = await getRecordByKey(certificationRepo.agent, certificationRepo.repoDid, subjectDid);
+        if (legacy && legacy.status === "certified" && normalizeDid(legacy.issuerDid || certificationRepo.repoDid) === requester.did) recordToDelete = legacy;
       }
-
-      if (!recordToDelete) {
-        return NextResponse.json({
-          success: true,
-          action: "already-revoked",
-          subjectDid,
-          subjectHandle: targetHandle,
-        });
-      }
-
-      if (recordToDelete.status === "trusted-verifier") {
-        return NextResponse.json(
-          { error: "Un certificateur de confiance ne peut pas retirer une fleur." },
-          { status: 403 }
-        );
-      }
-
-      await certificationRepo.agent.api.com.atproto.repo.deleteRecord({
-        repo: certificationRepo.repoDid,
-        collection: CERTIFICATION_COLLECTION,
-        rkey: keyToDelete,
-      });
-
-      return NextResponse.json({
-        success: true,
-        action: "revoked",
-        subjectDid,
-        subjectHandle: recordToDelete.subjectHandle || targetHandle,
-        previousStatus: recordToDelete.status,
-      });
+      if (!recordToDelete) return NextResponse.json({ success: true, action: "already-revoked", subjectDid, subjectHandle: targetHandle });
+      if (recordToDelete.status === "trusted-verifier") return NextResponse.json({ error: "Un certificateur de confiance ne peut pas retirer une fleur." }, { status: 403 });
+      await certificationRepo.agent.api.com.atproto.repo.deleteRecord({ repo: certificationRepo.repoDid, collection: CERTIFICATION_COLLECTION, rkey: keyToDelete });
+      return NextResponse.json({ success: true, action: "revoked", subjectDid, subjectHandle: recordToDelete.subjectHandle || targetHandle, previousStatus: recordToDelete.status });
     }
 
-    if (!requesterIsAdmin && status !== "certified") {
-      return NextResponse.json(
-        { error: "Un certificateur de confiance peut uniquement attribuer une certification ronde." },
-        { status: 403 }
-      );
-    }
-
-    // Une nouvelle attribution explicite par l'admin réactive aussi l'affichage
-    // local si le compte avait précédemment été masqué dans Kelo.
-    if (requesterIsAdmin) {
-      await makeCertificationVisibleLocally(
-        certificationRepo.agent,
-        certificationRepo.repoDid,
-        subjectDid
-      );
-    }
+    if (!requesterIsAdmin && status !== "certified") return NextResponse.json({ error: "Un certificateur de confiance peut uniquement attribuer une certification ronde." }, { status: 403 });
+    if (requesterIsAdmin) await makeCertificationVisibleLocally(certificationRepo.agent, certificationRepo.repoDid, subjectDid);
 
     const issuedAt = existingOwnRecord?.issuedAt || new Date().toISOString();
+    const response = await certificationRepo.agent.api.com.atproto.repo.putRecord({ repo: certificationRepo.repoDid, collection: CERTIFICATION_COLLECTION, rkey: recordKey, record: { $type: CERTIFICATION_COLLECTION, subjectDid, subjectHandle: targetHandle, status, issuedAt, issuerDid: requester.did, issuerHandle: requester.handle }, validate: false });
 
-    const response = await certificationRepo.agent.api.com.atproto.repo.putRecord({
-      repo: certificationRepo.repoDid,
-      collection: CERTIFICATION_COLLECTION,
-      rkey: recordKey,
-      record: {
-        $type: CERTIFICATION_COLLECTION,
-        subjectDid,
-        subjectHandle: targetHandle,
-        status,
-        issuedAt,
-        issuerDid: requester.did,
-        issuerHandle: requester.handle,
-      },
-      validate: false,
-    });
-
-    return NextResponse.json({
-      success: true,
-      action: existingOwnRecord ? "updated" : "certified",
-      uri: response.data.uri,
-      cid: response.data.cid,
-      subjectDid,
-      subjectHandle: targetHandle,
-      status,
-      issuedAt,
-      issuerDid: requester.did,
-      issuerHandle: requester.handle,
-    });
+    return NextResponse.json({ success: true, action: existingOwnRecord ? "updated" : "certified", uri: response.data.uri, cid: response.data.cid, subjectDid, subjectHandle: targetHandle, status, issuedAt, issuerDid: requester.did, issuerHandle: requester.handle });
   } catch (error) {
     console.error("[admin/certify] Erreur", error);
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Erreur interne du serveur.",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Erreur interne du serveur." }, { status: 500 });
   }
 }
