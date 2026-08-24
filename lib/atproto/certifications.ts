@@ -110,9 +110,14 @@ async function fetchAllRecordsDirect(): Promise<CertificationRecord[]> {
 
 async function fetchAllRecords(): Promise<CertificationRecord[]> {
   if (typeof window !== "undefined") {
-    const response = await fetch("/api/kelo/certifications", {
+    // Le nonce empêche tout cache intermédiaire de resservir un ancien compteur
+    // dans le panneau admin, même après une nouvelle certification.
+    const response = await fetch(`/api/kelo/certifications?ts=${Date.now()}`, {
       cache: "no-store",
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-cache, no-store, max-age=0",
+      },
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -129,6 +134,18 @@ async function fetchAllRecords(): Promise<CertificationRecord[]> {
 }
 
 export async function listCertifications(): Promise<CertificationRecord[]> {
+  const isAdminView =
+    typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
+
+  // L'administration doit toujours voir la vérité du dépôt central. Avant,
+  // le cache mémoire de 2 minutes (et son fallback silencieux) pouvait rester
+  // affiché à 174 alors que les nouvelles certifications étaient bien écrites.
+  // Sur /admin on force donc une lecture fraîche à chaque actualisation.
+  if (isAdminView) {
+    pendingAllRecords = null;
+    return fetchAllRecords();
+  }
+
   if (allRecordsCache && allRecordsExpiresAt > Date.now()) return allRecordsCache;
   if (pendingAllRecords) return pendingAllRecords;
 
