@@ -5,6 +5,7 @@ const LOGIN_ACTIVITY_COLLECTION = "eu.kelosocial.loginactivity";
 const REPO_IDENTIFIER = process.env.CERTIFICATION_REPO_IDENTIFIER?.trim() || "kelosocial.eu";
 const REPO_PDS_URL = process.env.CERTIFICATION_REPO_PDS_URL?.trim() || "https://eurosky.social";
 const REPO_APP_PASSWORD = process.env.CERTIFICATION_REPO_APP_PASSWORD?.trim() || "";
+const BLUESKY_ENTRYWAY_URL = "https://bsky.social";
 
 type LoginMethod = "password" | "qr-kelo-id";
 
@@ -32,20 +33,52 @@ function isValidSession(value: unknown): value is RequestSession {
   );
 }
 
+function normalizeService(value: string) {
+  return value.trim().replace(/\/$/, "");
+}
+
+function getSessionVerificationServices(pdsUrl: string): string[] {
+  const normalized = normalizeService(pdsUrl);
+  const services = [normalized];
+
+  try {
+    const hostname = new URL(normalized).hostname.toLowerCase();
+    if (hostname === "bsky.social" || hostname.endsWith(".host.bsky.network")) {
+      services.unshift(BLUESKY_ENTRYWAY_URL);
+    }
+  } catch {}
+
+  return [...new Set(services)];
+}
+
 async function verifySession(session: RequestSession) {
-  const agent = new AtpAgent({ service: session.pdsUrl });
-  await agent.resumeSession({
-    accessJwt: session.accessJwt,
-    refreshJwt: session.refreshJwt || "",
-    active: true,
-    handle: session.handle,
-    did: session.did,
-  });
-  const current = await agent.api.com.atproto.server.getSession();
-  return {
-    did: normalizeDid(current.data.did || ""),
-    handle: normalizeHandle(current.data.handle || ""),
-  };
+  let lastError: unknown = null;
+
+  for (const service of getSessionVerificationServices(session.pdsUrl)) {
+    try {
+      const agent = new AtpAgent({ service });
+      await agent.resumeSession({
+        accessJwt: session.accessJwt,
+        refreshJwt: session.refreshJwt || "",
+        active: true,
+        handle: session.handle,
+        did: session.did,
+      });
+      const current = await agent.api.com.atproto.server.getSession();
+      const did = normalizeDid(current.data.did || "");
+      const handle = normalizeHandle(current.data.handle || "");
+
+      if (did && did === normalizeDid(session.did)) {
+        return { did, handle };
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Impossible de vérifier la session AT Protocol.");
 }
 
 async function getCentralRepo() {
@@ -63,6 +96,13 @@ function detectDevice(userAgent: string) {
   if (/ipad|tablet/.test(ua)) return "tablette";
   if (/android|iphone|mobile/.test(ua)) return "mobile";
   return "ordinateur";
+}
+
+function makeRecordKey(did: string) {
+  const time = Date.now().toString(36);
+  const random = Math.random().toString(36).slice(2, 10);
+  const suffix = normalizeDid(did).replace(/[^a-z0-9]/g, "").slice(-8);
+  return `${time}-${random}-${suffix}`;
 }
 
 export async function POST(request: Request) {
@@ -87,9 +127,10 @@ export async function POST(request: Request) {
     const connectedAt = new Date().toISOString();
     const device = detectDevice(request.headers.get("user-agent") || "");
 
-    await agent.api.com.atproto.repo.createRecord({
+    const result = await agent.api.com.atproto.repo.putRecord({
       repo: repoDid,
       collection: LOGIN_ACTIVITY_COLLECTION,
+      rkey: makeRecordKey(verified.did),
       validate: false,
       record: {
         $type: LOGIN_ACTIVITY_COLLECTION,
@@ -102,9 +143,21 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      uri: result.data.uri,
+      connectedAt,
+    });
   } catch (error) {
     console.error("[login-activity]", error);
-    return NextResponse.json({ error: "Impossible d’enregistrer la connexion." }, { status: 500 });
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? `Impossible d’enregistrer la connexion : ${error.message}`
+            : "Impossible d’enregistrer la connexion.",
+      },
+      { status: 500 }
+    );
   }
 }
