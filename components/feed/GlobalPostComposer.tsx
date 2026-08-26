@@ -59,6 +59,7 @@ export default function GlobalPostComposer() {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [composerMode, setComposerMode] = useState<"post" | "reel">("post");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -69,10 +70,21 @@ export default function GlobalPostComposer() {
   const hasVideo = files.some((file) => file.type.startsWith("video/"));
 
   useEffect(() => {
-    const showComposer = () => {
+    const showComposer = (event: Event) => {
       if (!requireVerification()) return;
+
+      const detail = event instanceof CustomEvent ? event.detail : undefined;
+      const incomingFile = detail?.file instanceof File ? detail.file : null;
+      const mode = detail?.mode === "reel" ? "reel" : "post";
+
+      setComposerMode(mode);
       setOpen(true);
-      window.setTimeout(() => textareaRef.current?.focus(), 50);
+
+      if (incomingFile) {
+        applyFiles([incomingFile]);
+      } else {
+        window.setTimeout(() => textareaRef.current?.focus(), 50);
+      }
     };
 
     window.addEventListener(OPEN_GLOBAL_COMPOSER_EVENT, showComposer);
@@ -98,6 +110,7 @@ export default function GlobalPostComposer() {
     setContentLabel("");
     setEmojiOpen(false);
     setError("");
+    setComposerMode("post");
   }
 
   function closeComposer() {
@@ -206,7 +219,7 @@ export default function GlobalPostComposer() {
       <section
         role="dialog"
         aria-modal="true"
-        aria-label="Écrire une publication"
+        aria-label={composerMode === "reel" ? "Publier un Réel" : "Écrire une publication"}
         className="fixed inset-x-0 bottom-0 z-[90] max-h-[92dvh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl md:left-1/2 md:top-1/2 md:bottom-auto md:w-[min(680px,calc(100%-2rem))] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-3xl"
       >
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-kelo-border bg-white/95 px-4 py-3 backdrop-blur">
@@ -218,7 +231,7 @@ export default function GlobalPostComposer() {
           >
             <X className="h-5 w-5" />
           </button>
-          <h2 className="font-extrabold text-kelo-text">Écrire un post</h2>
+          <h2 className="font-extrabold text-kelo-text">{composerMode === "reel" ? "Publier un Réel" : "Écrire un post"}</h2>
           <span className="h-10 w-10" aria-hidden="true" />
         </header>
 
@@ -232,7 +245,7 @@ export default function GlobalPostComposer() {
                 value={text}
                 maxLength={POST_CHARACTER_LIMIT}
                 onChange={(event) => setText(event.target.value)}
-                placeholder="Quoi de neuf ?"
+                placeholder={composerMode === "reel" ? "Ajouter une légende..." : "Quoi de neuf ?"}
                 rows={6}
                 className="min-h-36 min-w-0 flex-1 resize-none bg-transparent text-lg leading-relaxed text-kelo-text placeholder-kelo-muted focus:outline-none"
               />
@@ -337,7 +350,7 @@ export default function GlobalPostComposer() {
                 disabled={loading || overLimit || (!text.trim() && files.length === 0) || !verified || !checked}
                 className="ml-auto rounded-full bg-kelo-gradient px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {loading ? "Publication..." : "Publier"}
+                {loading ? "Publication..." : composerMode === "reel" ? "Publier le Réel" : "Publier"}
               </button>
             </div>
           </div>
