@@ -43,3 +43,16 @@ html.kelo-reduce-motion *,html.kelo-reduce-motion *::before,html.kelo-reduce-mot
 .settings-bluesky-section { min-width:0; overflow-x:hidden; }
 .settings-bluesky-section input,.settings-bluesky-section select,.settings-bluesky-section textarea,.settings-bluesky-section button { max-width:100%; }
 @media (max-width:1023px) { .settings-bluesky-section>* { min-width:0; } }
+
+/* Sur les profils, le cadre rond de l'avatar ne doit jamais s'étirer quand la
+   zone passe en colonne sur mobile/tablette. Le flex parent utilise sinon
+   align-items: stretch par défaut, ce qui transforme le cercle en grande pilule. */
+@media (max-width:767px) {
+  .inline-block.rounded-full.border-4.border-white.shadow-md {
+    display:inline-flex;
+    align-self:flex-start !important;
+    width:fit-content !important;
+    max-width:fit-content;
+    flex:0 0 auto;
+  }
+}
