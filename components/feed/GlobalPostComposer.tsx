@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import CurrentUserAvatar from "@/components/feed/CurrentUserAvatar";
+import VideoRecorderDialog from "@/components/feed/VideoRecorderDialog";
 import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
 import { useIdentityVerification } from "@/hooks/useIdentityVerification";
 import {
@@ -60,9 +61,9 @@ export default function GlobalPostComposer() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [composerMode, setComposerMode] = useState<"post" | "reel">("post");
+  const [videoRecorderOpen, setVideoRecorderOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
   const gifInputRef = useRef<HTMLInputElement>(null);
 
   const count = useMemo(() => characterCount(text), [text]);
@@ -111,6 +112,7 @@ export default function GlobalPostComposer() {
     setEmojiOpen(false);
     setError("");
     setComposerMode("post");
+    setVideoRecorderOpen(false);
   }
 
   function closeComposer() {
@@ -317,13 +319,12 @@ export default function GlobalPostComposer() {
             <div className="relative mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-kelo-border pt-3">
               <div className="flex items-center gap-1">
                 <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={(event) => { applyFiles(Array.from(event.target.files || [])); event.target.value = ""; }} />
-                <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={(event) => { applyFiles(Array.from(event.target.files || [])); event.target.value = ""; }} />
                 <input ref={gifInputRef} type="file" accept="image/gif" className="hidden" onChange={(event) => { applyFiles(Array.from(event.target.files || [])); event.target.value = ""; }} />
 
                 <button type="button" onClick={() => imageInputRef.current?.click()} className="flex h-10 w-10 items-center justify-center rounded-full text-kelo-primary hover:bg-kelo-background" title="Ajouter une photo" aria-label="Ajouter une photo">
                   <ImageIcon className="h-5 w-5" />
                 </button>
-                <button type="button" onClick={() => videoInputRef.current?.click()} className="flex h-10 w-10 items-center justify-center rounded-full text-kelo-primary hover:bg-kelo-background" title="Ajouter une vidéo" aria-label="Ajouter une vidéo">
+                <button type="button" onClick={() => setVideoRecorderOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-full text-kelo-primary hover:bg-kelo-background" title="Filmer ou ajouter une vidéo" aria-label="Filmer ou ajouter une vidéo">
                   <Film className="h-5 w-5" />
                 </button>
                 <button type="button" onClick={() => gifInputRef.current?.click()} className="flex h-10 items-center gap-1 rounded-full px-2 text-xs font-bold text-kelo-primary hover:bg-kelo-background" title="Ajouter un GIF" aria-label="Ajouter un GIF">
@@ -356,6 +357,15 @@ export default function GlobalPostComposer() {
           </div>
         </div>
       </section>
+
+      <VideoRecorderDialog
+        open={videoRecorderOpen}
+        onClose={() => setVideoRecorderOpen(false)}
+        onVideoSelected={(file) => {
+          applyFiles([file]);
+          setVideoRecorderOpen(false);
+        }}
+      />
 
       <VerificationRequiredDialog open={dialogOpen} onClose={closeDialog} />
     </>
