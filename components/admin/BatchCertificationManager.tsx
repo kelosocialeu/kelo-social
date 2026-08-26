@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Search, Trash2, UserPlus, Users } from "lucide-react";
+import { Bot, Check, Search, Trash2, UserPlus, Users } from "lucide-react";
 
 import Button from "@/components/ui/Button";
 import Select from "@/components/ui/Select";
 import { getStoredSession } from "@/services/auth.service";
 
 type CertificationStatus = "certified" | "trusted-verifier" | "none";
+type AdminAction = CertificationStatus | "robot-on" | "robot-off";
 
 type Actor = {
   did: string;
@@ -28,7 +29,7 @@ export default function BatchCertificationManager({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Actor[]>([]);
   const [selected, setSelected] = useState<Actor[]>([]);
-  const [status, setStatus] = useState<CertificationStatus>("certified");
+  const [status, setStatus] = useState<AdminAction>("certified");
   const [searching, setSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
@@ -109,6 +110,7 @@ export default function BatchCertificationManager({
 
     const failures: string[] = [];
     let successCount = 0;
+    const robotAction = status === "robot-on" || status === "robot-off";
 
     for (let index = 0; index < selected.length; index += 4) {
       const group = selected.slice(index, index + 4);
@@ -116,15 +118,25 @@ export default function BatchCertificationManager({
         group.map(async (actor) => {
           try {
             const targetDid = actor.did?.startsWith("did:") ? actor.did : undefined;
-            const response = await fetch("/api/admin/certify", {
+            const endpoint = robotAction ? "/api/kelo/robot-status" : "/api/admin/certify";
+            const body = robotAction
+              ? {
+                  session,
+                  targetHandle: normalizeHandle(actor.handle),
+                  ...(targetDid ? { targetDid } : {}),
+                  enabled: status === "robot-on",
+                }
+              : {
+                  session,
+                  targetHandle: normalizeHandle(actor.handle),
+                  ...(targetDid ? { targetDid } : {}),
+                  status: status as CertificationStatus,
+                };
+
+            const response = await fetch(endpoint, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                session,
-                targetHandle: normalizeHandle(actor.handle),
-                ...(targetDid ? { targetDid } : {}),
-                status,
-              }),
+              body: JSON.stringify(body),
             });
 
             const data = await response.json().catch(() => ({}));
@@ -152,8 +164,14 @@ export default function BatchCertificationManager({
     }
 
     if (successCount > 0) {
+      const actionLabel =
+        status === "robot-on"
+          ? "logo robot ajouté"
+          : status === "robot-off"
+            ? "logo robot retiré"
+            : "certification mise à jour";
       setMessage(
-        `${successCount} compte${successCount > 1 ? "s" : ""} mis à jour avec succès.`
+        `${successCount} compte${successCount > 1 ? "s" : ""} : ${actionLabel}${successCount > 1 ? "s" : ""} avec succès.`
       );
       if (failures.length === 0) setSelected([]);
       else {
@@ -183,11 +201,11 @@ export default function BatchCertificationManager({
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-kelo-primary" />
             <h2 className="text-lg font-extrabold text-kelo-text">
-              Certification en lot
+              Certification et comptes robots en lot
             </h2>
           </div>
           <p className="mt-1 max-w-2xl text-sm text-kelo-muted">
-            Recherchez des comptes AT Protocol, ajoutez-les à la liste puis appliquez la même certification à toute la sélection en une fois.
+            Recherchez des comptes AT Protocol, sélectionnez-les puis appliquez une certification ou le logo de compte robot à toute la sélection.
           </p>
         </div>
         <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-kelo-muted">
@@ -301,13 +319,15 @@ export default function BatchCertificationManager({
 
       <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
         <Select
-          label="Certification à appliquer"
+          label="Action à appliquer"
           value={status}
-          onChange={(event) => setStatus(event.target.value as CertificationStatus)}
+          onChange={(event) => setStatus(event.target.value as AdminAction)}
         >
           <option value="certified">Compte certifié</option>
           <option value="trusted-verifier">Certificateur de confiance</option>
           <option value="none">Révoquer la certification</option>
+          <option value="robot-on">🤖 Ajouter le logo robot</option>
+          <option value="robot-off">Retirer le logo robot</option>
         </Select>
         <Button
           type="button"
@@ -317,9 +337,14 @@ export default function BatchCertificationManager({
           loadingText={`Mise à jour de ${selected.length} compte${selected.length > 1 ? "s" : ""}…`}
           className="min-w-[240px]"
         >
+          {status === "robot-on" ? <Bot className="mr-2 h-4 w-4" /> : null}
           Mettre à jour {selected.length > 0 ? `(${selected.length})` : "la sélection"}
         </Button>
       </div>
+
+      <p className="mt-3 text-xs text-kelo-muted">
+        Les comptes qui exposent déjà un label public de compte automatisé via AT Protocol sont synchronisés automatiquement et affichent le logo robot sans action manuelle.
+      </p>
 
       {message && <p className="mt-4 text-sm font-bold text-green-700">{message}</p>}
       {error && <p className="mt-4 text-sm font-medium text-kelo-danger">{error}</p>}
