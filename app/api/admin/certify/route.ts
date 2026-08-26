@@ -4,9 +4,18 @@ import { AtpAgent } from "@atproto/api";
 import { CERTIFICATION_SUPPRESSION_COLLECTION } from "@/lib/atproto/certification-suppressions";
 
 const CERTIFICATION_COLLECTION = "eu.kelosocial.certification";
-const CERTIFICATION_REPO_IDENTIFIER = process.env.CERTIFICATION_REPO_IDENTIFIER?.trim() || "kelosocial.eu";
-const CERTIFICATION_REPO_PDS_URL = process.env.CERTIFICATION_REPO_PDS_URL?.trim() || "https://eurosky.social";
-const CERTIFICATION_REPO_APP_PASSWORD = process.env.CERTIFICATION_REPO_APP_PASSWORD?.trim() || "";
+const CERTIFICATION_REPO_IDENTIFIER =
+  process.env.CERTIFICATION_REPO_IDENTIFIER?.trim() ||
+  process.env.KELO_ADMIN_ATPROTO_IDENTIFIER?.trim() ||
+  "kelosocial.eu";
+const CERTIFICATION_REPO_PDS_URL =
+  process.env.CERTIFICATION_REPO_PDS_URL?.trim() ||
+  process.env.KELO_ADMIN_PDS_URL?.trim() ||
+  "https://eurosky.social";
+const CERTIFICATION_REPO_APP_PASSWORD =
+  process.env.CERTIFICATION_REPO_APP_PASSWORD?.trim() ||
+  process.env.KELO_ADMIN_ATPROTO_PASSWORD?.trim() ||
+  "";
 
 type CertificationStatus = "certified" | "trusted-verifier" | "none";
 
@@ -33,6 +42,10 @@ function normalizeHandle(value: string): string {
 
 function normalizeDid(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function isValidDid(value: string): boolean {
+  return /^did:[a-z0-9]+:[^\s]+$/i.test(value.trim());
 }
 
 function getAdminHandles(): string[] {
@@ -117,8 +130,14 @@ async function authenticateRequester(session: RequestSession) {
 }
 
 async function authenticateCertificationRepo() {
-  if (!CERTIFICATION_REPO_APP_PASSWORD) throw new Error("Configuration serveur incomplète.");
-  const agent = new AtpAgent({ service: CERTIFICATION_REPO_PDS_URL });
+  if (!CERTIFICATION_REPO_APP_PASSWORD) {
+    throw new Error(
+      "Configuration du dépôt de certification incomplète : mot de passe administrateur manquant."
+    );
+  }
+
+  const service = assertSafePdsService(CERTIFICATION_REPO_PDS_URL);
+  const agent = new AtpAgent({ service });
   await agent.login({ identifier: CERTIFICATION_REPO_IDENTIFIER, password: CERTIFICATION_REPO_APP_PASSWORD });
   if (!agent.session?.did) throw new Error("Impossible d’authentifier le dépôt central de certification.");
   return { agent, repoDid: normalizeDid(agent.session.did), repoHandle: normalizeHandle(agent.session.handle || CERTIFICATION_REPO_IDENTIFIER) };
@@ -146,11 +165,29 @@ async function makeCertificationVisibleLocally(agent: AtpAgent, repo: string, su
   try { await agent.api.com.atproto.repo.deleteRecord({ repo, collection: CERTIFICATION_SUPPRESSION_COLLECTION, rkey: subjectDid }); } catch {}
 }
 
+function publicErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+
+  if (message.includes("Configuration du dépôt de certification")) return message;
+  if (message.includes("Session AT Protocol incohérente")) return message;
+  if (message.includes("Le PDS doit utiliser HTTPS")) return message;
+  if (message.includes("Adresse de PDS privée ou locale interdite")) return message;
+  if (/authentication|auth|password|login|credential/i.test(message)) {
+    return "Impossible d’authentifier le dépôt central de certification. Vérifiez le compte administrateur configuré sur Vercel.";
+  }
+  if (/fetch|network|timeout|ECONN|ENOTFOUND|unreachable/i.test(message)) {
+    return "Le dépôt central de certification est temporairement inaccessible.";
+  }
+
+  return "Erreur interne du serveur.";
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const session = body?.session;
     const rawTargetHandle = typeof body?.targetHandle === "string" ? body.targetHandle : "";
+    const rawTargetDid = typeof body?.targetDid === "string" ? body.targetDid : "";
     const status = body?.status;
 
     if (!isValidSession(session)) return NextResponse.json({ error: "Session invalide ou incomplète. Reconnectez-vous." }, { status: 401 });
@@ -170,9 +207,12 @@ export async function POST(request: Request) {
     const targetHandle = normalizeHandle(rawTargetHandle);
     if (targetHandle.length > 253 || !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(targetHandle)) return NextResponse.json({ error: "Handle cible invalide." }, { status: 400 });
 
-    const resolved = await requester.agent.api.com.atproto.identity.resolveHandle({ handle: targetHandle });
-    const subjectDid = normalizeDid(resolved.data.did || "");
-    if (!subjectDid) return NextResponse.json({ error: "Impossible de trouver le DID du compte cible." }, { status: 404 });
+    let subjectDid = normalizeDid(rawTargetDid);
+    if (!subjectDid || !isValidDid(subjectDid)) {
+      const resolved = await requester.agent.api.com.atproto.identity.resolveHandle({ handle: targetHandle });
+      subjectDid = normalizeDid(resolved.data.did || "");
+    }
+    if (!subjectDid || !isValidDid(subjectDid)) return NextResponse.json({ error: "Impossible de trouver le DID du compte cible." }, { status: 404 });
 
     if (status === "none" && requesterIsAdmin) {
       const hiddenAt = await hideCertificationLocally(certificationRepo.agent, certificationRepo.repoDid, subjectDid, targetHandle, requester.did, requester.handle);
@@ -206,6 +246,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, action: existingOwnRecord ? "updated" : "certified", uri: response.data.uri, cid: response.data.cid, subjectDid, subjectHandle: targetHandle, status, issuedAt, issuerDid: requester.did, issuerHandle: requester.handle });
   } catch (error) {
     console.error("[admin/certify] Erreur", error);
-    return NextResponse.json({ error: "Erreur interne du serveur." }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(error) }, { status: 500 });
   }
 }
