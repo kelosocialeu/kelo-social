@@ -16,7 +16,7 @@ import {
 } from "@/lib/atproto/verification";
 import {
   CertificationRecord,
-  getKeloCertification,
+  listCertifications,
 } from "@/lib/atproto/certifications";
 import { isCertificationSuppressed } from "@/lib/atproto/certification-suppressions";
 
@@ -52,24 +52,15 @@ function normalizeDid(value: string) {
   return value.trim().toLowerCase();
 }
 
-export default function VerificationBadge({
-  actor,
-  size = 16,
-}: VerificationBadgeProps) {
+export default function VerificationBadge({ actor, size = 16 }: VerificationBadgeProps) {
   const did = typeof actor?.did === "string" ? actor.did : "";
   const cacheKey = normalizeDid(did);
   const cached = cacheKey ? badgeCache.get(cacheKey) : undefined;
   const initialNativeBadge = getVerificationBadge(actor);
 
-  const [nativeBadge, setNativeBadge] = useState<VerificationBadgeType>(
-    cached?.nativeBadge ?? initialNativeBadge
-  );
-  const [nativeActor, setNativeActor] = useState<any>(
-    cached?.nativeActor ?? actor
-  );
-  const [keloCertifications, setKeloCertifications] = useState<CertificationRecord[]>(
-    cached?.kelo ?? []
-  );
+  const [nativeBadge, setNativeBadge] = useState<VerificationBadgeType>(cached?.nativeBadge ?? initialNativeBadge);
+  const [nativeActor, setNativeActor] = useState<any>(cached?.nativeActor ?? actor);
+  const [keloCertifications, setKeloCertifications] = useState<CertificationRecord[]>(cached?.kelo ?? []);
   const [suppressed, setSuppressed] = useState<boolean>(cached?.suppressed ?? false);
   const [open, setOpen] = useState(false);
   const [issuers, setIssuers] = useState<IssuerProfile[]>([]);
@@ -81,23 +72,20 @@ export default function VerificationBadge({
 
     async function load() {
       try {
-        // Important : on ne recharge plus TOUTE la collection de certifications
-        // pour chaque compte affiché. Une seule lecture ciblée par DID suffit.
-        // De plus getPublicNativeVerification réutilise immédiatement le champ
-        // verification déjà inclus dans les objets actor de l'AppView.
-        const [publicVerification, keloRecord, localSuppression] = await Promise.all([
+        const [publicVerification, allKeloRecords, localSuppression] = await Promise.all([
           getPublicNativeVerification(actor),
-          did ? getKeloCertification(did) : Promise.resolve(null),
+          did ? listCertifications() : Promise.resolve([] as CertificationRecord[]),
           did ? isCertificationSuppressed(did) : Promise.resolve(false),
         ]);
-
         if (cancelled) return;
 
-        const enriched = publicVerification
-          ? { ...actor, verification: publicVerification }
-          : actor;
+        const enriched = publicVerification ? { ...actor, verification: publicVerification } : actor;
         const nextNative = getVerificationBadge(enriched);
-        const matching = keloRecord ? [keloRecord] : [];
+        // Keep every certification for this subject. A single account can have
+        // several Kelo certifications from different trusted certifiers.
+        const matching = allKeloRecords.filter(
+          (record) => normalizeDid(record.subjectDid) === normalizeDid(did)
+        );
 
         setNativeActor(enriched);
         setNativeBadge(nextNative);
@@ -113,17 +101,12 @@ export default function VerificationBadge({
           });
         }
       } catch (error) {
-        console.warn(
-          "Certification temporairement indisponible, conservation du dernier état connu.",
-          error
-        );
+        console.warn("Certification temporairement indisponible, conservation du dernier état connu.", error);
       }
     }
 
     void load();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [actor, did, cacheKey]);
 
   useEffect(() => {
@@ -133,26 +116,15 @@ export default function VerificationBadge({
 
   const badgeType = useMemo<VerificationBadgeType>(() => {
     if (suppressed) return null;
-
-    if (
-      nativeBadge === "trusted-verifier" ||
-      keloCertifications.some((record) => record.status === "trusted-verifier")
-    ) {
+    if (nativeBadge === "trusted-verifier" || keloCertifications.some((record) => record.status === "trusted-verifier")) {
       return "trusted-verifier";
     }
-
-    if (
-      nativeBadge === "verified" ||
-      keloCertifications.some((record) => record.status === "certified")
-    ) {
+    if (nativeBadge === "verified" || keloCertifications.some((record) => record.status === "certified")) {
       return "verified";
     }
-
     return null;
   }, [nativeBadge, keloCertifications, suppressed]);
 
-  // Un badge natif déjà fourni par l'AppView s'affiche immédiatement au rendu.
-  // Les données Kelo arrivent ensuite sans bloquer le profil ou la carte de post.
   if (!badgeType) return null;
 
   const handleClick = async (event: React.MouseEvent<HTMLDivElement>) => {
@@ -161,28 +133,18 @@ export default function VerificationBadge({
     setOpen(true);
 
     if (badgeType !== "verified" || issuers.length || loadingIssuer) return;
-
     setLoadingIssuer(true);
     setIssuerError(false);
 
     try {
-      const entries: Array<{
-        did?: string;
-        handle?: string;
-        displayName?: string;
-        source: "native" | "kelo";
-      }> = getVerificationIssuers(nativeActor).map((issuer) => ({
-        did: issuer.issuer,
-        source: "native",
-      }));
+      const entries: Array<{ did?: string; handle?: string; displayName?: string; source: "native" | "kelo" }> =
+        getVerificationIssuers(nativeActor).map((issuer) => ({ did: issuer.issuer, source: "native" }));
 
       for (const certification of keloCertifications) {
         if (certification.status !== "certified") continue;
         entries.push({
           did: certification.issuerDid,
-          handle:
-            certification.issuerHandle ||
-            (!certification.issuerDid ? "kelosocial.eu" : undefined),
+          handle: certification.issuerHandle || (!certification.issuerDid ? "kelosocial.eu" : undefined),
           displayName: !certification.issuerDid ? "Kelo Social" : undefined,
           source: "kelo",
         });
@@ -190,45 +152,23 @@ export default function VerificationBadge({
 
       const unique = entries.filter((entry, index, all) => {
         const key = entry.did?.toLowerCase() || entry.handle?.toLowerCase();
-        return (
-          !!key &&
-          all.findIndex(
-            (candidate) =>
-              (candidate.did?.toLowerCase() || candidate.handle?.toLowerCase()) === key
-          ) === index
-        );
+        return !!key && all.findIndex((candidate) =>
+          (candidate.did?.toLowerCase() || candidate.handle?.toLowerCase()) === key
+        ) === index;
       });
 
-      const profiles = await Promise.all(
-        unique.map(async (entry) => {
-          if (entry.did) {
-            try {
-              const profile = await getIssuerProfile(entry.did);
-              return {
-                did: entry.did,
-                handle: profile.handle,
-                displayName: profile.displayName,
-                avatar: profile.avatar,
-                source: entry.source,
-              } as IssuerProfile;
-            } catch {}
-          }
+      const profiles = await Promise.all(unique.map(async (entry) => {
+        if (entry.did) {
+          try {
+            const profile = await getIssuerProfile(entry.did);
+            return { did: entry.did, handle: profile.handle, displayName: profile.displayName, avatar: profile.avatar, source: entry.source } as IssuerProfile;
+          } catch {}
+        }
+        if (entry.handle) return { handle: entry.handle, displayName: entry.displayName, source: entry.source } as IssuerProfile;
+        return null;
+      }));
 
-          if (entry.handle) {
-            return {
-              handle: entry.handle,
-              displayName: entry.displayName,
-              source: entry.source,
-            } as IssuerProfile;
-          }
-
-          return null;
-        })
-      );
-
-      const valid = profiles.filter(
-        (profile): profile is IssuerProfile => Boolean(profile?.handle)
-      );
+      const valid = profiles.filter((profile): profile is IssuerProfile => Boolean(profile?.handle));
       setIssuers(valid);
       setIssuerError(valid.length === 0);
     } catch {
@@ -241,128 +181,56 @@ export default function VerificationBadge({
   return (
     <>
       <div onClick={handleClick} className="relative inline-flex cursor-pointer">
-        <Badge
-          status={
-            badgeType === "trusted-verifier" ? "trusted-verifier" : "certified"
-          }
-          size={size}
-        />
+        <Badge status={badgeType === "trusted-verifier" ? "trusted-verifier" : "certified"} size={size} />
       </div>
 
       {open && (
         <>
-          <div
-            className="fixed inset-0 z-30 bg-black/10"
-            onClick={() => setOpen(false)}
-          />
-
+          <div className="fixed inset-0 z-30 bg-black/10" onClick={() => setOpen(false)} />
           {badgeType === "verified" ? (
-            <div
-              className="fixed left-1/2 top-1/2 z-40 max-h-[80vh] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-kelo-border bg-white p-5 shadow-kelo"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <p className="mb-3 text-sm font-bold text-kelo-text">
-                Compte certifié
-              </p>
-
-              {loadingIssuer && (
-                <p className="text-sm text-kelo-muted">Chargement...</p>
-              )}
-
+            <div className="fixed left-1/2 top-1/2 z-40 max-h-[80vh] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-kelo-border bg-white p-5 shadow-kelo" onClick={(event) => event.stopPropagation()}>
+              <p className="mb-3 text-sm font-bold text-kelo-text">Compte certifié</p>
+              {loadingIssuer && <p className="text-sm text-kelo-muted">Chargement...</p>}
               {!loadingIssuer && issuers.length > 0 && (
                 <>
                   <p className="mb-2 text-xs text-kelo-muted">
-                    {issuers.length > 1
-                      ? `Certifié par ${issuers.length} certificateurs de confiance :`
-                      : "Certifié par :"}
+                    {issuers.length > 1 ? `Certifié par ${issuers.length} certificateurs de confiance :` : "Certifié par :"}
                   </p>
                   <div className="space-y-1">
                     {issuers.map((issuer) => (
-                      <Link
-                        key={issuer.did || issuer.handle}
-                        href={`/profile/${issuer.handle}`}
-                        className="flex items-center gap-3 rounded-xl p-2 hover:bg-kelo-background"
-                        onClick={() => setOpen(false)}
-                      >
-                        <Avatar
-                          src={issuer.avatar}
-                          fallback={issuer.handle[0]?.toUpperCase() || "K"}
-                          size="sm"
-                        />
+                      <Link key={issuer.did || issuer.handle} href={`/profile/${issuer.handle}`} className="flex items-center gap-3 rounded-xl p-2 hover:bg-kelo-background" onClick={() => setOpen(false)}>
+                        <Avatar src={issuer.avatar} fallback={issuer.handle[0]?.toUpperCase() || "K"} size="sm" />
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-bold text-kelo-text">
-                            {issuer.displayName || issuer.handle}
-                          </p>
-                          <p className="truncate text-xs text-kelo-muted">
-                            @{issuer.handle}
-                            {issuer.source === "kelo" ? " · Kelo" : " · AT Protocol"}
-                          </p>
+                          <p className="truncate text-sm font-bold text-kelo-text">{issuer.displayName || issuer.handle}</p>
+                          <p className="truncate text-xs text-kelo-muted">@{issuer.handle}{issuer.source === "kelo" ? " · Kelo" : " · AT Protocol"}</p>
                         </div>
                       </Link>
                     ))}
                   </div>
                 </>
               )}
-
               {!loadingIssuer && issuerError && (
-                <p className="text-sm text-kelo-muted">
-                  Les détails des certificateurs sont temporairement indisponibles.
-                  La certification reste active.
-                </p>
+                <p className="text-sm text-kelo-muted">Les détails des certificateurs sont temporairement indisponibles. La certification reste active.</p>
               )}
-
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="mt-4 w-full rounded-full bg-kelo-background py-2.5 text-sm font-bold text-kelo-text"
-              >
-                Fermer
-              </button>
+              <button type="button" onClick={() => setOpen(false)} className="mt-4 w-full rounded-full bg-kelo-background py-2.5 text-sm font-bold text-kelo-text">Fermer</button>
             </div>
           ) : (
-            <div
-              className="fixed left-1/2 top-1/2 z-40 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-kelo-border bg-white p-6 shadow-kelo"
-              onClick={(event) => event.stopPropagation()}
-            >
+            <div className="fixed left-1/2 top-1/2 z-40 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-kelo-border bg-white p-6 shadow-kelo" onClick={(event) => event.stopPropagation()}>
               <div className="mb-5 rounded-2xl bg-kelo-background p-5">
                 <div className="flex items-center justify-center gap-3">
                   <div className="flex flex-col items-center gap-2">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-kelo-gradient">
-                      <Logo className="h-8 w-8" />
-                    </div>
-                    <span className="text-xs font-semibold text-kelo-muted">
-                      Kelo
-                    </span>
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-kelo-gradient"><Logo className="h-8 w-8" /></div>
+                    <span className="text-xs font-semibold text-kelo-muted">Kelo</span>
                   </div>
                   <ArrowRight className="h-4 w-4 text-kelo-muted" />
-                  <img
-                    src={CERTIFIER_IMAGE}
-                    alt="Certificateur de confiance"
-                    className="h-14 w-14 object-contain"
-                  />
+                  <img src={CERTIFIER_IMAGE} alt="Certificateur de confiance" className="h-14 w-14 object-contain" />
                   <ArrowRight className="h-4 w-4 text-kelo-muted" />
-                  <img
-                    src={VERIFIED_IMAGE}
-                    alt="Compte certifié"
-                    className="h-14 w-14 object-contain"
-                  />
+                  <img src={VERIFIED_IMAGE} alt="Compte certifié" className="h-14 w-14 object-contain" />
                 </div>
               </div>
-
-              <h3 className="mb-2 text-center text-base font-extrabold text-kelo-text">
-                {actor?.displayName || actor?.handle} est un certificateur de confiance
-              </h3>
-              <p className="mb-5 text-center text-sm text-kelo-muted">
-                Ce statut peut provenir de Kelo Social ou d’un service AT Protocol
-                synchronisé.
-              </p>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="w-full rounded-full bg-kelo-background py-2.5 text-sm font-bold text-kelo-text"
-              >
-                Fermer
-              </button>
+              <h3 className="mb-2 text-center text-base font-extrabold text-kelo-text">{actor?.displayName || actor?.handle} est un certificateur de confiance</h3>
+              <p className="mb-5 text-center text-sm text-kelo-muted">Ce statut peut provenir de Kelo Social ou d’un service AT Protocol synchronisé.</p>
+              <button type="button" onClick={() => setOpen(false)} className="w-full rounded-full bg-kelo-background py-2.5 text-sm font-bold text-kelo-text">Fermer</button>
             </div>
           )}
         </>
