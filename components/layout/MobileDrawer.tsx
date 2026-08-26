@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BadgeCheck, Bell, Bookmark, Clapperboard, Hash, Home, ListChecks, LogOut, MessageCircle, PenSquare, Rocket, Search, Settings, ShieldCheck, User, X } from "lucide-react";
+import { BadgeCheck, Bell, Bookmark, Bot, Clapperboard, Hash, Home, ListChecks, LogOut, MessageCircle, PenSquare, Rocket, Search, Settings, ShieldCheck, User, X } from "lucide-react";
 import Logo from "@/components/ui/Logo";
 import { useAdminRole } from "@/hooks/useAdminRole";
 
@@ -40,7 +40,12 @@ export default function MobileDrawer({ open, handle, onClose, onLogout, onCreate
         <nav className="flex flex-col gap-1">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => { const active = isRouteActive(pathname, href); return <Link key={href} href={href} onClick={onClose} aria-current={active ? "page" : undefined} className={`flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold transition ${active ? "bg-kelo-gradient text-white shadow-sm" : "text-kelo-text hover:bg-white/60"}`}><Icon className="h-5 w-5 flex-shrink-0" /><span className="truncate">{label}</span></Link>; })}
           {showVerifier && <Link href="/verifier" onClick={onClose} aria-current={isRouteActive(pathname, "/verifier") ? "page" : undefined} className={`flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold transition ${isRouteActive(pathname, "/verifier") ? "bg-kelo-gradient text-white shadow-sm" : "text-kelo-secondary hover:bg-white/60"}`}><BadgeCheck className="h-5 w-5" />Panneau certificateur</Link>}
-          {isAdmin && <Link href="/admin" onClick={onClose} className={`flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold transition ${isRouteActive(pathname, "/admin") ? "bg-kelo-gradient text-white shadow-sm" : "text-kelo-secondary hover:bg-white/60"}`}><ShieldCheck className="h-5 w-5" />Panneau Admin</Link>}
+          {checked && isAdmin && <div className="mt-3 rounded-2xl border border-kelo-primary/20 bg-white/55 p-2">
+            <p className="px-3 pb-1 pt-2 text-[11px] font-extrabold uppercase tracking-wider text-kelo-muted">Administration</p>
+            <Link href="/admin" onClick={onClose} className={`flex items-center gap-4 rounded-xl px-3 py-3 text-sm font-semibold transition ${pathname === "/admin" ? "bg-kelo-gradient text-white shadow-sm" : "text-kelo-secondary hover:bg-white/70"}`}><ShieldCheck className="h-5 w-5" />Tableau de bord</Link>
+            <Link href="/admin/certifiers" onClick={onClose} className={`flex items-center gap-4 rounded-xl px-3 py-3 text-sm font-semibold transition ${isRouteActive(pathname, "/admin/certifiers") ? "bg-kelo-gradient text-white shadow-sm" : "text-kelo-secondary hover:bg-white/70"}`}><BadgeCheck className="h-5 w-5" />Certifications</Link>
+            <Link href="/admin/certifiers" onClick={onClose} className="flex items-center gap-4 rounded-xl px-3 py-3 text-sm font-semibold text-kelo-secondary transition hover:bg-white/70"><Bot className="h-5 w-5" />Comptes robots</Link>
+          </div>}
         </nav>
       </div>
       <div className="relative border-t border-white/40 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-4"><button type="button" onClick={onLogout} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-white/65 py-3 text-sm font-bold text-kelo-text transition active:scale-[0.98]"><LogOut className="h-4 w-4" />Déconnexion</button></div>
