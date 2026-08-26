@@ -63,7 +63,7 @@ export function clearSearchCache(): void {
 
 function buildPostSearchParams(query: string, limit: number, cursor?: string) {
   const trimmed = normalizeQuery(query);
-  const hashtagOnly = /^#[\p{L}\p{N}_-]+$/u.test(trimmed);
+  const hashtagOnly = trimmed.startsWith("#") && trimmed.length > 1 && !/\s/.test(trimmed.slice(1));
   const params: Record<string, unknown> = {
     q: hashtagOnly ? trimmed.slice(1) : trimmed,
     limit: Math.min(Math.max(limit, 1), 100),
