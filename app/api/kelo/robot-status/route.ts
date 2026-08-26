@@ -76,10 +76,12 @@ async function authenticateRequester(session: RequestSession) {
     did: session.did,
   });
   const response = await agent.api.com.atproto.server.getSession();
-  return {
-    did: normalizeDid(response.data.did || ""),
-    handle: normalizeHandle(response.data.handle || ""),
-  };
+  const did = normalizeDid(response.data.did || "");
+  const handle = normalizeHandle(response.data.handle || "");
+  if (!did || did !== normalizeDid(session.did)) {
+    throw new Error("Session AT Protocol incohérente.");
+  }
+  return { did, handle };
 }
 
 async function authenticateCentralRepo() {
@@ -142,7 +144,7 @@ export async function GET(request: NextRequest) {
   const handle = normalizeHandle(request.nextUrl.searchParams.get("handle") || "");
   const actor = did || handle;
   if (!actor) {
-    return NextResponse.json({ robot: false, source: null });
+    return NextResponse.json({ robot: false, kelo: false, atproto: false, source: null });
   }
 
   const [kelo, atproto] = await Promise.all([
@@ -152,6 +154,8 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     robot: kelo || atproto,
+    kelo,
+    atproto,
     source: kelo ? "kelo" : atproto ? "atproto" : null,
     synchronized: atproto,
   });
@@ -162,22 +166,36 @@ export async function POST(request: Request) {
     const body = await request.json();
     const session = body?.session;
     const enabled = body?.enabled === true;
-    const targetHandle = normalizeHandle(String(body?.targetHandle || ""));
-    let targetDid = normalizeDid(String(body?.targetDid || ""));
 
     if (!isValidSession(session)) {
       return NextResponse.json({ error: "Session invalide." }, { status: 401 });
     }
+
+    const requester = await authenticateRequester(session);
+    const admin = isAdmin(requester.did, requester.handle);
+
+    const requestedHandle = normalizeHandle(String(body?.targetHandle || requester.handle));
+    const requestedDid = normalizeDid(String(body?.targetDid || requester.did));
+
+    const editingSelf =
+      (!requestedDid || requestedDid === requester.did) &&
+      (!requestedHandle || requestedHandle === requester.handle);
+
+    if (!editingSelf && !admin) {
+      return NextResponse.json(
+        { error: "Vous pouvez uniquement modifier le statut robot de votre propre compte." },
+        { status: 403 }
+      );
+    }
+
+    const central = await authenticateCentralRepo();
+    let targetHandle = editingSelf ? requester.handle : requestedHandle;
+    let targetDid = editingSelf ? requester.did : requestedDid;
+
     if (!targetHandle) {
       return NextResponse.json({ error: "Compte cible manquant." }, { status: 400 });
     }
 
-    const requester = await authenticateRequester(session);
-    if (!isAdmin(requester.did, requester.handle)) {
-      return NextResponse.json({ error: "Action réservée à l’administration Kelo Social." }, { status: 403 });
-    }
-
-    const central = await authenticateCentralRepo();
     if (!targetDid.startsWith("did:")) {
       const resolved = await central.agent.api.com.atproto.identity.resolveHandle({ handle: targetHandle });
       targetDid = normalizeDid(resolved.data.did || "");
@@ -195,7 +213,17 @@ export async function POST(request: Request) {
           rkey,
         });
       } catch {}
-      return NextResponse.json({ success: true, robot: false, targetDid, targetHandle });
+
+      const atproto = await getAtprotoRobotState(targetDid);
+      return NextResponse.json({
+        success: true,
+        robot: atproto,
+        kelo: false,
+        atproto,
+        synchronized: atproto,
+        targetDid,
+        targetHandle,
+      });
     }
 
     await central.agent.api.com.atproto.repo.putRecord({
@@ -209,11 +237,21 @@ export async function POST(request: Request) {
         enabled: true,
         updatedAt: new Date().toISOString(),
         updatedByDid: requester.did,
+        selfDeclared: editingSelf,
       },
       validate: false,
     });
 
-    return NextResponse.json({ success: true, robot: true, targetDid, targetHandle });
+    const atproto = await getAtprotoRobotState(targetDid);
+    return NextResponse.json({
+      success: true,
+      robot: true,
+      kelo: true,
+      atproto,
+      synchronized: atproto,
+      targetDid,
+      targetHandle,
+    });
   } catch (error) {
     console.error("[kelo/robot-status]", error);
     return NextResponse.json(
