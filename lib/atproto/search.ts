@@ -5,6 +5,11 @@ interface SearchCacheEntry<T> {
   expiresAt: number;
 }
 
+export interface SearchPage<T> {
+  items: T[];
+  cursor?: string;
+}
+
 const SEARCH_CACHE_MS = 60_000;
 const RETRY_DELAYS_MS = [350, 900];
 
@@ -14,31 +19,21 @@ const pendingPosts = new Map<string, Promise<any[]>>();
 const pendingActors = new Map<string, Promise<any[]>>();
 
 function normalizeQuery(query: string): string {
-  return query.trim().toLowerCase();
+  return query.trim();
 }
 
 function makeKey(query: string, limit: number): string {
-  return `${normalizeQuery(query)}:${limit}`;
+  return `${normalizeQuery(query).toLowerCase()}:${limit}`;
 }
 
-function getFresh<T>(
-  cache: Map<string, SearchCacheEntry<T>>,
-  key: string
-): T | undefined {
+function getFresh<T>(cache: Map<string, SearchCacheEntry<T>>, key: string): T | undefined {
   const entry = cache.get(key);
   if (!entry) return undefined;
-
-  if (entry.expiresAt <= Date.now()) {
-    return undefined;
-  }
-
+  if (entry.expiresAt <= Date.now()) return undefined;
   return entry.value;
 }
 
-function getStale<T>(
-  cache: Map<string, SearchCacheEntry<T>>,
-  key: string
-): T | undefined {
+function getStale<T>(cache: Map<string, SearchCacheEntry<T>>, key: string): T | undefined {
   return cache.get(key)?.value;
 }
 
@@ -48,18 +43,14 @@ function sleep(ms: number): Promise<void> {
 
 async function withRetry<T>(operation: () => Promise<T>): Promise<T> {
   let lastError: unknown;
-
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
     try {
       return await operation();
     } catch (error) {
       lastError = error;
-      if (attempt < RETRY_DELAYS_MS.length) {
-        await sleep(RETRY_DELAYS_MS[attempt]);
-      }
+      if (attempt < RETRY_DELAYS_MS.length) await sleep(RETRY_DELAYS_MS[attempt]);
     }
   }
-
   throw lastError;
 }
 
@@ -70,11 +61,61 @@ export function clearSearchCache(): void {
   pendingActors.clear();
 }
 
-/**
- * Recherche de publications sur tout le réseau fédéré.
- * Les recherches passent directement par l'AppView publique : un PDS
- * utilisateur n'expose pas forcément les endpoints de recherche globale.
- */
+function buildPostSearchParams(query: string, limit: number, cursor?: string) {
+  const trimmed = normalizeQuery(query);
+  const hashtagOnly = /^#[\p{L}\p{N}_-]+$/u.test(trimmed);
+  const params: Record<string, unknown> = {
+    q: hashtagOnly ? trimmed.slice(1) : trimmed,
+    limit: Math.min(Math.max(limit, 1), 100),
+  };
+  if (hashtagOnly) params.tag = [trimmed.slice(1)];
+  if (cursor) params.cursor = cursor;
+  return params;
+}
+
+export async function searchNetworkPostsPage(
+  query: string,
+  limit = 50,
+  cursor?: string
+): Promise<SearchPage<any>> {
+  const trimmed = normalizeQuery(query);
+  if (trimmed.length < 2) return { items: [] };
+
+  const agent = createAppViewAgent();
+  const response = await withRetry(() =>
+    agent.api.app.bsky.feed.searchPosts(buildPostSearchParams(trimmed, limit, cursor) as any)
+  );
+
+  return {
+    items: response.data.posts || [],
+    cursor: response.data.cursor || undefined,
+  };
+}
+
+export async function searchNetworkActorsPage(
+  query: string,
+  limit = 50,
+  cursor?: string
+): Promise<SearchPage<any>> {
+  const trimmed = normalizeQuery(query);
+  if (trimmed.length < 2) return { items: [] };
+
+  const agent = createAppViewAgent();
+  const response = await withRetry(() =>
+    agent.api.app.bsky.actor.searchActors({
+      q: trimmed,
+      limit: Math.min(Math.max(limit, 1), 100),
+      ...(cursor ? { cursor } : {}),
+    } as any)
+  );
+
+  return {
+    items: response.data.actors || [],
+    cursor: response.data.cursor || undefined,
+  };
+}
+
+/** Recherche de publications sur tout le réseau fédéré. */
 export async function searchNetworkPosts(query: string, limit = 25) {
   const normalized = normalizeQuery(query);
   if (normalized.length < 2) return [];
@@ -88,20 +129,9 @@ export async function searchNetworkPosts(query: string, limit = 25) {
 
   const request = (async () => {
     try {
-      const agent = createAppViewAgent();
-      const response = await withRetry(() =>
-        agent.api.app.bsky.feed.searchPosts({
-          q: normalized,
-          limit,
-        })
-      );
-
-      const value = response.data.posts || [];
-      postsCache.set(key, {
-        value,
-        expiresAt: Date.now() + SEARCH_CACHE_MS,
-      });
-      return value;
+      const page = await searchNetworkPostsPage(normalized, limit);
+      postsCache.set(key, { value: page.items, expiresAt: Date.now() + SEARCH_CACHE_MS });
+      return page.items;
     } catch (error) {
       console.warn("Recherche de publications temporairement indisponible :", error);
       return getStale(postsCache, key) || [];
@@ -130,20 +160,9 @@ export async function searchNetworkActors(query: string, limit = 6) {
 
   const request = (async () => {
     try {
-      const agent = createAppViewAgent();
-      const response = await withRetry(() =>
-        agent.api.app.bsky.actor.searchActors({
-          q: normalized,
-          limit,
-        })
-      );
-
-      const value = response.data.actors || [];
-      actorsCache.set(key, {
-        value,
-        expiresAt: Date.now() + SEARCH_CACHE_MS,
-      });
-      return value;
+      const page = await searchNetworkActorsPage(normalized, limit);
+      actorsCache.set(key, { value: page.items, expiresAt: Date.now() + SEARCH_CACHE_MS });
+      return page.items;
     } catch (error) {
       console.warn("Recherche de comptes temporairement indisponible :", error);
       return getStale(actorsCache, key) || [];
