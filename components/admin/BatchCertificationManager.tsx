@@ -115,12 +115,14 @@ export default function BatchCertificationManager({
       const groupResults = await Promise.all(
         group.map(async (actor) => {
           try {
+            const targetDid = actor.did?.startsWith("did:") ? actor.did : undefined;
             const response = await fetch("/api/admin/certify", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 session,
                 targetHandle: normalizeHandle(actor.handle),
+                ...(targetDid ? { targetDid } : {}),
                 status,
               }),
             });
