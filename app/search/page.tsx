@@ -44,7 +44,8 @@ function SearchContent() {
   const [tab, setTab] = useState<"posts" | "accounts">("posts");
   const [searching, setSearching] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [postError, setPostError] = useState<string | null>(null);
+  const [actorError, setActorError] = useState<string | null>(null);
   const [posts, setPosts] = useState<any[]>([]);
   const [actors, setActors] = useState<any[]>([]);
   const [postCursor, setPostCursor] = useState<string | undefined>();
@@ -64,36 +65,45 @@ function SearchContent() {
       setActors([]);
       setPostCursor(undefined);
       setActorCursor(undefined);
-      setError(null);
+      setPostError(null);
+      setActorError(null);
       setSearching(false);
       return;
     }
 
     setSearching(true);
-    setError(null);
+    setPostError(null);
+    setActorError(null);
     setPostCursor(undefined);
     setActorCursor(undefined);
 
     const timeout = window.setTimeout(async () => {
-      try {
-        const [postPage, actorPage] = await Promise.all([
-          searchNetworkPostsPage(trimmed, 50),
-          searchNetworkActorsPage(trimmed, 50),
-        ]);
-        setPosts(formatSearchPosts(postPage.items));
-        setActors(actorPage.items);
-        setPostCursor(postPage.cursor);
-        setActorCursor(actorPage.cursor);
-      } catch (searchError) {
-        console.error("Erreur pendant la recherche :", searchError);
-        setError("La recherche a échoué. Réessayez dans un instant.");
+      const [postResult, actorResult] = await Promise.allSettled([
+        searchNetworkPostsPage(trimmed, 50),
+        searchNetworkActorsPage(trimmed, 50),
+      ]);
+
+      if (postResult.status === "fulfilled") {
+        setPosts(formatSearchPosts(postResult.value.items));
+        setPostCursor(postResult.value.cursor);
+      } else {
+        console.error("Erreur recherche publications :", postResult.reason);
         setPosts([]);
-        setActors([]);
         setPostCursor(undefined);
-        setActorCursor(undefined);
-      } finally {
-        setSearching(false);
+        setPostError("La recherche de publications est temporairement indisponible.");
       }
+
+      if (actorResult.status === "fulfilled") {
+        setActors(actorResult.value.items);
+        setActorCursor(actorResult.value.cursor);
+      } else {
+        console.error("Erreur recherche comptes :", actorResult.reason);
+        setActors([]);
+        setActorCursor(undefined);
+        setActorError("La recherche de comptes est temporairement indisponible.");
+      }
+
+      setSearching(false);
     }, 350);
 
     return () => window.clearTimeout(timeout);
@@ -102,7 +112,7 @@ function SearchContent() {
   const loadMorePosts = async () => {
     if (!postCursor || loadingMore) return;
     setLoadingMore(true);
-    setError(null);
+    setPostError(null);
     try {
       const page = await searchNetworkPostsPage(query.trim(), 50, postCursor);
       const formatted = formatSearchPosts(page.items);
@@ -110,7 +120,7 @@ function SearchContent() {
       setPostCursor(page.cursor);
     } catch (loadError) {
       console.error(loadError);
-      setError("Impossible de charger davantage de publications.");
+      setPostError("Impossible de charger davantage de publications.");
     } finally {
       setLoadingMore(false);
     }
@@ -119,14 +129,14 @@ function SearchContent() {
   const loadMoreActors = async () => {
     if (!actorCursor || loadingMore) return;
     setLoadingMore(true);
-    setError(null);
+    setActorError(null);
     try {
       const page = await searchNetworkActorsPage(query.trim(), 50, actorCursor);
       setActors((current) => appendUnique(current, page.items, (actor: any) => actor.did));
       setActorCursor(page.cursor);
     } catch (loadError) {
       console.error(loadError);
-      setError("Impossible de charger davantage de comptes.");
+      setActorError("Impossible de charger davantage de comptes.");
     } finally {
       setLoadingMore(false);
     }
@@ -142,6 +152,7 @@ function SearchContent() {
   }
 
   const hasQuery = query.trim().length >= 2;
+  const currentError = tab === "posts" ? postError : actorError;
 
   return (
     <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
@@ -169,14 +180,14 @@ function SearchContent() {
 
         {!hasQuery && <div className="flex min-h-[calc(100vh-90px)] items-start justify-center px-6 py-10 sm:items-center"><div className="max-w-xl text-center"><p className="text-sm text-kelo-muted sm:text-base">Cherchez un mot-clé, un hashtag ou un handle pour explorer tout le réseau fédéré.</p></div></div>}
         {hasQuery && searching && <p className="py-10 text-center text-sm text-kelo-muted">Recherche en cours...</p>}
-        {hasQuery && !searching && error && <p className="py-5 text-center text-sm text-kelo-danger">{error}</p>}
+        {hasQuery && !searching && currentError && <p className="py-5 text-center text-sm text-kelo-danger">{currentError}</p>}
 
         {hasQuery && !searching && tab === "posts" && (
           <div>
             <div className="divide-y divide-kelo-border">
               {posts.length > 0 ? posts.map((post: any) => (
                 <PostCard key={post.uri} post={post} isMine={!!myDid && post.author?.did === myDid} isBookmarked={isBookmarked(post.uri)} onBookmark={() => toggleBookmark(post)} />
-              )) : !error ? <p className="py-10 text-center text-sm text-kelo-muted">Aucune publication trouvée pour cette recherche.</p> : null}
+              )) : !postError ? <p className="py-10 text-center text-sm text-kelo-muted">Aucune publication trouvée pour cette recherche.</p> : null}
             </div>
             {postCursor && posts.length > 0 && <div className="p-4 text-center"><button type="button" onClick={loadMorePosts} disabled={loadingMore} className="rounded-full bg-kelo-gradient px-6 py-3 text-sm font-bold text-white disabled:opacity-50">{loadingMore ? "Chargement..." : "Charger plus de publications"}</button></div>}
           </div>
@@ -197,7 +208,7 @@ function SearchContent() {
                     {actor.description && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-kelo-muted">{actor.description}</p>}
                   </div>
                 </Link>
-              )) : !error ? <p className="py-10 text-center text-sm text-kelo-muted">Aucun compte trouvé.</p> : null}
+              )) : !actorError ? <p className="py-10 text-center text-sm text-kelo-muted">Aucun compte trouvé.</p> : null}
             </div>
             {actorCursor && actors.length > 0 && <div className="p-4 text-center"><button type="button" onClick={loadMoreActors} disabled={loadingMore} className="rounded-full bg-kelo-gradient px-6 py-3 text-sm font-bold text-white disabled:opacity-50">{loadingMore ? "Chargement..." : "Charger plus de comptes"}</button></div>}
           </div>
