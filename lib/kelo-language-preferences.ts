@@ -90,6 +90,17 @@ export const KELO_LANGUAGES = [
   ["ca", "Català"]
 ] as const;
 
+export const KELO_INTERFACE_LANGUAGES = [
+  ["auto", "Automatique (appareil)"],
+  ["fr", "Français"], ["en", "English"], ["nl", "Nederlands"], ["de", "Deutsch"],
+  ["es", "Español"], ["it", "Italiano"], ["pt", "Português"], ["pl", "Polski"],
+  ["ro", "Română"], ["sv", "Svenska"], ["da", "Dansk"], ["fi", "Suomi"],
+  ["no", "Norsk"], ["cs", "Čeština"], ["el", "Ελληνικά"], ["uk", "Українська"],
+  ["ru", "Русский"], ["tr", "Türkçe"], ["ar", "العربية"], ["zh-CN", "简体中文"],
+  ["ja", "日本語"], ["ko", "한국어"], ["hi", "हिन्दी"], ["id", "Bahasa Indonesia"],
+  ["vi", "Tiếng Việt"], ["th", "ไทย"]
+] as const;
+
 export const KELO_INTERESTS = ["Actualités", "Art", "Cinéma", "Culture", "Éducation", "Environnement", "Finance", "Gaming", "Histoire", "Humour", "Livres", "Musique", "Politique", "Sciences", "Sport", "Technologie", "Voyage"];
 
 const DEFAULT_PREFERENCES: KeloContentPreferences = {
