@@ -27,6 +27,7 @@ type TranslationContextValue = {
   loading: boolean;
   t: (key: string, fallback?: string, variables?: Record<string, string | number>) => string;
   reload: () => Promise<void>;
+  setLanguage: (locale: string) => Promise<void>;
 };
 
 const TranslationContext = createContext<TranslationContextValue>({
@@ -34,6 +35,7 @@ const TranslationContext = createContext<TranslationContextValue>({
   loading: false,
   t: (_key, fallback = "") => fallback,
   reload: async () => {},
+  setLanguage: async () => {},
 });
 
 const dictionaries = new Map<string, TranslationDictionary>();
@@ -41,9 +43,6 @@ const dictionaries = new Map<string, TranslationDictionary>();
 async function loadDictionary(locale: string): Promise<TranslationDictionary> {
   if (dictionaries.has(locale)) return dictionaries.get(locale)!;
 
-  // Les traductions de l'interface sont des fichiers statiques versionnés
-  // avec l'application. Le navigateur peut donc les mettre en cache :
-  // aucun appel à une IA/API de traduction n'est effectué à l'affichage.
   const response = await fetch(`/locales/${encodeURIComponent(locale)}.json`, {
     cache: "force-cache",
   });
@@ -66,8 +65,13 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     return normalizeLocale(resolvedInterfaceLanguage(prefs.interfaceLanguage));
   }, [did]);
 
-  const reload = useCallback(async () => {
-    const requested = resolveLocale();
+  const applyLocale = useCallback(async (requestedLocale: string) => {
+    const requested = normalizeLocale(
+      requestedLocale === "auto"
+        ? resolvedInterfaceLanguage("auto")
+        : requestedLocale
+    );
+
     setLoading(true);
 
     try {
@@ -102,7 +106,15 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     } finally {
       setLoading(false);
     }
-  }, [resolveLocale]);
+  }, []);
+
+  const reload = useCallback(async () => {
+    await applyLocale(resolveLocale());
+  }, [applyLocale, resolveLocale]);
+
+  const setLanguage = useCallback(async (requestedLocale: string) => {
+    await applyLocale(requestedLocale);
+  }, [applyLocale]);
 
   useEffect(() => {
     void reload();
@@ -131,8 +143,8 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   );
 
   const value = useMemo(
-    () => ({ locale, loading, t, reload }),
-    [locale, loading, t, reload]
+    () => ({ locale, loading, t, reload, setLanguage }),
+    [locale, loading, t, reload, setLanguage]
   );
 
   return (
