@@ -14,6 +14,16 @@ const INTERFACE_LANGUAGES = [
   ["de", "Deutsch"],
   ["es", "Español"],
   ["it", "Italiano"],
+  ["pt", "Português"],
+  ["pl", "Polski"],
+  ["ro", "Română"],
+  ["sv", "Svenska"],
+  ["da", "Dansk"],
+  ["fi", "Suomi"],
+  ["no", "Norsk"],
+  ["cs", "Čeština"],
+  ["el", "Ελληνικά"],
+  ["uk", "Українська"],
 ] as const;
 
 const AVAILABLE_INTERFACE_CODES = new Set(
@@ -27,9 +37,6 @@ export default function LanguageContentSection() {
 
   useEffect(() => {
     const stored = getKeloContentPreferences(did);
-    // Une ancienne préférence peut pointer vers une langue dont le fichier
-    // statique n'existe pas encore. Dans ce cas, on revient à Automatique au
-    // lieu de laisser l'interface retomber silencieusement en français.
     if (!AVAILABLE_INTERFACE_CODES.has(stored.interfaceLanguage as any)) {
       const next = { ...stored, interfaceLanguage: "auto" };
       setPrefs(next);
