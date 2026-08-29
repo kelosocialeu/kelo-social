@@ -98,7 +98,9 @@ export const KELO_INTERFACE_LANGUAGES = [
   ["no", "Norsk"], ["cs", "Čeština"], ["el", "Ελληνικά"], ["uk", "Українська"],
   ["ru", "Русский"], ["tr", "Türkçe"], ["ar", "العربية"], ["zh-CN", "简体中文"],
   ["ja", "日本語"], ["ko", "한국어"], ["hi", "हिन्दी"], ["id", "Bahasa Indonesia"],
-  ["vi", "Tiếng Việt"], ["th", "ไทย"]
+  ["vi", "Tiếng Việt"], ["th", "ไทย"], ["hu", "Magyar"], ["az", "Azərbaycanca"],
+  ["uz", "O‘zbekcha"], ["am", "አማርኛ"], ["so", "Soomaali"], ["ne", "नेपाली"],
+  ["si", "සිංහල"], ["km", "ខ្មែរ"], ["lo", "ລາວ"], ["fil", "Filipino"]
 ] as const;
 
 export const KELO_INTERESTS = ["Actualités", "Art", "Cinéma", "Culture", "Éducation", "Environnement", "Finance", "Gaming", "Histoire", "Humour", "Livres", "Musique", "Politique", "Sciences", "Sport", "Technologie", "Voyage"];
