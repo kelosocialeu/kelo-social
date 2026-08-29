@@ -32,7 +32,7 @@ const AVAILABLE_INTERFACE_CODES = new Set(
 
 export default function LanguageContentSection() {
   const { did } = useAuthContext();
-  const { t } = useTranslation();
+  const { t, setLanguage } = useTranslation();
   const [prefs, setPrefs] = useState<KeloContentPreferences>({ interfaceLanguage: "auto", postLanguages: [], interests: [] });
 
   useEffect(() => {
@@ -41,16 +41,23 @@ export default function LanguageContentSection() {
       const next = { ...stored, interfaceLanguage: "auto" };
       setPrefs(next);
       saveKeloContentPreferences(did, next);
-      window.dispatchEvent(new Event("kelo-content-preferences-changed"));
+      void setLanguage("auto");
       return;
     }
     setPrefs(stored);
-  }, [did]);
+  }, [did, setLanguage]);
 
   const save = (next: KeloContentPreferences) => {
     setPrefs(next);
     saveKeloContentPreferences(did, next);
     window.dispatchEvent(new Event("kelo-content-preferences-changed"));
+  };
+
+  const changeInterfaceLanguage = (interfaceLanguage: string) => {
+    const next = { ...prefs, interfaceLanguage };
+    setPrefs(next);
+    saveKeloContentPreferences(did, next);
+    void setLanguage(interfaceLanguage);
   };
 
   const toggle = (field: "postLanguages" | "interests", value: string) =>
@@ -70,7 +77,7 @@ export default function LanguageContentSection() {
       <p className="mt-1 text-sm text-kelo-muted">{t("settings.language.description", "Choisissez la langue d’affichage. Automatique utilise la langue de votre appareil.")}</p>
       <select
         value={prefs.interfaceLanguage}
-        onChange={e => save({ ...prefs, interfaceLanguage: e.target.value })}
+        onChange={e => changeInterfaceLanguage(e.target.value)}
         className="mt-4 w-full rounded-xl border border-kelo-border bg-white p-3 text-sm"
       >
         {INTERFACE_LANGUAGES.map(([code, label]) => (
