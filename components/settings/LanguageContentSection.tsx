@@ -4,30 +4,11 @@ import { useEffect, useState } from "react";
 import { Globe2, Languages, Sparkles } from "lucide-react";
 import { useAuthContext } from "@/components/providers/AuthProvider";
 import { useTranslation } from "@/components/providers/TranslationProvider";
-import { getKeloContentPreferences, saveKeloContentPreferences, KELO_INTERESTS, KELO_LANGUAGES, KeloContentPreferences } from "@/lib/kelo-language-preferences";
-
-const INTERFACE_LANGUAGES = [
-  ["auto", "Automatique (appareil)"],
-  ["fr", "Français"],
-  ["en", "English"],
-  ["nl", "Nederlands"],
-  ["de", "Deutsch"],
-  ["es", "Español"],
-  ["it", "Italiano"],
-  ["pt", "Português"],
-  ["pl", "Polski"],
-  ["ro", "Română"],
-  ["sv", "Svenska"],
-  ["da", "Dansk"],
-  ["fi", "Suomi"],
-  ["no", "Norsk"],
-  ["cs", "Čeština"],
-  ["el", "Ελληνικά"],
-  ["uk", "Українська"],
-] as const;
+import { saveRemoteContentPreferences } from "@/lib/atproto/content-preferences";
+import { getKeloContentPreferences, saveKeloContentPreferences, KELO_INTERESTS, KELO_LANGUAGES, KELO_INTERFACE_LANGUAGES, KeloContentPreferences } from "@/lib/kelo-language-preferences";
 
 const AVAILABLE_INTERFACE_CODES = new Set(
-  INTERFACE_LANGUAGES.map(([code]) => code)
+  KELO_INTERFACE_LANGUAGES.map(([code]) => code)
 );
 
 export default function LanguageContentSection() {
@@ -41,15 +22,21 @@ export default function LanguageContentSection() {
       const next = { ...stored, interfaceLanguage: "auto" };
       setPrefs(next);
       saveKeloContentPreferences(did, next);
+      if (did) void saveRemoteContentPreferences(next);
       void setLanguage("auto");
       return;
     }
     setPrefs(stored);
+
+    const synced = () => setPrefs(getKeloContentPreferences(did));
+    window.addEventListener("kelo-content-preferences-synced", synced);
+    return () => window.removeEventListener("kelo-content-preferences-synced", synced);
   }, [did, setLanguage]);
 
   const save = (next: KeloContentPreferences) => {
     setPrefs(next);
     saveKeloContentPreferences(did, next);
+    if (did) void saveRemoteContentPreferences(next);
     window.dispatchEvent(new Event("kelo-content-preferences-changed"));
   };
 
@@ -57,6 +44,7 @@ export default function LanguageContentSection() {
     const next = { ...prefs, interfaceLanguage };
     setPrefs(next);
     saveKeloContentPreferences(did, next);
+    if (did) void saveRemoteContentPreferences(next);
     void setLanguage(interfaceLanguage);
   };
 
@@ -80,8 +68,8 @@ export default function LanguageContentSection() {
         onChange={e => changeInterfaceLanguage(e.target.value)}
         className="mt-4 w-full rounded-xl border border-kelo-border bg-white p-3 text-sm"
       >
-        {INTERFACE_LANGUAGES.map(([code, label]) => (
-          <option key={code} value={code}>{label}</option>
+        {KELO_INTERFACE_LANGUAGES.map(([code, label]) => (
+          <option key={code} value={code}>{code === "auto" ? t("settings.language.auto", label) : label}</option>
         ))}
       </select>
       <p className="mt-2 text-xs text-kelo-muted">
