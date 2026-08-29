@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Bell, Menu } from "lucide-react";
 import Logo from "@/components/ui/Logo";
 import { getUnreadNotificationCount } from "@/lib/atproto/notifications";
+import { useTranslation } from "@/components/providers/TranslationProvider";
 
 interface MobileHeaderProps {
   onOpenMenu: () => void;
@@ -15,6 +16,7 @@ const NOTIFICATION_COUNT_REFRESH_MS = 20_000;
 export default function MobileHeader({
   onOpenMenu,
 }: MobileHeaderProps) {
+  const { t } = useTranslation();
   const [unreadCount, setUnreadCount] = useState(0);
 
   const refreshUnreadCount = useCallback(async () => {
@@ -57,7 +59,7 @@ export default function MobileHeader({
         <button
           type="button"
           onClick={onOpenMenu}
-          aria-label="Ouvrir le menu"
+          aria-label={t("nav.openMenu", "Ouvrir le menu")}
           className="absolute left-0 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/40 bg-white/55 text-kelo-text shadow-sm transition active:scale-95"
         >
           <Menu className="h-5 w-5" />
@@ -72,11 +74,9 @@ export default function MobileHeader({
 
         <Link
           href="/notifications"
-          aria-label={
-            unreadCount > 0
-              ? `${unreadCount} notification${unreadCount > 1 ? "s" : ""} non lue${unreadCount > 1 ? "s" : ""}`
-              : "Notifications"
-          }
+          aria-label={unreadCount > 0
+            ? t("nav.unreadNotifications", `${unreadCount} notification(s) non lue(s)`, { count: unreadCount })
+            : t("nav.notifications", "Notifications")}
           className="absolute right-0 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/40 bg-white/55 text-kelo-text shadow-sm transition active:scale-95"
         >
           <Bell className="h-5 w-5" />
