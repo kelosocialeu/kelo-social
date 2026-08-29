@@ -31,6 +31,7 @@ jobs:
         with:
           node-version: "20"
 
+      # This only generates deployment assets; users never call translation APIs.
       - name: Generate locale files
         run: node scripts/generate-static-interface-locales.mjs || true
 
