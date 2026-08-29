@@ -9,7 +9,8 @@ function normalizePreferences(value: any): KeloContentPreferences | null {
   return {
     interfaceLanguage: typeof value.interfaceLanguage === "string" ? value.interfaceLanguage : "auto",
     postLanguages: Array.isArray(value.postLanguages) ? value.postLanguages.filter((item: unknown): item is string => typeof item === "string") : [],
-    interests: Array.isArray(value.interests) ? value.interests.filter((item: unknown): item is string => typeof item === "string") : [],
+    // Les centres d'intérêt restent locaux : un record de repo AT Protocol est public.
+    interests: [],
   };
 }
 
@@ -38,11 +39,10 @@ export async function saveRemoteContentPreferences(prefs: KeloContentPreferences
         $type: COLLECTION,
         interfaceLanguage: prefs.interfaceLanguage || "auto",
         postLanguages: Array.from(new Set(prefs.postLanguages || [])),
-        interests: Array.from(new Set(prefs.interests || [])),
         updatedAt: new Date().toISOString(),
       },
     });
   } catch (error) {
-    console.warn("Kelo preferences remote sync skipped:", error);
+    console.warn("Kelo language preference remote sync skipped:", error);
   }
 }
