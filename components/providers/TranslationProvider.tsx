@@ -41,8 +41,11 @@ const dictionaries = new Map<string, TranslationDictionary>();
 async function loadDictionary(locale: string): Promise<TranslationDictionary> {
   if (dictionaries.has(locale)) return dictionaries.get(locale)!;
 
+  // Les traductions de l'interface sont des fichiers statiques versionnés
+  // avec l'application. Le navigateur peut donc les mettre en cache :
+  // aucun appel à une IA/API de traduction n'est effectué à l'affichage.
   const response = await fetch(`/locales/${encodeURIComponent(locale)}.json`, {
-    cache: "no-store",
+    cache: "force-cache",
   });
 
   if (!response.ok) throw new Error(`Locale ${locale} indisponible`);
