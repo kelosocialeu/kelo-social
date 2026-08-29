@@ -39,7 +39,9 @@ export const KELO_INTERFACE_LANGUAGES = [
   ["si", "සිංහල"], ["km", "ខ្មែរ"], ["lo", "ລາວ"], ["fil", "Filipino"],
   ["ms", "Bahasa Melayu"], ["jv", "Basa Jawa"], ["su", "Basa Sunda"], ["yo", "Yorùbá"],
   ["ig", "Igbo"], ["zu", "isiZulu"], ["xh", "isiXhosa"], ["rw", "Kinyarwanda"],
-  ["mg", "Malagasy"], ["af", "Afrikaans"]
+  ["mg", "Malagasy"], ["af", "Afrikaans"], ["he", "עברית"], ["bg", "Български"],
+  ["sr", "Српски"], ["hr", "Hrvatski"], ["sk", "Slovenčina"], ["lt", "Lietuvių"],
+  ["lv", "Latviešu"], ["et", "Eesti"], ["sl", "Slovenščina"], ["bs", "Bosanski"]
 ] as const;
 
 export const KELO_INTERESTS = ["Actualités", "Art", "Cinéma", "Culture", "Éducation", "Environnement", "Finance", "Gaming", "Histoire", "Humour", "Livres", "Musique", "Politique", "Sciences", "Sport", "Technologie", "Voyage"];
@@ -65,10 +67,7 @@ export function getKeloContentPreferences(did?: string | null): KeloContentPrefe
   const account = parsePreferences(localStorage.getItem(accountKey(did)));
   if (account) return account;
   const last = parsePreferences(localStorage.getItem(LAST_PREFERENCES_KEY));
-  if (last && did) {
-    localStorage.setItem(accountKey(did), JSON.stringify(last));
-    return last;
-  }
+  if (last && did) { localStorage.setItem(accountKey(did), JSON.stringify(last)); return last; }
   return last || { ...DEFAULT_PREFERENCES };
 }
 
