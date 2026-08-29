@@ -19,7 +19,12 @@ import {
 import {
   getKeloContentPreferences,
   resolvedInterfaceLanguage,
+  saveKeloContentPreferences,
 } from "@/lib/kelo-language-preferences";
+import {
+  loadRemoteContentPreferences,
+  saveRemoteContentPreferences,
+} from "@/lib/atproto/content-preferences";
 import { useAuthContext } from "@/components/providers/AuthProvider";
 
 type TranslationContextValue = {
@@ -119,6 +124,31 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (!did) return;
+    let cancelled = false;
+
+    void (async () => {
+      const local = getKeloContentPreferences(did);
+      const remote = await loadRemoteContentPreferences();
+      if (cancelled) return;
+
+      if (remote) {
+        saveKeloContentPreferences(did, remote);
+        await applyLocale(remote.interfaceLanguage);
+        window.dispatchEvent(new Event("kelo-content-preferences-synced"));
+      } else {
+        // Migration douce pour les comptes qui avaient déjà des préférences
+        // locales avant l'ajout de la synchronisation multi-appareils.
+        await saveRemoteContentPreferences(local);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [did, applyLocale]);
 
   useEffect(() => {
     const listener = () => void reload();
