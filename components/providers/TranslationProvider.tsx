@@ -135,8 +135,14 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       if (cancelled) return;
 
       if (remote) {
-        saveKeloContentPreferences(did, remote);
-        await applyLocale(remote.interfaceLanguage);
+        const merged = {
+          ...local,
+          interfaceLanguage: remote.interfaceLanguage,
+          postLanguages: remote.postLanguages,
+          interests: local.interests,
+        };
+        saveKeloContentPreferences(did, merged);
+        await applyLocale(merged.interfaceLanguage);
         window.dispatchEvent(new Event("kelo-content-preferences-synced"));
       } else {
         // Migration douce pour les comptes qui avaient déjà des préférences
