@@ -5,6 +5,7 @@ import MobileNavigationShell from "@/components/layout/MobileNavigationShell";
 import MobileOrientationLock from "@/components/layout/MobileOrientationLock";
 import DisplayPreferencesBootstrap from "@/components/layout/DisplayPreferencesBootstrap";
 import EmojiCompatibility from "@/components/layout/EmojiCompatibility";
+import PublicLanguageSelector from "@/components/layout/PublicLanguageSelector";
 import SystemNotificationBootstrap from "@/components/layout/SystemNotificationBootstrap";
 import SystemNotificationWatcher from "@/components/layout/SystemNotificationWatcher";
 import BioMentionLinker from "@/components/profile/BioMentionLinker";
@@ -65,6 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <TranslationProvider>
             <DisplayPreferencesBootstrap />
             <EmojiCompatibility />
+            <PublicLanguageSelector />
             <SystemNotificationBootstrap />
             <SystemNotificationWatcher />
             <MobileOrientationLock />
