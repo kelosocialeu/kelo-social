@@ -10,7 +10,6 @@ import {
 
 import {
   getStoredSession,
-  restoreStoredSession,
   logout as logoutService,
 } from "@/services/auth.service";
 
@@ -52,26 +51,16 @@ export function AuthProvider({
   };
 
   useEffect(() => {
-    let cancelled = false;
-
-    // Une session déjà persistée suffit pour afficher immédiatement l'app.
-    // Sa validation réseau se poursuit en arrière-plan au lieu de bloquer
-    // chaque navigation avec un écran de vérification.
-    const localSession = getStoredSession();
-    setSession(localSession);
-    setChecked(true);
-
-    if (localSession) {
-      restoreStoredSession()
-        .then((restored) => {
-          if (cancelled) return;
-          setSession(restored || getStoredSession());
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setSession(getStoredSession());
-        });
-    }
+    /*
+     * La session AT Protocol est persistée dans localStorage. Au démarrage,
+     * on la restaure immédiatement sans effectuer de validation réseau.
+     *
+     * Une validation réseau ici pouvait déconnecter l'utilisateur à tort
+     * lors d'un simple timeout, d'une panne temporaire du PDS ou d'un souci
+     * CORS. La session sera validée/renouvelée au moment où une requête
+     * authentifiée aura réellement besoin de l'agent AT Protocol.
+     */
+    refreshSession();
 
     const handleStorage = () => {
       refreshSession();
@@ -88,8 +77,6 @@ export function AuthProvider({
     );
 
     return () => {
-      cancelled = true;
-
       window.removeEventListener(
         "storage",
         handleStorage
