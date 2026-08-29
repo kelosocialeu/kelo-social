@@ -10,6 +10,13 @@ export class AuthError extends Error {
   }
 }
 
+class InvalidSessionError extends AuthError {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidSessionError";
+  }
+}
+
 export class AuthFactorRequiredError extends AuthError {
   constructor() {
     super(
@@ -91,7 +98,7 @@ async function refreshAtProtocolSession(session: AtpSession): Promise<AtpSession
 
   pendingSessionRefresh = (async () => {
     if (!session.refreshJwt) {
-      throw new AuthError(
+      throw new InvalidSessionError(
         "Votre session ne peut pas être renouvelée. Veuillez vous reconnecter."
       );
     }
@@ -117,19 +124,25 @@ async function refreshAtProtocolSession(session: AtpSession): Promise<AtpSession
 
     if (!response.ok) {
       if (isDefinitelyExpiredSessionStatus(response.status)) {
-        throw new AuthError("Votre session a expiré. Veuillez vous reconnecter.");
+        throw new InvalidSessionError("Votre session a expiré. Veuillez vous reconnecter.");
       }
-      throw new Error(
+      throw new AuthError(
         `Le PDS est temporairement indisponible pendant le renouvellement de session (${response.status}).`
       );
     }
 
-    const data = (await response.json()) as any;
+    let data: any;
+    try {
+      data = await response.json();
+    } catch {
+      throw new AuthError("Le PDS a retourné une réponse temporairement illisible.");
+    }
+
     if (!data.accessJwt || !data.refreshJwt || !data.handle || !data.did) {
-      throw new AuthError("Le PDS a retourné une session incomplète.");
+      throw new AuthError("Le PDS a retourné une session incomplète. Réessayez dans un instant.");
     }
     if (data.did !== session.did) {
-      throw new AuthError("La session renouvelée ne correspond pas au compte connecté.");
+      throw new InvalidSessionError("La session renouvelée ne correspond pas au compte connecté.");
     }
 
     const next: AtpSession = {
@@ -301,10 +314,20 @@ export async function resumeAgentSession(session: AtpSession) {
       return await resume(await refreshAtProtocolSession(session));
     } catch (error) {
       clearCachedAgent();
-      if (error instanceof AuthError) {
+
+      // On ne supprime la session persistée que si le PDS confirme qu'elle
+      // est réellement invalide/expirée. Une panne réseau, un timeout, du
+      // CORS ou une indisponibilité temporaire ne doivent jamais déconnecter
+      // définitivement l'utilisateur.
+      if (error instanceof InvalidSessionError) {
         sessionStorage.clear();
         throw error;
       }
+
+      if (error instanceof AuthError) {
+        throw error;
+      }
+
       throw new AuthError(
         "Connexion temporairement impossible avec votre PDS. Votre session est conservée."
       );
