@@ -4,6 +4,10 @@ import { discoverAccount } from "@/lib/atproto/discovery";
 
 export const runtime = "nodejs";
 
+function normalizeOrigin(value: string) {
+  return value.trim().replace(/\/$/, "");
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -11,11 +15,10 @@ export async function POST(request: Request) {
     const token = String(body?.token || "").trim();
     const password = String(body?.password || "");
 
-    if (!identifier || !token || !password) {
+    if (!token || !password) {
       return NextResponse.json(
         {
-          error:
-            "Le handle, le code reçu et le nouveau mot de passe sont obligatoires.",
+          error: "Le code reçu et le nouveau mot de passe sont obligatoires.",
         },
         { status: 400 }
       );
@@ -31,9 +34,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const account = await discoverAccount(identifier);
+    let pdsUrl = normalizeOrigin(
+      process.env.KELO_ADMIN_PDS_URL || "https://pds.kelosocial.eu"
+    );
+
+    if (identifier) {
+      const account = await discoverAccount(identifier);
+      pdsUrl = normalizeOrigin(account.pdsUrl);
+    }
+
     const response = await fetch(
-      `${account.pdsUrl.replace(/\/$/, "")}/xrpc/com.atproto.server.resetPassword`,
+      `${pdsUrl}/xrpc/com.atproto.server.resetPassword`,
       {
         method: "POST",
         headers: {
