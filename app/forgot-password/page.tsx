@@ -12,6 +12,7 @@ type Step = "request" | "confirm" | "done";
 export default function ForgotPasswordPage() {
   const [step, setStep] = useState<Step>("request");
   const [identifier, setIdentifier] = useState("");
+  const [email, setEmail] = useState("");
   const [token, setToken] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -25,11 +26,17 @@ export default function ForgotPasswordPage() {
     setError("");
     setMessage("");
 
+    if (!identifier.trim() && !email.trim()) {
+      setError("Saisissez votre handle ou votre adresse e-mail.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch("/api/auth/password-reset/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier }),
+        body: JSON.stringify({ identifier, email }),
       });
       const data = await response.json();
 
@@ -90,26 +97,38 @@ export default function ForgotPasswordPage() {
   return (
     <AuthLayout
       title="Mot de passe oublié"
-      tagline="Entrez simplement votre handle. Pour les comptes hébergés sur le PDS Kelo, l’adresse e-mail reste privée et le code est envoyé automatiquement."
+      tagline="Saisissez votre handle ou votre adresse e-mail. Un seul des deux suffit."
     >
       {step === "request" && (
         <form onSubmit={requestReset} className="flex flex-col gap-5">
           <Input
-            label="Identifiant / Handle"
+            label="Identifiant / Handle (facultatif)"
             type="text"
-            required
             autoComplete="username"
             value={identifier}
             onChange={(event) => setIdentifier(event.target.value)}
             placeholder="votre-compte.kelosocial.eu"
           />
 
+          <div className="text-center text-xs font-semibold uppercase tracking-wide text-kelo-muted">
+            ou
+          </div>
+
+          <Input
+            label="Adresse e-mail (facultatif)"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="vous@exemple.com"
+          />
+
           <div className="rounded-2xl bg-kelo-background p-4 text-xs text-kelo-muted">
             <p>
-              Kelo Social détecte automatiquement le PDS du compte. Si le compte est hébergé sur le PDS Kelo, votre adresse e-mail n’est jamais affichée : elle sert uniquement côté serveur pour demander l’envoi du code de récupération.
+              Sur le PDS Kelo, un handle seul suffit : Kelo Social retrouve l’adresse associée côté serveur sans l’afficher.
             </p>
             <p className="mt-2">
-              Pour un compte hébergé sur un PDS externe, Kelo Social ne peut pas lire son adresse e-mail privée : la récupération doit alors être effectuée auprès de ce PDS.
+              Une adresse e-mail seule permet également de demander un code pour un compte Kelo. Pour un PDS externe, saisissez le handle et l’e-mail afin que Kelo Social sache quel serveur contacter.
             </p>
           </div>
 
