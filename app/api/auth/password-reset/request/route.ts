@@ -52,35 +52,45 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const identifier = String(body?.identifier || "").trim();
+    const suppliedEmail = String(body?.email || "").trim().toLowerCase();
 
-    if (!identifier) {
+    if (!identifier && !suppliedEmail) {
       return NextResponse.json(
-        { error: "Le handle est obligatoire." },
+        { error: "Saisissez votre handle ou votre adresse e-mail." },
         { status: 400 }
       );
     }
 
-    const account = await discoverAccount(identifier);
     const keloPdsUrl = normalizeOrigin(
       process.env.KELO_ADMIN_PDS_URL || "https://pds.kelosocial.eu"
     );
-    const accountPdsUrl = normalizeOrigin(account.pdsUrl);
 
-    if (accountPdsUrl !== keloPdsUrl) {
-      return NextResponse.json(
-        {
-          error:
-            "Ce compte est hébergé sur un PDS externe. L’AT Protocol ne permet pas à Kelo Social de lire l’adresse e-mail privée d’un autre PDS à partir du handle. Utilisez la procédure de récupération proposée par ce PDS.",
-          externalPds: true,
-          pdsUrl: account.pdsUrl,
-        },
-        { status: 400 }
-      );
+    let targetPdsUrl = keloPdsUrl;
+    let email = suppliedEmail;
+
+    if (identifier) {
+      const account = await discoverAccount(identifier);
+      targetPdsUrl = normalizeOrigin(account.pdsUrl);
+
+      if (!email) {
+        if (targetPdsUrl !== keloPdsUrl) {
+          return NextResponse.json(
+            {
+              error:
+                "Pour un compte hébergé sur un PDS externe, saisissez aussi l’adresse e-mail associée au compte.",
+              externalPds: true,
+              pdsUrl: account.pdsUrl,
+            },
+            { status: 400 }
+          );
+        }
+
+        email = await getKeloAccountEmail(account.pdsUrl, account.did);
+      }
     }
 
-    const email = await getKeloAccountEmail(account.pdsUrl, account.did);
     const response = await fetch(
-      `${accountPdsUrl}/xrpc/com.atproto.server.requestPasswordReset`,
+      `${targetPdsUrl}/xrpc/com.atproto.server.requestPasswordReset`,
       {
         method: "POST",
         headers: {
@@ -110,9 +120,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      pdsUrl: account.pdsUrl,
+      pdsUrl: targetPdsUrl,
       message:
-        "Si ce compte peut être récupéré, un code a été envoyé à l’adresse e-mail associée. L’adresse reste masquée.",
+        "Si le compte peut être récupéré, un code a été envoyé à l’adresse e-mail associée.",
     });
   } catch (error) {
     console.error("[password-reset/request]", error);
