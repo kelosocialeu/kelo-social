@@ -26,13 +26,28 @@ export async function updateHandle(newHandle: string): Promise<void> {
     { encoding: "application/json" }
   );
 
-  // Le DID reste l'identité permanente. Seul le handle change.
-  // On synchronise immédiatement la session locale afin que toutes les
-  // pages de Kelo Social affichent le nouveau handle sans reconnexion.
   sessionStorage.set({
     ...session,
     handle: cleanHandle,
   });
+}
+
+/** Envoie à l'adresse actuelle le code AT Protocol permettant de confirmer l'email. */
+export async function requestEmailConfirmation(): Promise<void> {
+  const { agent } = await getAccountAgent();
+  await agent.api.com.atproto.server.requestEmailConfirmation();
+}
+
+/** Confirme l'adresse actuelle avec le code reçu par email. */
+export async function confirmEmail(email: string, token: string): Promise<void> {
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanToken = token.trim();
+  if (!cleanEmail || !cleanToken) throw new Error("Adresse email et code requis.");
+  const { agent } = await getAccountAgent();
+  await agent.api.com.atproto.server.confirmEmail(
+    { email: cleanEmail, token: cleanToken },
+    { encoding: "application/json" }
+  );
 }
 
 /**
