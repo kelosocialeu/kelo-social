@@ -12,7 +12,6 @@ type Step = "request" | "confirm" | "done";
 export default function ForgotPasswordPage() {
   const [step, setStep] = useState<Step>("request");
   const [identifier, setIdentifier] = useState("");
-  const [email, setEmail] = useState("");
   const [token, setToken] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -30,7 +29,7 @@ export default function ForgotPasswordPage() {
       const response = await fetch("/api/auth/password-reset/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier, email }),
+        body: JSON.stringify({ identifier }),
       });
       const data = await response.json();
 
@@ -91,7 +90,7 @@ export default function ForgotPasswordPage() {
   return (
     <AuthLayout
       title="Mot de passe oublié"
-      tagline="Kelo Social contacte automatiquement le PDS qui héberge votre compte AT Protocol."
+      tagline="Entrez simplement votre handle. Pour les comptes hébergés sur le PDS Kelo, l’adresse e-mail reste privée et le code est envoyé automatiquement."
     >
       {step === "request" && (
         <form onSubmit={requestReset} className="flex flex-col gap-5">
@@ -102,22 +101,17 @@ export default function ForgotPasswordPage() {
             autoComplete="username"
             value={identifier}
             onChange={(event) => setIdentifier(event.target.value)}
-            placeholder="votre-compte.exemple"
+            placeholder="votre-compte.kelosocial.eu"
           />
 
-          <Input
-            label="Adresse e-mail du compte"
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="vous@exemple.com"
-          />
-
-          <p className="text-xs text-kelo-muted">
-            Le code est envoyé par votre PDS à l’adresse e-mail associée au compte. Kelo Social ne reçoit pas ce code par e-mail et ne stocke pas votre nouveau mot de passe.
-          </p>
+          <div className="rounded-2xl bg-kelo-background p-4 text-xs text-kelo-muted">
+            <p>
+              Kelo Social détecte automatiquement le PDS du compte. Si le compte est hébergé sur le PDS Kelo, votre adresse e-mail n’est jamais affichée : elle sert uniquement côté serveur pour demander l’envoi du code de récupération.
+            </p>
+            <p className="mt-2">
+              Pour un compte hébergé sur un PDS externe, Kelo Social ne peut pas lire son adresse e-mail privée : la récupération doit alors être effectuée auprès de ce PDS.
+            </p>
+          </div>
 
           {error && (
             <p role="alert" className="text-sm font-medium text-kelo-danger">
@@ -126,7 +120,7 @@ export default function ForgotPasswordPage() {
           )}
 
           <Button type="submit" loading={loading} loadingText="Envoi du code...">
-            Envoyer le code
+            Envoyer le code de récupération
           </Button>
         </form>
       )}
@@ -202,9 +196,7 @@ export default function ForgotPasswordPage() {
             <h2 className="text-lg font-extrabold text-kelo-text">
               Mot de passe modifié
             </h2>
-            <p className="mt-2 text-sm text-kelo-muted">
-              {message}
-            </p>
+            <p className="mt-2 text-sm text-kelo-muted">{message}</p>
           </div>
 
           <Link
