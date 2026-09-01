@@ -16,10 +16,7 @@ html,body { margin:0; padding:0; width:100%; max-width:100%; overflow-x:hidden; 
 * { box-sizing:border-box; }
 img,video,canvas,svg { max-width:100%; }
 button { transition:.25s; }
-
-/* Emoji are rendered as Twemoji images when the device's own emoji font is old. */
 img.kelo-emoji { width:1.15em; height:1.15em; margin:0 .04em; vertical-align:-.18em; display:inline-block; object-fit:contain; }
-
 ::-webkit-scrollbar { width:10px; }
 ::-webkit-scrollbar-thumb { background:#c8c8d8; border-radius:999px; }
 ::-webkit-scrollbar-thumb:hover { background:#a7a7bd; }
@@ -44,9 +41,47 @@ html.kelo-reduce-motion *,html.kelo-reduce-motion *::before,html.kelo-reduce-mot
 .settings-bluesky-section input,.settings-bluesky-section select,.settings-bluesky-section textarea,.settings-bluesky-section button { max-width:100%; }
 @media (max-width:1023px) { .settings-bluesky-section>* { min-width:0; } }
 
-/* Sur les profils, le cadre rond de l'avatar ne doit jamais s'étirer quand la
-   zone passe en colonne sur mobile/tablette. Le flex parent utilise sinon
-   align-items: stretch par défaut, ce qui transforme le cercle en grande pilule. */
+/* Landing page motion: progressive entrance, living social preview and subtle ambient movement. */
+body:has(.kelo-landing){background:#fbfaff}
+.kelo-landing{position:relative;isolation:isolate;animation:keloLandingFade .55s ease-out both}
+.kelo-landing::before,.kelo-landing::after{content:"";position:absolute;z-index:-1;pointer-events:none;border-radius:999px;filter:blur(70px);opacity:.34}
+.kelo-landing::before{width:420px;height:420px;top:140px;left:-180px;background:#8b5cf6;animation:keloOrbOne 14s ease-in-out infinite alternate}
+.kelo-landing::after{width:380px;height:380px;top:560px;right:-170px;background:#ec4899;animation:keloOrbTwo 17s ease-in-out infinite alternate}
+.kelo-landing-header{animation:keloDrop .7s cubic-bezier(.22,1,.36,1) both}
+.kelo-landing-copy{animation:keloRise .85s .08s cubic-bezier(.22,1,.36,1) both}
+.kelo-landing-title-gradient{background-size:200% 200%!important;animation:keloGradient 6s ease-in-out infinite}
+.kelo-landing-preview{animation:keloPreviewIn .95s .16s cubic-bezier(.22,1,.36,1) both,keloFloat 6s 1.2s ease-in-out infinite}
+.kelo-landing-preview article{transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s ease}
+.kelo-landing-preview article:hover{transform:translateY(-5px) scale(1.01);box-shadow:0 18px 45px rgba(83,55,160,.12)}
+.kelo-landing-preview .kelo-preview-avatar{animation:keloAvatar 4s ease-in-out infinite}
+.kelo-landing-preview .kelo-preview-check{animation:keloPulse 2.6s ease-in-out infinite}
+.kelo-landing-preview .kelo-preview-media{background-size:180% 180%!important;animation:keloGradient 7s ease-in-out infinite}
+.kelo-landing-highlight{transition:transform .3s ease,background .3s ease;animation:keloRise .7s cubic-bezier(.22,1,.36,1) both}
+.kelo-landing-highlight:nth-child(2){animation-delay:.08s}.kelo-landing-highlight:nth-child(3){animation-delay:.16s}.kelo-landing-highlight:nth-child(4){animation-delay:.24s}
+.kelo-landing-highlight:hover{transform:translateY(-5px);background:rgba(245,243,255,.72)}
+.kelo-feature-card{position:relative;overflow:hidden;transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s ease,border-color .35s ease;animation:keloRise .7s cubic-bezier(.22,1,.36,1) both}
+.kelo-feature-card::after{content:"";position:absolute;inset:-100% -50%;pointer-events:none;background:linear-gradient(110deg,transparent 45%,rgba(139,92,246,.09) 50%,transparent 55%);transform:translateX(-55%);transition:transform .8s ease}
+.kelo-feature-card:hover{transform:translateY(-9px);border-color:rgba(139,92,246,.24);box-shadow:0 26px 65px rgba(70,44,140,.13)}
+.kelo-feature-card:hover::after{transform:translateX(55%)}
+.kelo-feature-card:nth-child(2){animation-delay:.09s}.kelo-feature-card:nth-child(3){animation-delay:.18s}.kelo-feature-card:nth-child(4){animation-delay:.27s}
+.kelo-feature-card>span{transition:transform .35s cubic-bezier(.22,1,.36,1)}.kelo-feature-card:hover>span{transform:rotate(-7deg) scale(1.08)}
+.kelo-landing-dark{position:relative;background-size:180% 180%;animation:keloDarkGlow 8s ease-in-out infinite}
+.kelo-landing-dark::after{content:"";position:absolute;width:190px;height:190px;right:16%;bottom:-110px;border-radius:50%;border:1px solid rgba(255,255,255,.12);animation:keloRing 7s ease-in-out infinite}
+.kelo-landing-cta{animation:keloRise .8s cubic-bezier(.22,1,.36,1) both}
+@keyframes keloLandingFade{from{opacity:0}to{opacity:1}}
+@keyframes keloDrop{from{opacity:0;transform:translateY(-18px)}to{opacity:1;transform:none}}
+@keyframes keloRise{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+@keyframes keloPreviewIn{from{opacity:0;transform:translateY(38px) scale(.94) rotate(2deg)}to{opacity:1;transform:none}}
+@keyframes keloFloat{0%,100%{transform:translateY(0) rotate(.2deg)}50%{transform:translateY(-13px) rotate(-.5deg)}}
+@keyframes keloGradient{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+@keyframes keloPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(124,58,237,.22)}50%{transform:scale(1.1);box-shadow:0 0 0 7px rgba(124,58,237,0)}}
+@keyframes keloAvatar{0%,100%{transform:rotate(0) scale(1)}50%{transform:rotate(-3deg) scale(1.04)}}
+@keyframes keloOrbOne{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(90px,90px,0) scale(1.2)}}
+@keyframes keloOrbTwo{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(-100px,80px,0) scale(1.16)}}
+@keyframes keloDarkGlow{0%,100%{box-shadow:0 30px 80px rgba(30,20,70,.18)}50%{box-shadow:0 35px 100px rgba(124,58,237,.26)}}
+@keyframes keloRing{0%,100%{transform:scale(.85);opacity:.25}50%{transform:scale(1.2);opacity:.55}}
+@media(prefers-reduced-motion:reduce){.kelo-landing,.kelo-landing::before,.kelo-landing::after,.kelo-landing-header,.kelo-landing-copy,.kelo-landing-title-gradient,.kelo-landing-preview,.kelo-landing-preview .kelo-preview-avatar,.kelo-landing-preview .kelo-preview-check,.kelo-landing-preview .kelo-preview-media,.kelo-landing-highlight,.kelo-feature-card,.kelo-landing-dark,.kelo-landing-dark::after,.kelo-landing-cta{animation:none!important}.kelo-feature-card,.kelo-landing-highlight,.kelo-landing-preview article{transition:none!important}}
+
 @media (max-width:767px) {
   .inline-block.rounded-full.border-4.border-white.shadow-md {
     display:inline-flex;
