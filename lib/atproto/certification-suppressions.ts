@@ -26,6 +26,8 @@ interface CacheEntry {
 
 const CACHE_DURATION = 60 * 1000;
 const cache = new Map<string, CacheEntry>();
+let fullListLoadedAt = 0;
+let fullListPromise: Promise<CertificationSuppressionRecord[]> | null = null;
 
 function normalizeDid(value: string) {
   return value.trim().toLowerCase();
@@ -68,9 +70,7 @@ function createPolicyAgent() {
   return new AtpAgent({ service: CERTIFICATION_POLICY_PDS_URL });
 }
 
-export async function listCertificationSuppressions(): Promise<
-  CertificationSuppressionRecord[]
-> {
+async function fetchFullSuppressionList(): Promise<CertificationSuppressionRecord[]> {
   const agent = createPolicyAgent();
   const records: CertificationSuppressionRecord[] = [];
   let cursor: string | undefined;
@@ -87,7 +87,6 @@ export async function listCertificationSuppressions(): Promise<
       for (const item of response.data.records) {
         const parsed = parseSuppression(item.value);
         if (!parsed) continue;
-
         records.push(parsed);
         cache.set(normalizeDid(parsed.subjectDid), {
           value: parsed,
@@ -97,11 +96,30 @@ export async function listCertificationSuppressions(): Promise<
 
       cursor = response.data.cursor;
     } while (cursor);
+
+    fullListLoadedAt = Date.now();
+    return records;
   } catch {
     return [];
   }
+}
 
-  return records;
+export async function listCertificationSuppressions(): Promise<
+  CertificationSuppressionRecord[]
+> {
+  if (fullListLoadedAt && Date.now() - fullListLoadedAt < CACHE_DURATION) {
+    return Array.from(cache.values())
+      .filter((entry) => entry.value)
+      .map((entry) => entry.value!)
+  }
+
+  if (!fullListPromise) {
+    fullListPromise = fetchFullSuppressionList().finally(() => {
+      fullListPromise = null;
+    });
+  }
+
+  return fullListPromise;
 }
 
 export async function getCertificationSuppression(
@@ -115,28 +133,22 @@ export async function getCertificationSuppression(
     return cached.value;
   }
 
-  const agent = createPolicyAgent();
+  // A suppression is a sparse policy record. Querying getRecord for every DID
+  // produces a 400 RecordNotFound for nearly every account and floods DevTools.
+  // Load the small policy collection once, cache it, and treat absent DIDs as
+  // not suppressed without issuing one failing XRPC request per account.
+  await listCertificationSuppressions();
 
-  try {
-    const response = await agent.api.com.atproto.repo.getRecord({
-      repo: CERTIFICATION_POLICY_REPO_HANDLE,
-      collection: CERTIFICATION_SUPPRESSION_COLLECTION,
-      rkey: did,
-    });
-
-    const parsed = parseSuppression(response.data.value);
-    cache.set(did, {
-      value: parsed,
-      expiresAt: Date.now() + CACHE_DURATION,
-    });
-    return parsed;
-  } catch {
-    cache.set(did, {
-      value: null,
-      expiresAt: Date.now() + CACHE_DURATION,
-    });
-    return null;
+  const afterList = cache.get(did);
+  if (afterList && afterList.expiresAt > Date.now()) {
+    return afterList.value;
   }
+
+  cache.set(did, {
+    value: null,
+    expiresAt: Date.now() + CACHE_DURATION,
+  });
+  return null;
 }
 
 export async function isCertificationSuppressed(subjectDid: string) {
@@ -149,4 +161,6 @@ export function clearCertificationSuppressionCache(subjectDid?: string) {
     return;
   }
   cache.clear();
+  fullListLoadedAt = 0;
+  fullListPromise = null;
 }
