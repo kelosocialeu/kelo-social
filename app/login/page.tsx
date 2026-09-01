@@ -80,11 +80,7 @@ export default function LoginPage() {
     setQrLoading(true);
     setQrMessage(t("auth.login.qr.confirmed", "Connexion confirmée. Ouverture de Kelo Social..."));
     try {
-      const confirmedSession = await withTimeout(
-        loginWithKeloIdSession(session),
-        15000,
-        t("auth.login.qr.timeout", "La validation de la session prend trop de temps. Générez un nouveau QR et réessayez.")
-      );
+      const confirmedSession = await withTimeout(loginWithKeloIdSession(session), 15000, t("auth.login.qr.timeout", "La validation de la session prend trop de temps. Générez un nouveau QR et réessayez."));
       await trackQrLogin(confirmedSession);
       refreshSession();
       window.location.replace("/feed");
@@ -142,7 +138,7 @@ export default function LoginPage() {
     <AuthLayout title={t("auth.login.title", "Connexion")} tagline={t("auth.login.tagline", "Accédez à votre espace souverain et fédéré sur l’AT Protocol.")}>
       <div className="mb-5 grid grid-cols-2 gap-2 rounded-2xl bg-kelo-background p-1">
         <button type="button" onClick={() => { stopPolling(); setMode("password"); }} className={`rounded-xl px-3 py-2 text-sm font-bold ${mode === "password" ? "bg-white shadow-sm" : "text-kelo-muted"}`}>
-          {t("auth.login.passwordMode", "Mot de passe")}
+          {t("auth.login.passwordMode", "E-mail / mot de passe")}
         </button>
         <button type="button" onClick={() => { setMode("kelo-id"); void startKeloIdLogin(); }} className={`rounded-xl px-3 py-2 text-sm font-bold ${mode === "kelo-id" ? "bg-white shadow-sm" : "text-kelo-muted"}`}>
           {t("auth.login.qrMode", "QR Kelo ID")}
@@ -151,8 +147,8 @@ export default function LoginPage() {
 
       {mode === "password" ? (
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          <Input label={t("auth.login.identifier", "Identifiant / Handle")} type="text" required autoComplete="username" value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder={t("auth.login.identifierPlaceholder", "votre-compte.exemple")} />
-          <p className="-mt-3 text-xs text-kelo-muted">{t("auth.login.pdsAuto", "Kelo Social détecte automatiquement le PDS associé à votre compte.")}</p>
+          <Input label={t("auth.login.identifier", "Adresse e-mail ou handle")} type="text" inputMode="email" required autoComplete="username" value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder={t("auth.login.identifierPlaceholder", "vous@exemple.eu ou votre-compte.exemple")} />
+          <p className="-mt-3 text-xs text-kelo-muted">{t("auth.login.pdsAuto", "Utilisez l’adresse e-mail liée à votre compte AT Protocol ou votre handle. Kelo Social retrouve ensuite votre PDS.")}</p>
           <Input label={t("auth.login.password", "Mot de passe")} type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t("auth.login.passwordPlaceholder", "Votre mot de passe")} />
           {needsCode && <Input label={t("auth.login.emailCode", "Code reçu par e-mail")} type="text" required autoComplete="one-time-code" value={authFactorToken} onChange={(event) => setAuthFactorToken(event.target.value)} placeholder={t("auth.login.codePlaceholder", "Code de connexion")} />}
           <div className="-mt-3 flex justify-end"><Link href="/forgot-password" className="text-sm font-semibold text-kelo-primary hover:underline">{t("auth.login.forgotPassword", "Mot de passe oublié ?")}</Link></div>
