@@ -8,7 +8,16 @@ export function normalizeLocale(locale?: string | null): string {
   if (!locale) return DEFAULT_LOCALE;
   const clean = locale.trim();
   if (!clean) return DEFAULT_LOCALE;
-  return clean;
+
+  const normalized = clean.replace(/_/g, "-");
+  const lower = normalized.toLowerCase();
+
+  // Kelo ships one interface dictionary per base language. Browser locales
+  // such as fr-FR, fr-BE, en-US, etc. must therefore resolve to fr, en, ...
+  // instead of triggering a useless /locales/fr-FR.json 404.
+  if (lower === "zh" || lower.startsWith("zh-")) return "zh-CN";
+
+  return normalized.split("-")[0].toLowerCase() || DEFAULT_LOCALE;
 }
 
 export function isRtlLocale(locale: string): boolean {
