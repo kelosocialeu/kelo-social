@@ -67,6 +67,16 @@ export default function GamesPage() {
                 visual="cards"
               />
               <GameCard
+                href="/games/uno"
+                icon={<Gamepad2 className="h-8 w-8"/>}
+                title="Uno Kelo"
+                eyebrow="Jeu de défausse"
+                description="Associe couleurs, chiffres et cartes spéciales. Vide ta main avant ton adversaire et annonce UNO Kelo au bon moment."
+                modes={["Robot", "Ami", "Joueur aléatoire"]}
+                stat="7 cartes au départ"
+                visual="uno"
+              />
+              <GameCard
                 href="/games/chess"
                 icon={<Crown className="h-8 w-8"/>}
                 title="Kelo Échecs"
@@ -90,7 +100,7 @@ export default function GamesPage() {
   );
 }
 
-function GameCard({ href, icon, title, eyebrow, description, modes, stat, visual }: { href: string; icon: React.ReactNode; title: string; eyebrow: string; description: string; modes: string[]; stat: string; visual: "quiz" | "cards" | "chess" }) {
+function GameCard({ href, icon, title, eyebrow, description, modes, stat, visual }: { href: string; icon: React.ReactNode; title: string; eyebrow: string; description: string; modes: string[]; stat: string; visual: "quiz" | "cards" | "uno" | "chess" }) {
   return (
     <Link href={href} className="group overflow-hidden rounded-[30px] border border-kelo-border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
       <div className="relative h-44 overflow-hidden bg-kelo-gradient p-5 text-white">
@@ -98,6 +108,7 @@ function GameCard({ href, icon, title, eyebrow, description, modes, stat, visual
         <div className="relative flex items-start justify-between"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur">{icon}</div><span className="rounded-full bg-white/15 px-3 py-1 text-xs font-extrabold backdrop-blur">Disponible</span></div>
         {visual === "quiz" && <div className="absolute bottom-4 right-5 text-6xl font-black text-white/25">?</div>}
         {visual === "cards" && <div className="absolute bottom-3 right-5 flex -space-x-6"><span className="rotate-[-12deg] rounded-xl border border-white/40 bg-white/20 px-5 py-7 text-2xl font-black backdrop-blur">K</span><span className="rotate-[8deg] rounded-xl border border-white/40 bg-white/25 px-5 py-7 text-2xl font-black backdrop-blur">★</span></div>}
+        {visual === "uno" && <div className="absolute bottom-2 right-5 flex -space-x-5"><span className="rotate-[-14deg] rounded-xl border-2 border-white/50 bg-red-500 px-4 py-6 text-2xl font-black">7</span><span className="rotate-[3deg] rounded-xl border-2 border-white/50 bg-yellow-400 px-4 py-6 text-2xl font-black text-black">+2</span><span className="rotate-[14deg] rounded-xl border-2 border-white/50 bg-blue-500 px-4 py-6 text-2xl font-black">↻</span></div>}
         {visual === "chess" && <div className="absolute bottom-1 right-4 text-7xl text-white/30">♞</div>}
       </div>
       <div className="p-5">
