@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kelo Translate</title>
+  <style>
+    body{font-family:system-ui,-apple-system,sans-serif;width:310px;margin:0;padding:18px;background:#fff;color:#151515}h1{font-size:18px;margin:0 0 4px}.sub{font-size:12px;color:#666;margin:0 0 16px}label{display:block;font-size:12px;font-weight:700;margin-bottom:6px}select,button{width:100%;box-sizing:border-box;border-radius:12px;padding:10px 12px;font:inherit}select{border:1px solid #ddd;background:#fff;margin-bottom:10px}button{border:0;font-weight:750;cursor:pointer;margin-top:8px}.primary{background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff}.secondary{background:#f2f2f2;color:#222}.status{min-height:18px;margin-top:12px;font-size:12px;color:#555}.brand{font-size:11px;color:#888;margin-top:12px;text-align:center}
+  </style>
+</head>
+<body>
+  <h1>Kelo Translate</h1>
+  <p class="sub">Traduire la page ouverte.</p>
+  <label for="language">Langue</label>
+  <select id="language">
+    <option value="fr">Français</option><option value="en">English</option><option value="nl">Nederlands</option><option value="de">Deutsch</option><option value="es">Español</option><option value="it">Italiano</option><option value="pt">Português</option><option value="pl">Polski</option><option value="uk">Українська</option><option value="ru">Русский</option><option value="ar">العربية</option><option value="hi">हिन्दी</option><option value="zh-CN">简体中文</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="tr">Türkçe</option><option value="id">Bahasa Indonesia</option><option value="vi">Tiếng Việt</option><option value="th">ไทย</option><option value="sw">Kiswahili</option>
+  </select>
+  <button id="translate" class="primary">Traduire cette page</button>
+  <button id="restore" class="secondary">Afficher l’original</button>
+  <div id="status" class="status"></div>
+  <div class="brand">Kelo Translate · traitement par lots et cache</div>
+  <script src="popup.js"></script>
+</body>
+</html>
