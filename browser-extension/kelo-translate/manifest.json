@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Kelo Translate",
+  "version": "0.1.0",
+  "description": "Traduit les pages web avec Kelo Translate.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://*.kelosocial.eu/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Kelo Translate"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
