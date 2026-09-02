@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-type GameKind = "cards" | "chess";
+type GameKind = "cards" | "chess" | "uno";
 type RoomMode = "friend" | "online" | "tournament";
 
 type Player = {
@@ -120,10 +120,14 @@ function recordResult(game: GameKind, winnerHandle: string, loserHandle: string,
   update(loserHandle, false);
 }
 
+function isGameKind(value: string): value is GameKind {
+  return value === "cards" || value === "chess" || value === "uno";
+}
+
 export async function GET(request: NextRequest) {
   cleanup();
-  const rankingGame = request.nextUrl.searchParams.get("ranking") as GameKind | null;
-  if (rankingGame === "cards" || rankingGame === "chess") {
+  const rankingGame = request.nextUrl.searchParams.get("ranking");
+  if (rankingGame && isGameKind(rankingGame)) {
     return NextResponse.json({ ranking: getRanking(rankingGame) });
   }
   const roomId = request.nextUrl.searchParams.get("room")?.toUpperCase();
@@ -137,8 +141,9 @@ export async function POST(request: NextRequest) {
   cleanup();
   const body = await request.json().catch(() => ({}));
   const action = String(body.action || "");
-  const game = String(body.game || "") as GameKind;
-  if (game !== "cards" && game !== "chess") return NextResponse.json({ error: "invalid_game" }, { status: 400 });
+  const gameValue = String(body.game || "");
+  if (!isGameKind(gameValue)) return NextResponse.json({ error: "invalid_game" }, { status: 400 });
+  const game: GameKind = gameValue;
   const player = playerFromBody(body);
 
   if (action === "create") {
