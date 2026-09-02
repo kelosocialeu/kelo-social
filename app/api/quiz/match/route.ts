@@ -43,9 +43,9 @@ function randomCode(length = 6) {
 
 function cleanOldRooms() {
   const cutoff = Date.now() - 2 * 60 * 60 * 1000;
-  for (const [id, room] of store.rooms.entries()) {
+  store.rooms.forEach((room, id) => {
     if (room.createdAt < cutoff) store.rooms.delete(id);
-  }
+  });
   store.queue = store.queue.filter((id) => store.rooms.has(id));
 }
 
