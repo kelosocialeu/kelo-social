@@ -3,26 +3,56 @@
 import { useState } from "react";
 import { Languages } from "lucide-react";
 import { getKeloContentPreferences, resolvedInterfaceLanguage } from "@/lib/kelo-language-preferences";
+import { translateKeloText } from "@/lib/kelo-browser-translate";
 
 export default function PostTranslation({ text }: { text: string }) {
   const [translated, setTranslated] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [engine, setEngine] = useState<"browser" | "server" | "cache" | "">("");
+
   if (!text?.trim()) return null;
+
   const translate = async () => {
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
     try {
-      const target = resolvedInterfaceLanguage(getKeloContentPreferences().interfaceLanguage).split("-")[0];
-      const res = await fetch("/api/translate", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({text,target}) });
-      const data = await res.json();
-      if (!res.ok || !data.translation) throw new Error(data.error || "translation failed");
-      setTranslated(data.translation);
-    } catch { setError("Traduction indisponible pour le moment."); }
-    finally { setLoading(false); }
+      const target = resolvedInterfaceLanguage(getKeloContentPreferences().interfaceLanguage);
+      const result = await translateKeloText(text, target);
+      setTranslated(result.translation);
+      setEngine(result.engine);
+    } catch {
+      setError("Traduction indisponible sur cet appareil pour le moment.");
+    } finally {
+      setLoading(false);
+    }
   };
-  return <div className="mt-2" onClick={e=>e.stopPropagation()}>
-    <button type="button" onClick={translate} disabled={loading} className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-bold text-kelo-primary hover:bg-kelo-primary/10 disabled:opacity-50"><Languages className="h-4 w-4"/>{loading?"Traduction…":translated?"Retraduire":"Traduire"}</button>
-    {translated&&<div className="mt-1 rounded-xl bg-kelo-background p-3 text-sm leading-relaxed text-kelo-text"><div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-kelo-muted">Traduction</div>{translated}</div>}
-    {error&&<p className="mt-1 text-xs text-red-600">{error}</p>}
-  </div>;
+
+  return (
+    <div className="mt-2" onClick={(event) => event.stopPropagation()}>
+      <button
+        type="button"
+        onClick={translate}
+        disabled={loading}
+        className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-bold text-kelo-primary hover:bg-kelo-primary/10 disabled:opacity-50"
+      >
+        <Languages className="h-4 w-4" />
+        {loading ? "Traduction…" : translated ? "Retraduire" : "Traduire"}
+      </button>
+
+      {translated && (
+        <div className="mt-1 rounded-xl bg-kelo-background p-3 text-sm leading-relaxed text-kelo-text">
+          <div className="mb-1 flex items-center justify-between gap-3 text-[11px] font-bold uppercase tracking-wide text-kelo-muted">
+            <span>Traduction</span>
+            <span className="normal-case font-medium">
+              {engine === "browser" ? "sur votre appareil" : engine === "cache" ? "mise en cache" : "Kelo Translate"}
+            </span>
+          </div>
+          {translated}
+        </div>
+      )}
+
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+    </div>
+  );
 }
