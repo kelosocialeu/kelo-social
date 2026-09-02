@@ -3,13 +3,18 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 const MAX_TEXT_LENGTH = 5000;
+const MAX_BATCH_ITEMS = 60;
+const MAX_BATCH_CHARS = 12000;
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const CACHE_MAX = 2000;
+const CACHE_MAX = 5000;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX = 60;
+const CONCURRENCY = 8;
 
 type CacheEntry = { value: string; source?: string; createdAt: number };
 type RateEntry = { count: number; resetAt: number };
+
+type TranslationResult = { translation: string; source?: string; engine: "cache" | "kelo" | "free-fallback" };
 
 const globalStore = globalThis as typeof globalThis & {
   __keloTranslateCache?: Map<string, CacheEntry>;
@@ -122,7 +127,7 @@ async function translateWithFreeFallback(text: string, target: string) {
   url.searchParams.set("q", text);
 
   const response = await fetch(url.toString(), {
-    headers: { Accept: "application/json", "User-Agent": "KeloTranslate/1.0 (+https://kelosocial.eu)" },
+    headers: { Accept: "application/json", "User-Agent": "KeloTranslate/1.1 (+https://kelosocial.eu)" },
     cache: "force-cache",
     signal: AbortSignal.timeout(10000),
   });
@@ -139,47 +144,101 @@ async function translateWithFreeFallback(text: string, target: string) {
   return { translation, source };
 }
 
+async function translateOne(text: string, target: string): Promise<TranslationResult> {
+  const cached = readCache(text, target);
+  if (cached) return { translation: cached.value, source: cached.source, engine: "cache" };
+
+  const { protectedText, values } = protectTokens(text);
+  let result: { translation: string; source?: string } | null = null;
+  let engine: TranslationResult["engine"] = "kelo";
+
+  try {
+    result = await translateWithConfiguredEndpoint(protectedText, target);
+  } catch (error) {
+    console.warn("Configured Kelo Translate endpoint failed", error);
+  }
+
+  if (!result) {
+    result = await translateWithFreeFallback(protectedText, target);
+    engine = "free-fallback";
+  }
+
+  const translation = restoreTokens(result.translation, values);
+  writeCache(text, target, translation, result.source);
+  return { translation, source: result.source, engine };
+}
+
+async function translateBatch(texts: string[], target: string) {
+  const output = new Array<TranslationResult>(texts.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (true) {
+      const index = cursor++;
+      if (index >= texts.length) return;
+      try {
+        output[index] = await translateOne(texts[index], target);
+      } catch (error) {
+        console.warn(`Kelo Translate batch item ${index} failed`, error);
+        output[index] = { translation: texts[index], engine: "free-fallback" };
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, texts.length) }, () => worker()));
+  return output;
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
+  const corsHeaders = { "Access-Control-Allow-Origin": "*" };
   try {
     if (isRateLimited(request)) {
-      return NextResponse.json({ error: "Trop de demandes de traduction" }, { status: 429 });
+      return NextResponse.json({ error: "Trop de demandes de traduction" }, { status: 429, headers: corsHeaders });
     }
 
-    const body = await request.json() as { text?: unknown; target?: unknown };
-    const text = typeof body.text === "string" ? body.text.trim() : "";
+    const body = await request.json() as { text?: unknown; texts?: unknown; target?: unknown };
     const target = typeof body.target === "string" ? normalizeLanguage(body.target) : "";
-
-    if (!text || !target) return NextResponse.json({ error: "Paramètres invalides" }, { status: 400 });
-    if (text.length > MAX_TEXT_LENGTH) return NextResponse.json({ error: "Texte trop long" }, { status: 413 });
-    if (!/^[a-z]{2,3}(?:-[A-Z]{2})?$/.test(target)) return NextResponse.json({ error: "Langue cible invalide" }, { status: 400 });
-
-    const cached = readCache(text, target);
-    if (cached) return NextResponse.json({ translation: cached.value, source: cached.source, engine: "cache" });
-
-    const { protectedText, values } = protectTokens(text);
-    let result: { translation: string; source?: string } | null = null;
-    let engine = "kelo";
-
-    try {
-      result = await translateWithConfiguredEndpoint(protectedText, target);
-    } catch (error) {
-      console.warn("Configured Kelo Translate endpoint failed", error);
+    if (!target || !/^[a-z]{2,3}(?:-[A-Z]{2})?$/.test(target)) {
+      return NextResponse.json({ error: "Langue cible invalide" }, { status: 400, headers: corsHeaders });
     }
 
-    if (!result) {
-      result = await translateWithFreeFallback(protectedText, target);
-      engine = "free-fallback";
+    if (Array.isArray(body.texts)) {
+      const texts = body.texts.filter((value): value is string => typeof value === "string" && value.trim().length > 0).map((value) => value.trim());
+      const totalChars = texts.reduce((sum, value) => sum + value.length, 0);
+      if (!texts.length || texts.length > MAX_BATCH_ITEMS) return NextResponse.json({ error: "Lot invalide" }, { status: 400, headers: corsHeaders });
+      if (totalChars > MAX_BATCH_CHARS || texts.some((value) => value.length > MAX_TEXT_LENGTH)) {
+        return NextResponse.json({ error: "Lot de traduction trop volumineux" }, { status: 413, headers: corsHeaders });
+      }
+
+      const results = await translateBatch(texts, target);
+      return NextResponse.json(
+        { translations: results.map((result) => result.translation), results },
+        { headers: { ...corsHeaders, "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800" } },
+      );
     }
 
-    const translation = restoreTokens(result.translation, values);
-    writeCache(text, target, translation, result.source);
+    const text = typeof body.text === "string" ? body.text.trim() : "";
+    if (!text) return NextResponse.json({ error: "Paramètres invalides" }, { status: 400, headers: corsHeaders });
+    if (text.length > MAX_TEXT_LENGTH) return NextResponse.json({ error: "Texte trop long" }, { status: 413, headers: corsHeaders });
 
+    const result = await translateOne(text, target);
     return NextResponse.json(
-      { translation, source: result.source, engine },
-      { headers: { "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800" } },
+      result,
+      { headers: { ...corsHeaders, "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800" } },
     );
   } catch (error) {
     console.error("Kelo Translate failed", error);
-    return NextResponse.json({ error: "Traduction temporairement indisponible" }, { status: 502 });
+    return NextResponse.json({ error: "Traduction temporairement indisponible" }, { status: 502, headers: corsHeaders });
   }
 }
