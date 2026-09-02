@@ -4,12 +4,18 @@ type TranslationResult = {
   engine: "browser" | "server" | "cache";
 };
 
-const CACHE_PREFIX = "kelo-translate:v1:";
+// v2 invalidates translations cached while an unknown source language was
+// incorrectly interpreted as French.
+const CACHE_PREFIX = "kelo-translate:v2:";
 
 function normalizeLanguage(value: string) {
   const trimmed = (value || "").trim();
-  if (!trimmed) return "fr";
-  return trimmed.toLowerCase() === "zh-cn" ? "zh-CN" : trimmed.split("-")[0];
+  if (!trimmed) return "";
+  return trimmed.toLowerCase() === "zh-cn" ? "zh-CN" : trimmed.split("-")[0].toLowerCase();
+}
+
+function targetLanguage(value: string) {
+  return normalizeLanguage(value) || "fr";
 }
 
 function hashText(input: string) {
@@ -22,7 +28,7 @@ function hashText(input: string) {
 }
 
 function cacheKey(text: string, target: string) {
-  return `${CACHE_PREFIX}${normalizeLanguage(target)}:${hashText(text)}`;
+  return `${CACHE_PREFIX}${targetLanguage(target)}:${hashText(text)}`;
 }
 
 function readCache(text: string, target: string): string | null {
@@ -32,7 +38,6 @@ function readCache(text: string, target: string): string | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { value?: string; createdAt?: number };
     if (!parsed.value) return null;
-    // Keep translations for 30 days. This avoids repeated AI work for viral posts.
     if (parsed.createdAt && Date.now() - parsed.createdAt > 30 * 24 * 60 * 60 * 1000) {
       localStorage.removeItem(cacheKey(text, target));
       return null;
@@ -48,7 +53,7 @@ function writeCache(text: string, target: string, value: string) {
   try {
     localStorage.setItem(cacheKey(text, target), JSON.stringify({ value, createdAt: Date.now() }));
   } catch {
-    // Storage can be unavailable in private mode or full. Translation still works.
+    // Translation still works when local storage is unavailable.
   }
 }
 
@@ -59,27 +64,35 @@ async function translateInBrowser(text: string, target: string): Promise<Transla
   const LanguageDetectorApi = w.LanguageDetector;
   if (!TranslatorApi?.availability || !TranslatorApi?.create || !LanguageDetectorApi?.create) return null;
 
+  let detector: any = null;
+  let translator: any = null;
   try {
     const detectorAvailability = await LanguageDetectorApi.availability?.();
     if (detectorAvailability === "unavailable") return null;
 
-    const detector = await LanguageDetectorApi.create();
+    detector = await LanguageDetectorApi.create();
     const detected = await detector.detect(text);
-    const source = normalizeLanguage(detected?.[0]?.detectedLanguage || detected?.[0]?.language || "");
-    const normalizedTarget = normalizeLanguage(target);
-    if (!source || source === normalizedTarget) return { translation: text, source, engine: "browser" };
+    const detectedLanguage = detected?.[0]?.detectedLanguage || detected?.[0]?.language || "";
+    const source = normalizeLanguage(detectedLanguage);
+    const normalizedTarget = targetLanguage(target);
+
+    // Unknown source must fall back to the server. It must never be guessed as
+    // French, otherwise a foreign-language post can be returned unchanged.
+    if (!source) return null;
+    if (source === normalizedTarget) return { translation: text, source, engine: "browser" };
 
     const availability = await TranslatorApi.availability({ sourceLanguage: source, targetLanguage: normalizedTarget });
     if (availability === "unavailable") return null;
 
-    const translator = await TranslatorApi.create({ sourceLanguage: source, targetLanguage: normalizedTarget });
+    translator = await TranslatorApi.create({ sourceLanguage: source, targetLanguage: normalizedTarget });
     const translation = await translator.translate(text);
-    translator.destroy?.();
-    detector.destroy?.();
     if (typeof translation !== "string" || !translation.trim()) return null;
-    return { translation, source, engine: "browser" };
+    return { translation: translation.trim(), source, engine: "browser" };
   } catch {
     return null;
+  } finally {
+    translator?.destroy?.();
+    detector?.destroy?.();
   }
 }
 
@@ -87,13 +100,14 @@ async function translateOnServer(text: string, target: string): Promise<Translat
   const response = await fetch("/api/translate", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ text, target: normalizeLanguage(target) }),
+    body: JSON.stringify({ text, target: targetLanguage(target) }),
+    cache: "no-store",
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || typeof data.translation !== "string") {
+  if (!response.ok || typeof data.translation !== "string" || !data.translation.trim()) {
     throw new Error(data.error || "translation unavailable");
   }
-  return { translation: data.translation, source: data.source, engine: "server" };
+  return { translation: data.translation.trim(), source: data.source, engine: "server" };
 }
 
 export async function translateKeloText(text: string, target: string): Promise<TranslationResult> {
