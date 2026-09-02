@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, Search, Bell, MessageCircle, Hash, ListChecks, Rocket, Bookmark,
-  User, Users, Settings, ShieldCheck, BadgeCheck, PenSquare, LogOut, Newspaper, Clapperboard, Gamepad2,
+  User, Users, Settings, ShieldCheck, BadgeCheck, PenSquare, LogOut, Newspaper, Clapperboard, Gamepad2, Layers3, Crown,
 } from "lucide-react";
 
 import Logo from "@/components/ui/Logo";
@@ -19,6 +19,8 @@ const NAV_ITEMS = [
   { href: "/feed", key: "nav.home", fallback: "Accueil", icon: Home, prefetch: true },
   { href: "/reels", key: "nav.reels", fallback: "Réels", icon: Clapperboard, prefetch: true },
   { href: "/games", key: "nav.games", fallback: "Jeux", icon: Gamepad2, prefetch: true },
+  { href: "/games/cards", key: "nav.keloCards", fallback: "Kelo Cards", icon: Layers3, prefetch: true },
+  { href: "/games/chess", key: "nav.keloChess", fallback: "Kelo Échecs", icon: Crown, prefetch: true },
   { href: "/search", key: "nav.explore", fallback: "Explorer", icon: Search, prefetch: false },
   { href: "/journal", key: "nav.journal", fallback: "Journal", icon: Newspaper, prefetch: false },
   { href: "/notifications", key: "nav.notifications", fallback: "Notifications", icon: Bell, prefetch: true },
@@ -33,6 +35,7 @@ const NAV_ITEMS = [
 
 function isRouteActive(pathname: string, href: string): boolean {
   if (href === "/feed") return pathname === "/feed";
+  if (href === "/games") return pathname === "/games";
   if (href === "/profile") return pathname === "/profile" || pathname.startsWith("/profile/");
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -51,7 +54,8 @@ export default function Sidebar({ handle, onLogout }: SidebarProps) {
         <nav className="flex flex-col gap-1 text-base font-semibold text-kelo-text">
           {NAV_ITEMS.map(({ href, key, fallback, icon: Icon, prefetch }) => {
             const active = isRouteActive(pathname, href);
-            return <Link key={href} href={href} prefetch={prefetch} aria-current={active ? "page" : undefined} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 transition-colors ${active ? "bg-kelo-gradient text-white" : "hover:bg-kelo-background"}`}>
+            const gameChild = href === "/games/cards" || href === "/games/chess";
+            return <Link key={href} href={href} prefetch={prefetch} aria-current={active ? "page" : undefined} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 transition-colors ${gameChild ? "ml-4 text-sm" : ""} ${active ? "bg-kelo-gradient text-white" : "hover:bg-kelo-background"}`}>
               <Icon className="h-5 w-5 flex-shrink-0"/><span className="min-w-0 flex-1 truncate">{t(key, fallback)}</span>
               {href === "/notifications" && unreadNotifications > 0 && <span aria-label={t("nav.unreadNotifications", `${unreadNotifications} notification(s) non lue(s)`, { count: unreadNotifications })} className={`flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-xs font-extrabold ${active ? "bg-white text-kelo-primary" : "bg-kelo-gradient text-white"}`}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}
             </Link>;
