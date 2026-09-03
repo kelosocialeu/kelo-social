@@ -16,28 +16,77 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
 import { getActorProfile, getActorFeed } from "@/lib/atproto/profile";
+import { getReadAgent } from "@/lib/atproto/read-agent";
 import { deleteOwnPost } from "@/lib/atproto/posts";
 import { getActorLists, ManagedList } from "@/lib/atproto/lists";
 import { getActorStarterPacks, StarterPackView } from "@/lib/atproto/starter-packs";
 
 const BASE_TABS = ["Posts", "Réponses", "Média", "Vidéos", "Posts aimés", "Fils d'actu"] as const;
+const POST_TABS = ["Posts", "Réponses", "Média", "Vidéos", "Posts aimés"] as const;
 
-type ProfileTab = (typeof BASE_TABS)[number] | "Listes" | "Kits de démarrage";
+type BaseTab = (typeof BASE_TABS)[number];
+type PostTab = (typeof POST_TABS)[number];
+type ProfileTab = BaseTab | "Listes" | "Kits de démarrage";
 type ConnectionsView = "followers" | "following" | null;
 
+type ActorFeedGenerator = {
+  uri: string;
+  cid?: string;
+  did?: string;
+  displayName?: string;
+  description?: string;
+  avatar?: string;
+  likeCount?: number;
+  creator?: {
+    did?: string;
+    handle?: string;
+    displayName?: string;
+    avatar?: string;
+  };
+};
+
 function formatFeed(feed: any[]) {
-  return feed.map((item: any) => ({
-    uri: item.post.uri,
-    cid: item.post.cid,
-    author: item.post.author,
-    record: item.post.record,
-    embed: item.post.embed,
-    likeCount: item.post.likeCount || 0,
-    repostCount: item.post.repostCount || 0,
-    replyCount: item.post.replyCount || 0,
-    viewer: item.post.viewer || {},
-    repostedBy: item.reason?.$type === "app.bsky.feed.defs#reasonRepost" ? item.reason.by : null,
-  }));
+  return feed
+    .filter((item: any) => item?.post?.uri)
+    .map((item: any) => ({
+      uri: item.post.uri,
+      cid: item.post.cid,
+      author: item.post.author,
+      record: item.post.record,
+      embed: item.post.embed,
+      likeCount: item.post.likeCount || 0,
+      repostCount: item.post.repostCount || 0,
+      replyCount: item.post.replyCount || 0,
+      viewer: item.post.viewer || {},
+      repostedBy:
+        item.reason?.$type === "app.bsky.feed.defs#reasonRepost"
+          ? item.reason.by
+          : null,
+    }));
+}
+
+function isReply(item: any) {
+  return Boolean(item?.post?.record?.reply);
+}
+
+function isMediaPost(item: any) {
+  const type = item?.post?.embed?.$type;
+  return (
+    type === "app.bsky.embed.images#view" ||
+    type === "app.bsky.embed.video#view"
+  );
+}
+
+function isVideoPost(item: any) {
+  return item?.post?.embed?.$type === "app.bsky.embed.video#view";
+}
+
+function getTabEmptyMessage(tab: PostTab, handle: string) {
+  if (tab === "Réponses") return `@${handle} n’a encore publié aucune réponse.`;
+  if (tab === "Média") return `@${handle} n’a encore publié aucun média.`;
+  if (tab === "Vidéos") return `@${handle} n’a encore publié aucune vidéo.`;
+  if (tab === "Posts aimés") return `Aucun post aimé n’est disponible pour @${handle}.`;
+  return "Aucune publication pour l’instant.";
 }
 
 export default function ProfilePage() {
@@ -48,6 +97,9 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<any>(null);
   const [lists, setLists] = useState<ManagedList[]>([]);
   const [starterPacks, setStarterPacks] = useState<StarterPackView[]>([]);
+  const [actorFeeds, setActorFeeds] = useState<ActorFeedGenerator[]>([]);
+  const [loadingActorFeeds, setLoadingActorFeeds] = useState(false);
+  const [actorFeedsError, setActorFeedsError] = useState<string | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ProfileTab>("Posts");
@@ -58,6 +110,9 @@ export default function ProfilePage() {
   const { isBookmarked, toggleBookmark } = useBookmarks();
 
   const isOwnProfile = checked && myHandle?.toLowerCase() === targetHandle.toLowerCase();
+  const activePostTab: PostTab = POST_TABS.includes(activeTab as PostTab)
+    ? (activeTab as PostTab)
+    : "Posts";
 
   useEffect(() => {
     if (!checked || !targetHandle) return;
@@ -93,20 +148,95 @@ export default function ProfilePage() {
     loadProfileData();
   }, [checked, targetHandle]);
 
-  const fetchProfilePosts = useCallback(
+  useEffect(() => {
+    if (!checked || !targetHandle || activeTab !== "Fils d'actu") return;
+
+    let cancelled = false;
+
+    async function loadActorFeeds() {
+      setLoadingActorFeeds(true);
+      setActorFeedsError(null);
+
+      try {
+        const agent = await getReadAgent();
+        const response = await (agent.api.app.bsky.feed as any).getActorFeeds({
+          actor: targetHandle,
+          limit: 100,
+        });
+
+        if (!cancelled) {
+          setActorFeeds(Array.isArray(response?.data?.feeds) ? response.data.feeds : []);
+        }
+      } catch (error) {
+        console.error("Impossible de charger les fils d’actu du profil :", error);
+        if (!cancelled) {
+          setActorFeeds([]);
+          setActorFeedsError("Impossible de charger les fils d’actu de ce profil.");
+        }
+      } finally {
+        if (!cancelled) setLoadingActorFeeds(false);
+      }
+    }
+
+    loadActorFeeds();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, checked, targetHandle]);
+
+  const fetchProfileContent = useCallback(
     async (cursor?: string) => {
-      if (!checked || !targetHandle) {
+      if (!checked || !targetHandle || !POST_TABS.includes(activeTab as PostTab)) {
         return { items: [], cursor: undefined };
       }
 
-      const response = await getActorFeed(targetHandle, 30, cursor);
+      if (activeTab === "Posts") {
+        const response = await getActorFeed(targetHandle, 30, cursor);
+        return {
+          items: formatFeed(response.items),
+          cursor: response.cursor,
+        };
+      }
+
+      const agent = await getReadAgent();
+
+      if (activeTab === "Posts aimés") {
+        const response = await (agent.api.app.bsky.feed as any).getActorLikes({
+          actor: targetHandle,
+          limit: 30,
+          cursor,
+        });
+        return {
+          items: formatFeed(response?.data?.feed || []),
+          cursor: response?.data?.cursor,
+        };
+      }
+
+      const filter = activeTab === "Média" || activeTab === "Vidéos"
+        ? "posts_with_media"
+        : "posts_with_replies";
+
+      const response = await (agent.api.app.bsky.feed as any).getAuthorFeed({
+        actor: targetHandle,
+        limit: 50,
+        cursor,
+        filter,
+      });
+
+      const rawFeed = response?.data?.feed || [];
+      const filteredFeed =
+        activeTab === "Réponses"
+          ? rawFeed.filter(isReply)
+          : activeTab === "Vidéos"
+            ? rawFeed.filter(isVideoPost)
+            : rawFeed.filter(isMediaPost);
 
       return {
-        items: formatFeed(response.items),
-        cursor: response.cursor,
+        items: formatFeed(filteredFeed),
+        cursor: response?.data?.cursor,
       };
     },
-    [checked, targetHandle]
+    [activeTab, checked, targetHandle]
   );
 
   const {
@@ -117,9 +247,14 @@ export default function ProfilePage() {
     hasMore,
     error: postsError,
     loadMore,
-  } = useInfiniteFeed(fetchProfilePosts, [checked, targetHandle], {
-    getItemKey: (post: any) => post.uri,
-  });
+  } = useInfiniteFeed(
+    fetchProfileContent,
+    [checked, targetHandle, activePostTab],
+    {
+      getItemKey: (post: any) => post.uri,
+      cacheKey: `profile:${targetHandle}:${activePostTab}`,
+    }
+  );
 
   const handleLogout = () => {
     localStorage.clear();
@@ -141,7 +276,7 @@ export default function ProfilePage() {
     setPosts([]);
   };
 
-  const displayedPosts = postSearchQuery.trim()
+  const displayedPosts = postSearchQuery.trim() && activeTab === "Posts"
     ? posts.filter((p) =>
         (p.record?.text || "")
           .toLowerCase()
@@ -164,6 +299,12 @@ export default function ProfilePage() {
     }
   }, [activeTab, visibleTabs]);
 
+  useEffect(() => {
+    setActiveReplyUri(null);
+    setReplyText("");
+    setPostSearchQuery("");
+  }, [activeTab]);
+
   if (!checked || loadingProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-kelo-background font-sans text-kelo-muted">
@@ -182,6 +323,70 @@ export default function ProfilePage() {
       </div>
     );
   }
+
+  const renderPostList = () => (
+    <div className="divide-y divide-kelo-border">
+      {displayedPosts.map((post) => {
+        const postIsMine = Boolean(
+          myHandle && post?.author?.handle?.toLowerCase() === myHandle.toLowerCase()
+        );
+
+        return (
+          <PostCard
+            key={post.uri}
+            post={post}
+            isMine={postIsMine}
+            isBookmarked={isBookmarked(post.uri)}
+            replyOpen={activeReplyUri === post.uri}
+            replyText={replyText}
+            onToggleReply={() =>
+              setActiveReplyUri(activeReplyUri === post.uri ? null : post.uri)
+            }
+            onReplyTextChange={setReplyText}
+            onSendReply={() => {
+              setReplyText("");
+              setActiveReplyUri(null);
+            }}
+            onBookmark={() => toggleBookmark(post)}
+            onDelete={() => handleDelete(post.uri)}
+            onBlocked={handleModeration}
+            onMuted={handleModeration}
+          />
+        );
+      })}
+
+      {loadingPosts && (
+        <div className="flex justify-center py-10">
+          <img
+            src="https://kelosocial.sirv.com/logo.png"
+            alt="Chargement"
+            className="h-10 w-10 animate-spin object-contain"
+          />
+        </div>
+      )}
+
+      {!loadingPosts && postsError && (
+        <p className="px-4 py-8 text-center text-sm text-kelo-danger">
+          {postsError}
+        </p>
+      )}
+
+      {!loadingPosts && !postsError && displayedPosts.length === 0 && (
+        <p className="py-10 text-center text-sm text-kelo-muted">
+          {activeTab === "Posts" && postSearchQuery.trim()
+            ? "Aucune publication ne correspond à cette recherche."
+            : getTabEmptyMessage(activePostTab, targetHandle)}
+        </p>
+      )}
+
+      {!(activeTab === "Posts" && postSearchQuery.trim()) && (
+        <InfiniteScrollSentinel
+          onIntersect={loadMore}
+          disabled={loadingMore || !hasMore}
+        />
+      )}
+    </div>
+  );
 
   return (
     <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
@@ -310,32 +515,11 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {activeTab === "Posts" && (
-          <div className="divide-y divide-kelo-border">
-            {displayedPosts.map((post) => (
-              <PostCard
-                key={post.uri}
-                post={post}
-                isMine={isOwnProfile}
-                isBookmarked={isBookmarked(post.uri)}
-                replyOpen={activeReplyUri === post.uri}
-                replyText={replyText}
-                onToggleReply={() =>
-                  setActiveReplyUri(activeReplyUri === post.uri ? null : post.uri)
-                }
-                onReplyTextChange={setReplyText}
-                onSendReply={() => {
-                  setReplyText("");
-                  setActiveReplyUri(null);
-                }}
-                onBookmark={() => toggleBookmark(post)}
-                onDelete={() => handleDelete(post.uri)}
-                onBlocked={handleModeration}
-                onMuted={handleModeration}
-              />
-            ))}
+        {POST_TABS.includes(activeTab as PostTab) && renderPostList()}
 
-            {loadingPosts && (
+        {activeTab === "Fils d'actu" && (
+          <div className="p-4 sm:p-5 lg:p-6">
+            {loadingActorFeeds && (
               <div className="flex justify-center py-10">
                 <img
                   src="https://kelosocial.sirv.com/logo.png"
@@ -345,25 +529,53 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {!loadingPosts && postsError && (
-              <p className="px-4 py-8 text-center text-sm text-kelo-danger">
-                {postsError}
+            {!loadingActorFeeds && actorFeedsError && (
+              <p className="py-10 text-center text-sm text-kelo-danger">
+                {actorFeedsError}
               </p>
             )}
 
-            {!loadingPosts && !postsError && displayedPosts.length === 0 && (
+            {!loadingActorFeeds && !actorFeedsError && actorFeeds.length === 0 && (
               <p className="py-10 text-center text-sm text-kelo-muted">
-                {postSearchQuery.trim()
-                  ? "Aucune publication ne correspond à cette recherche."
-                  : "Aucune publication pour l’instant."}
+                @{targetHandle} n’a encore créé aucun fil d’actu.
               </p>
             )}
 
-            {!postSearchQuery.trim() && (
-              <InfiniteScrollSentinel
-                onIntersect={loadMore}
-                disabled={loadingMore || !hasMore}
-              />
+            {!loadingActorFeeds && actorFeeds.length > 0 && (
+              <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+                {actorFeeds.map((feed) => (
+                  <Link
+                    key={feed.uri}
+                    href={`/feeds/view?uri=${encodeURIComponent(feed.uri)}`}
+                    className="flex min-w-0 gap-3 rounded-2xl border border-kelo-border p-4 transition hover:bg-kelo-background/60"
+                  >
+                    {feed.avatar ? (
+                      <img
+                        src={feed.avatar}
+                        alt=""
+                        className="h-14 w-14 shrink-0 rounded-2xl object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-kelo-gradient text-xl font-extrabold text-white">
+                        {(feed.displayName || "F").charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-extrabold">
+                        {feed.displayName || "Fil d’actu"}
+                      </h3>
+                      {feed.description && (
+                        <p className="mt-1 line-clamp-2 text-xs text-kelo-muted">
+                          {feed.description}
+                        </p>
+                      )}
+                      <p className="mt-2 truncate text-xs text-kelo-muted">
+                        par @{feed.creator?.handle || targetHandle}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             )}
           </div>
         )}
@@ -443,14 +655,6 @@ export default function ProfilePage() {
             ))}
           </div>
         )}
-
-        {activeTab !== "Posts" &&
-          activeTab !== "Listes" &&
-          activeTab !== "Kits de démarrage" && (
-            <p className="py-10 text-center text-sm text-kelo-muted">
-              Bientôt disponible.
-            </p>
-          )}
       </main>
 
       <ProfileConnectionsModal
