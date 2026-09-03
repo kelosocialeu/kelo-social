@@ -1,6 +1,7 @@
 import { AtpSession } from "@/types/auth";
 
 const STORAGE_KEY = "kelo.session";
+const ACCOUNTS_KEY = "kelo.accounts";
 const SESSION_CHANGED_EVENT =
   "kelo-session-changed";
 
@@ -12,6 +13,25 @@ function notifySessionChanged(): void {
   window.dispatchEvent(
     new CustomEvent(SESSION_CHANGED_EVENT)
   );
+}
+
+function getStoredAccounts(): AtpSession[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(ACCOUNTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? (parsed as AtpSession[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberAccount(session: AtpSession): void {
+  if (typeof window === "undefined") return;
+  const accounts = getStoredAccounts();
+  const next = [session, ...accounts.filter((account) => account?.did && account.did !== session.did)];
+  window.localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(next));
 }
 
 /**
@@ -64,6 +84,8 @@ class LocalStorageSessionStorage
       JSON.stringify(session)
     );
 
+    rememberAccount(session);
+
     // Compatibilité TEMPORAIRE avec les pages pas encore migrées
     // (feed, profile, admin) qui lisent encore ces clés individuelles.
     // À supprimer une fois toutes les pages migrées vers AuthProvider.
@@ -104,6 +126,9 @@ class LocalStorageSessionStorage
 
     window.localStorage.removeItem(
       STORAGE_KEY
+    );
+    window.localStorage.removeItem(
+      ACCOUNTS_KEY
     );
 
     [
