@@ -252,7 +252,7 @@ export default function ProfilePage() {
     [checked, targetHandle, activePostTab],
     {
       getItemKey: (post: any) => post.uri,
-      cacheKey: `profile:${targetHandle}:${activePostTab}`,
+      cacheKey: `profile:v2:${checked ? "ready" : "pending"}:${targetHandle}:${activePostTab}`,
     }
   );
 
