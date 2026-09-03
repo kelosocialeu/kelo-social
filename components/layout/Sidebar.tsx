@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Home, Search, Bell, MessageCircle, Hash, ListChecks, Rocket, Bookmark,
   User, Users, Settings, ShieldCheck, BadgeCheck, PenSquare, LogOut, Newspaper, Clapperboard, Gamepad2,
@@ -16,19 +17,19 @@ import { useTranslation } from "@/components/providers/TranslationProvider";
 interface SidebarProps { handle: string; onLogout: () => void; }
 
 const NAV_ITEMS = [
-  { href: "/feed", key: "nav.home", fallback: "Accueil", icon: Home, prefetch: true },
-  { href: "/reels", key: "nav.reels", fallback: "Réels", icon: Clapperboard, prefetch: true },
-  { href: "/games", key: "nav.games", fallback: "Jeux", icon: Gamepad2, prefetch: true },
-  { href: "/search", key: "nav.explore", fallback: "Explorer", icon: Search, prefetch: false },
-  { href: "/journal", key: "nav.journal", fallback: "Journal", icon: Newspaper, prefetch: false },
-  { href: "/notifications", key: "nav.notifications", fallback: "Notifications", icon: Bell, prefetch: true },
-  { href: "/messages", key: "nav.messages", fallback: "Discussions", icon: MessageCircle, prefetch: true },
-  { href: "/feeds", key: "nav.feeds", fallback: "Fils d'actu", icon: Hash, prefetch: false },
-  { href: "/lists", key: "nav.lists", fallback: "Listes", icon: ListChecks, prefetch: false },
-  { href: "/starter-packs", key: "nav.starterPacks", fallback: "Kits de démarrage", icon: Rocket, prefetch: false },
-  { href: "/bookmarks", key: "nav.bookmarks", fallback: "Conservés", icon: Bookmark, prefetch: false },
-  { href: "/profile", key: "nav.profile", fallback: "Profil", icon: User, prefetch: true },
-  { href: "/settings", key: "nav.settings", fallback: "Paramètres", icon: Settings, prefetch: false },
+  { href: "/feed", key: "nav.home", fallback: "Accueil", icon: Home },
+  { href: "/reels", key: "nav.reels", fallback: "Réels", icon: Clapperboard },
+  { href: "/games", key: "nav.games", fallback: "Jeux", icon: Gamepad2 },
+  { href: "/search", key: "nav.explore", fallback: "Explorer", icon: Search },
+  { href: "/journal", key: "nav.journal", fallback: "Journal", icon: Newspaper },
+  { href: "/notifications", key: "nav.notifications", fallback: "Notifications", icon: Bell },
+  { href: "/messages", key: "nav.messages", fallback: "Discussions", icon: MessageCircle },
+  { href: "/feeds", key: "nav.feeds", fallback: "Fils d'actu", icon: Hash },
+  { href: "/lists", key: "nav.lists", fallback: "Listes", icon: ListChecks },
+  { href: "/starter-packs", key: "nav.starterPacks", fallback: "Kits de démarrage", icon: Rocket },
+  { href: "/bookmarks", key: "nav.bookmarks", fallback: "Conservés", icon: Bookmark },
+  { href: "/profile", key: "nav.profile", fallback: "Profil", icon: User },
+  { href: "/settings", key: "nav.settings", fallback: "Paramètres", icon: Settings },
 ];
 
 function isRouteActive(pathname: string, href: string): boolean {
@@ -40,32 +41,62 @@ function isRouteActive(pathname: string, href: string): boolean {
 
 export default function Sidebar({ handle, onLogout }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
   const { isAdmin, isTrustedVerifier, canCertify } = useAdminRole();
   const { count: unreadNotifications } = useUnreadNotifications();
   const { t } = useTranslation();
   const openComposer = () => window.dispatchEvent(new Event(OPEN_GLOBAL_COMPOSER_EVENT));
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    const routes = [
+      ...NAV_ITEMS.map((item) => item.href),
+      "/admin",
+      "/admin/people",
+      "/admin/journal",
+      "/admin/certifiers",
+      "/verifier",
+    ];
+
+    const prefetch = () => routes.forEach((route) => router.prefetch(route));
+    const timer = window.setTimeout(prefetch, 250);
+    return () => window.clearTimeout(timer);
+  }, [router]);
+
+  const navigate = (event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (isRouteActive(pathname, href)) return;
+    event.preventDefault();
+    if (pendingHref) return;
+    setPendingHref(href);
+    router.push(href);
+  };
 
   const sidebarContent = (
     <aside className="fixed inset-y-0 left-0 z-30 hidden h-screen w-72 flex-col justify-between border-r border-kelo-border bg-white p-6 md:flex">
       <div className="min-h-0 overflow-y-auto overscroll-contain">
         <div className="mb-8 flex items-center gap-2 px-2"><Logo className="h-9 w-auto"/><span className="text-lg font-extrabold text-kelo-text">Kelo</span></div>
         <nav className="flex flex-col gap-1 text-base font-semibold text-kelo-text">
-          {NAV_ITEMS.map(({ href, key, fallback, icon: Icon, prefetch }) => {
+          {NAV_ITEMS.map(({ href, key, fallback, icon: Icon }) => {
             const active = isRouteActive(pathname, href);
-            return <Link key={href} href={href} prefetch={prefetch} aria-current={active ? "page" : undefined} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 transition-colors ${active ? "bg-kelo-gradient text-white" : "hover:bg-kelo-background"}`}>
+            const pending = pendingHref === href;
+            return <Link key={href} href={href} prefetch onClick={(event) => navigate(event, href)} aria-current={active ? "page" : undefined} aria-busy={pending || undefined} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 transition-colors ${active ? "bg-kelo-gradient text-white" : "hover:bg-kelo-background"} ${pending ? "opacity-70" : ""}`}>
               <Icon className="h-5 w-5 flex-shrink-0"/><span className="min-w-0 flex-1 truncate">{t(key, fallback)}</span>
               {href === "/notifications" && unreadNotifications > 0 && <span aria-label={t("nav.unreadNotifications", `${unreadNotifications} notification(s) non lue(s)`, { count: unreadNotifications })} className={`flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-xs font-extrabold ${active ? "bg-white text-kelo-primary" : "bg-kelo-gradient text-white"}`}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}
             </Link>;
           })}
 
           {isAdmin && <>
-            <Link href="/admin" prefetch={false} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${pathname === "/admin" ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><ShieldCheck className="h-5 w-5"/>{t("nav.admin", "Panneau Admin")}</Link>
-            <Link href="/admin/people" prefetch={false} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/admin/people") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><Users className="h-5 w-5"/>{t("nav.people", "Personnes")}</Link>
-            <Link href="/admin/journal" prefetch={false} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/admin/journal") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><Newspaper className="h-5 w-5"/>{t("nav.journalMedia", "Médias du Journal")}</Link>
-            <Link href="/admin/certifiers" prefetch={false} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/admin/certifiers") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><BadgeCheck className="h-5 w-5"/>{t("nav.certifiers", "Gérer les certificateurs")}</Link>
+            <Link href="/admin" prefetch onClick={(event) => navigate(event, "/admin")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${pathname === "/admin" ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><ShieldCheck className="h-5 w-5"/>{t("nav.admin", "Panneau Admin")}</Link>
+            <Link href="/admin/people" prefetch onClick={(event) => navigate(event, "/admin/people")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/admin/people") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><Users className="h-5 w-5"/>{t("nav.people", "Personnes")}</Link>
+            <Link href="/admin/journal" prefetch onClick={(event) => navigate(event, "/admin/journal")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/admin/journal") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><Newspaper className="h-5 w-5"/>{t("nav.journalMedia", "Médias du Journal")}</Link>
+            <Link href="/admin/certifiers" prefetch onClick={(event) => navigate(event, "/admin/certifiers")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/admin/certifiers") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><BadgeCheck className="h-5 w-5"/>{t("nav.certifiers", "Gérer les certificateurs")}</Link>
           </>}
 
-          {!isAdmin && (isTrustedVerifier || canCertify) && <Link href="/verifier" prefetch={false} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/verifier") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><BadgeCheck className="h-5 w-5"/>{t("nav.verifier", "Panneau certificateur")}</Link>}
+          {!isAdmin && (isTrustedVerifier || canCertify) && <Link href="/verifier" prefetch onClick={(event) => navigate(event, "/verifier")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/verifier") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><BadgeCheck className="h-5 w-5"/>{t("nav.verifier", "Panneau certificateur")}</Link>}
         </nav>
       </div>
 
