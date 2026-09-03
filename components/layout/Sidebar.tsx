@@ -8,6 +8,7 @@ import {
   User, Users, Settings, ShieldCheck, BadgeCheck, PenSquare, LogOut, Newspaper, Clapperboard, Gamepad2,
 } from "lucide-react";
 
+import AccountSwitcher from "@/components/layout/AccountSwitcher";
 import Logo from "@/components/ui/Logo";
 import { OPEN_GLOBAL_COMPOSER_EVENT } from "@/components/feed/GlobalPostComposer";
 import { useAdminRole } from "@/hooks/useAdminRole";
@@ -102,7 +103,7 @@ export default function Sidebar({ handle, onLogout }: SidebarProps) {
 
       <div className="border-t border-kelo-border pt-4">
         <button type="button" onClick={openComposer} className="mb-4 flex w-full touch-manipulation items-center justify-center gap-2 rounded-full bg-kelo-gradient py-3 font-bold text-white"><PenSquare className="h-4 w-4"/>{t("nav.writePost", "Écrire un post")}</button>
-        <div className="mb-2 truncate px-1 text-xs text-kelo-muted">{t("nav.connectedAs", "Connecté :")} <span className="font-bold text-kelo-text">@{handle || t("nav.guest", "invité")}</span></div>
+        <div className="mb-3"><AccountSwitcher compact /></div>
         <button type="button" onClick={onLogout} className="flex w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-kelo-background py-2.5 text-sm font-bold text-kelo-text"><LogOut className="h-4 w-4"/>{t("nav.logout", "Déconnexion")}</button>
       </div>
     </aside>
