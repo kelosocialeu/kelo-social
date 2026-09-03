@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { BadgeCheck, Bell, Bookmark, Bot, Clapperboard, Hash, Home, ListChecks, LogOut, MessageCircle, PenSquare, Rocket, Search, Settings, ShieldCheck, User, X } from "lucide-react";
+import AccountSwitcher from "@/components/layout/AccountSwitcher";
 import Logo from "@/components/ui/Logo";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { useTranslation } from "@/components/providers/TranslationProvider";
@@ -75,6 +76,7 @@ export default function MobileDrawer({ open, handle, onClose, onLogout, onCreate
         <button type="button" onClick={onClose} aria-label={t("nav.closeMenu", "Fermer le menu")} className="flex h-10 w-10 touch-manipulation items-center justify-center rounded-2xl bg-white/60 text-kelo-muted transition active:scale-95"><X className="h-5 w-5" /></button>
       </div>
       <div className="relative min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <div className="mb-4"><AccountSwitcher onBeforeNavigate={onClose} /></div>
         <button type="button" onClick={() => { onCreatePost(); onClose(); }} className="mb-4 flex w-full touch-manipulation items-center justify-center gap-2 rounded-full bg-kelo-gradient py-3 font-bold text-white shadow-[0_12px_30px_rgba(139,92,246,0.3)] transition active:scale-[0.98]"><PenSquare className="h-4 w-4" />{t("nav.writePost", "Nouveau post")}</button>
         <nav className="flex flex-col gap-1">
           {NAV_ITEMS.map(({ href, key, fallback, icon: Icon }) => { const active = isRouteActive(pathname, href); const pending = pendingHref === href; return <Link key={href} href={href} prefetch onClick={(event) => navigate(event, href)} aria-current={active ? "page" : undefined} aria-busy={pending || undefined} className={`flex touch-manipulation items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold transition ${active ? "bg-kelo-gradient text-white shadow-sm" : "text-kelo-text hover:bg-white/60"} ${pending ? "opacity-60" : ""}`}><Icon className="h-5 w-5 flex-shrink-0" /><span className="truncate">{t(key, fallback)}</span></Link>; })}
