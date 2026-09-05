@@ -1,4 +1,5 @@
 import { createAtpAgent } from "@/lib/atproto/client";
+import { getOrStartKeloTrial } from "@/lib/atproto/kelo-trial";
 import {
   AtprotoDiscoveryError,
   discoverAccount,
@@ -59,6 +60,14 @@ function clearCachedAgent() {
 function saveSession(session: AtpSession) {
   sessionStorage.set(session);
   clearCachedAgent();
+}
+
+async function ensureKeloTrial(agent: ReturnType<typeof createAtpAgent>, did: string) {
+  try {
+    await getOrStartKeloTrial(agent, did);
+  } catch (error) {
+    console.warn("Impossible d'initialiser la période d'essai Kelo Social :", error);
+  }
 }
 
 function normalizePdsUrl(value: string) {
@@ -214,6 +223,7 @@ export async function login(credentials: LoginCredentials): Promise<AtpSession> 
   sessionStorage.set(session);
   cachedAgent = agent;
   cachedSessionKey = getSessionKey(session);
+  await ensureKeloTrial(agent, session.did);
   return session;
 }
 
@@ -221,7 +231,8 @@ export async function loginWithKeloIdSession(session: AtpSession): Promise<AtpSe
   if (!session?.accessJwt || !session?.refreshJwt || !session?.handle || !session?.did || !session?.pdsUrl) throw new AuthError("Session Kelo ID incomplète.");
   saveSession(session);
   try {
-    await resumeAgentSession(session);
+    const agent = await resumeAgentSession(session);
+    await ensureKeloTrial(agent, session.did);
     const current = getStoredSession();
     if (!current) throw new AuthError("La session Kelo ID n’a pas pu être enregistrée.");
     if (current.did !== session.did) throw new AuthError("La session Kelo ID ne correspond pas au compte confirmé.");
@@ -259,7 +270,13 @@ export async function resumeAgentSession(session: AtpSession) {
 export async function restoreStoredSession() {
   const stored = getStoredSession();
   if (!stored) return null;
-  try { await resumeAgentSession(stored); return getStoredSession() || stored; } catch { return getStoredSession(); }
+  try {
+    const agent = await resumeAgentSession(stored);
+    await ensureKeloTrial(agent, stored.did);
+    return getStoredSession() || stored;
+  } catch {
+    return getStoredSession();
+  }
 }
 
 export async function getAuthenticatedAgent() {
