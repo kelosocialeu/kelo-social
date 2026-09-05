@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Clapperboard, Gamepad2, Home, MessageCircle, Plus, User, X, Video, FileText } from "lucide-react";
+import { Clapperboard, Home, MessageCircle, Plus, User, X, Video, FileText } from "lucide-react";
 import { useTranslation } from "@/components/providers/TranslationProvider";
 import { OPEN_GLOBAL_COMPOSER_EVENT } from "@/components/feed/GlobalPostComposer";
 
@@ -24,7 +24,6 @@ export default function MobileBottomNav({ handle, hidden = false, onCreatePost }
   const navItems = [
     { href: "/feed", label: t("nav.home", "Accueil"), icon: Home },
     { href: "/reels", label: t("nav.reels", "Réels"), icon: Clapperboard },
-    { href: "/games", label: t("nav.games", "Jeux"), icon: Gamepad2 },
     { href: "/messages", label: t("nav.messages", "Discussions"), icon: MessageCircle },
   ];
 
@@ -33,7 +32,6 @@ export default function MobileBottomNav({ handle, hidden = false, onCreatePost }
     if (href === "/feed") return pathname === "/feed";
     if (href === "/messages") return pathname.startsWith("/messages");
     if (href === "/reels") return pathname.startsWith("/reels");
-    if (href === "/games") return pathname.startsWith("/games");
     return pathname === href;
   };
   const profileActive = pathname === "/profile" || pathname.startsWith("/profile/");
@@ -105,7 +103,6 @@ export default function MobileBottomNav({ handle, hidden = false, onCreatePost }
           <MobileNavLink {...navItems[1]} active={isActive(navItems[1].href)} pending={pendingHref === navItems[1].href} onNavigate={navigate} />
           <button type="button" onClick={() => setCreateMenuOpen((value) => !value)} aria-label={t("nav.createPost", "Créer")} aria-expanded={createMenuOpen} className="relative z-10 -mt-8 flex h-14 w-14 flex-shrink-0 touch-manipulation items-center justify-center rounded-full bg-kelo-gradient text-white shadow-[0_12px_32px_rgba(139,92,246,0.45)] transition-all duration-200 hover:scale-105 active:scale-95"><span className="absolute inset-0 rounded-full border border-white/35"/><Plus className={`relative h-7 w-7 transition-transform duration-200 ${createMenuOpen ? "rotate-45" : ""}`} strokeWidth={2.4}/></button>
           <MobileNavLink {...navItems[2]} active={isActive(navItems[2].href)} pending={pendingHref === navItems[2].href} onNavigate={navigate} />
-          <MobileNavLink {...navItems[3]} active={isActive(navItems[3].href)} pending={pendingHref === navItems[3].href} onNavigate={navigate} />
           <MobileNavLink href={profileHref} label={t("nav.profile", "Profil")} icon={User} active={profileActive} pending={pendingHref === profileHref} onNavigate={navigate}/>
         </div>
       </nav>
