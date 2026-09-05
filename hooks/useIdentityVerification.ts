@@ -12,15 +12,12 @@ import {
   getIdentityVerification,
   IdentityVerificationRecord,
 } from "@/lib/atproto/identity-verifications";
+import { getOrStartKeloTrial } from "@/lib/atproto/kelo-trial";
 
 import {
+  getAuthenticatedAgent,
   getStoredSession,
 } from "@/services/auth.service";
-
-interface TrialStatus {
-  active: boolean;
-  expiresAt?: string;
-}
 
 interface IdentityVerificationState {
   checked: boolean;
@@ -80,18 +77,6 @@ function persistVerification(
   }
 }
 
-async function fetchTrialStatus(did: string): Promise<TrialStatus> {
-  try {
-    const response = await fetch(`/api/trial/status?did=${encodeURIComponent(did)}`, {
-      cache: "no-store",
-    });
-    if (!response.ok) return { active: false };
-    return (await response.json()) as TrialStatus;
-  } catch {
-    return { active: false };
-  }
-}
-
 export function useIdentityVerification(): IdentityVerificationState {
   const [verification, setVerification] =
     useState<IdentityVerificationRecord | null>(null);
@@ -142,9 +127,10 @@ export function useIdentityVerification(): IdentityVerificationState {
         setTrialActive(false);
         setTrialExpiresAt(null);
       } else {
-        const trial = await fetchTrialStatus(session.did);
-        setTrialActive(trial.active === true);
-        setTrialExpiresAt(trial.expiresAt || null);
+        const { agent } = await getAuthenticatedAgent();
+        const trial = await getOrStartKeloTrial(agent, session.did);
+        setTrialActive(trial.active);
+        setTrialExpiresAt(trial.expiresAt);
       }
     } catch (error) {
       console.warn(
@@ -162,9 +148,15 @@ export function useIdentityVerification(): IdentityVerificationState {
         setTrialActive(false);
         setTrialExpiresAt(null);
       } else {
-        const trial = await fetchTrialStatus(session.did);
-        setTrialActive(trial.active === true);
-        setTrialExpiresAt(trial.expiresAt || null);
+        try {
+          const { agent } = await getAuthenticatedAgent();
+          const trial = await getOrStartKeloTrial(agent, session.did);
+          setTrialActive(trial.active);
+          setTrialExpiresAt(trial.expiresAt);
+        } catch {
+          setTrialActive(false);
+          setTrialExpiresAt(null);
+        }
       }
     } finally {
       setChecked(true);
@@ -173,8 +165,6 @@ export function useIdentityVerification(): IdentityVerificationState {
   }, []);
 
   const identityVerified = !!verification;
-  // `verified` reste la permission effective utilisée par les composants existants :
-  // vérification Kelo ID OU période d'essai encore active.
   const verified = identityVerified || trialActive;
 
   useEffect(() => {
