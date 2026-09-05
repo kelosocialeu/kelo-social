@@ -37,6 +37,7 @@ interface PostCardProps {
   onRepost?: () => void;
   onBookmark?: () => void;
   onDelete?: () => void;
+  onEdited?: (updatedPost: any) => void;
   onBlocked?: () => void;
   onMuted?: () => void;
   disableThreadLink?: boolean;
@@ -75,6 +76,7 @@ export default function PostCard({
   onRepost,
   onBookmark,
   onDelete,
+  onEdited,
   onBlocked,
   onMuted,
   disableThreadLink,
@@ -228,11 +230,27 @@ export default function PostCard({
     setSavingEdit(true);
     setEditError("");
     try {
-      const result = await editOwnPost(post.uri, post.record || {}, editText);
+      const currentRecord = {
+        ...(post.record || {}),
+        text: localText,
+        facets: localFacets,
+      };
+      const result = await editOwnPost(post.uri, currentRecord, editText);
+      const updatedPost = {
+        ...post,
+        cid: result.cid,
+        record: {
+          ...currentRecord,
+          ...result.record,
+          text: result.text,
+          facets: result.facets,
+        },
+      };
       setLocalText(result.text);
       setLocalFacets(result.facets);
       setLocalCid(result.cid);
       setEditText(result.text);
+      onEdited?.(updatedPost);
       setEditing(false);
     } catch (error: any) {
       setEditError(error?.message || "Impossible de modifier la publication.");
@@ -242,6 +260,11 @@ export default function PostCard({
   };
 
   const editLength = Array.from(editText).length;
+  const effectivePost = {
+    ...post,
+    cid: localCid,
+    record: { ...post.record, text: localText, facets: localFacets },
+  };
 
   return (
     <article
@@ -377,7 +400,7 @@ export default function PostCard({
               {editError && <p className="mt-2 text-xs font-semibold text-red-600">{editError}</p>}
             </div>
           ) : (
-            <SensitiveContentGate post={post}>
+            <SensitiveContentGate post={effectivePost}>
               <PostText text={localText} facets={localFacets} />
               <PostEmbed embed={post.embed} />
               <PostTranslation text={localText} />
@@ -385,7 +408,7 @@ export default function PostCard({
           )}
 
           <PostActions
-            post={{ ...post, cid: localCid, record: { ...post.record, text: localText, facets: localFacets } }}
+            post={effectivePost}
             replyCount={post.replyCount || 0}
             repostCount={localRepostCount}
             likeCount={localLikeCount}
