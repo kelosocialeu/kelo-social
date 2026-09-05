@@ -17,10 +17,18 @@ import {
   getStoredSession,
 } from "@/services/auth.service";
 
+interface TrialStatus {
+  active: boolean;
+  expiresAt?: string;
+}
+
 interface IdentityVerificationState {
   checked: boolean;
   loading: boolean;
   verified: boolean;
+  identityVerified: boolean;
+  trialActive: boolean;
+  trialExpiresAt: string | null;
   verification: IdentityVerificationRecord | null;
   dialogOpen: boolean;
   refresh: () => Promise<void>;
@@ -72,9 +80,23 @@ function persistVerification(
   }
 }
 
+async function fetchTrialStatus(did: string): Promise<TrialStatus> {
+  try {
+    const response = await fetch(`/api/trial/status?did=${encodeURIComponent(did)}`, {
+      cache: "no-store",
+    });
+    if (!response.ok) return { active: false };
+    return (await response.json()) as TrialStatus;
+  } catch {
+    return { active: false };
+  }
+}
+
 export function useIdentityVerification(): IdentityVerificationState {
   const [verification, setVerification] =
     useState<IdentityVerificationRecord | null>(null);
+  const [trialActive, setTrialActive] = useState(false);
+  const [trialExpiresAt, setTrialExpiresAt] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -90,6 +112,8 @@ export function useIdentityVerification(): IdentityVerificationState {
     if (!session?.did) {
       verificationRef.current = null;
       setVerification(null);
+      setTrialActive(false);
+      setTrialExpiresAt(null);
       setChecked(true);
       return;
     }
@@ -99,21 +123,29 @@ export function useIdentityVerification(): IdentityVerificationState {
     if (!verificationRef.current && persisted) {
       verificationRef.current = persisted;
       setVerification(persisted);
+      setTrialActive(false);
+      setTrialExpiresAt(null);
       setChecked(true);
     }
 
     setLoading(true);
 
     try {
-      // On force une lecture fraîche pour détecter rapidement une nouvelle
-      // validation, mais une panne réseau ne doit jamais retirer un statut
-      // précédemment confirmé.
       clearIdentityVerificationCache(session.did);
 
       const record = await getIdentityVerification(session.did);
       verificationRef.current = record;
       setVerification(record);
       persistVerification(session.did, record);
+
+      if (record) {
+        setTrialActive(false);
+        setTrialExpiresAt(null);
+      } else {
+        const trial = await fetchTrialStatus(session.did);
+        setTrialActive(trial.active === true);
+        setTrialExpiresAt(trial.expiresAt || null);
+      }
     } catch (error) {
       console.warn(
         "Vérification d’identité temporairement indisponible, dernier état conservé :",
@@ -127,6 +159,12 @@ export function useIdentityVerification(): IdentityVerificationState {
       if (fallback) {
         verificationRef.current = fallback;
         setVerification(fallback);
+        setTrialActive(false);
+        setTrialExpiresAt(null);
+      } else {
+        const trial = await fetchTrialStatus(session.did);
+        setTrialActive(trial.active === true);
+        setTrialExpiresAt(trial.expiresAt || null);
       }
     } finally {
       setChecked(true);
@@ -134,12 +172,15 @@ export function useIdentityVerification(): IdentityVerificationState {
     }
   }, []);
 
-  const verified = !!verification;
+  const identityVerified = !!verification;
+  // `verified` reste la permission effective utilisée par les composants existants :
+  // vérification Kelo ID OU période d'essai encore active.
+  const verified = identityVerified || trialActive;
 
   useEffect(() => {
     void refresh();
 
-    const delay = verified
+    const delay = identityVerified
       ? VERIFIED_REFRESH_MS
       : UNVERIFIED_REFRESH_MS;
 
@@ -162,7 +203,7 @@ export function useIdentityVerification(): IdentityVerificationState {
       window.removeEventListener("focus", runWhenVisible);
       document.removeEventListener("visibilitychange", runWhenVisible);
     };
-  }, [refresh, verified]);
+  }, [refresh, identityVerified]);
 
   const requireVerification = useCallback(() => {
     if (verified) return true;
@@ -179,6 +220,9 @@ export function useIdentityVerification(): IdentityVerificationState {
     checked,
     loading,
     verified,
+    identityVerified,
+    trialActive,
+    trialExpiresAt,
     verification,
     dialogOpen,
     refresh,
