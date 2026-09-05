@@ -11,8 +11,10 @@ import {
   clearIdentityVerificationCache,
   getIdentityVerification,
   IdentityVerificationRecord,
+  IdentityVerificationType,
 } from "@/lib/atproto/identity-verifications";
 import { getOrStartKeloTrial } from "@/lib/atproto/kelo-trial";
+import { syncKeloIdStatus } from "@/lib/kelo-id/status-sync";
 
 import {
   getAuthenticatedAgent,
@@ -36,6 +38,14 @@ interface IdentityVerificationState {
 const UNVERIFIED_REFRESH_MS = 15_000;
 const VERIFIED_REFRESH_MS = 2 * 60_000;
 const STORAGE_PREFIX = "kelo.identity-verification.";
+const SUPPORTED_TYPES: IdentityVerificationType[] = [
+  "human",
+  "enterprise",
+  "media",
+  "university",
+  "association",
+  "institution",
+];
 
 function storageKey(did: string) {
   return `${STORAGE_PREFIX}${did.trim().toLowerCase()}`;
@@ -77,6 +87,12 @@ function persistVerification(
   }
 }
 
+function normalizeVerificationType(value: string): IdentityVerificationType {
+  return SUPPORTED_TYPES.includes(value as IdentityVerificationType)
+    ? (value as IdentityVerificationType)
+    : "human";
+}
+
 export function useIdentityVerification(): IdentityVerificationState {
   const [verification, setVerification] =
     useState<IdentityVerificationRecord | null>(null);
@@ -116,6 +132,31 @@ export function useIdentityVerification(): IdentityVerificationState {
     setLoading(true);
 
     try {
+      // Source prioritaire pour les vérifications faites dans l'app Kelo ID.
+      // L'Edge Function vérifie le jeton AT Protocol auprès du PDS avant de lire Supabase.
+      try {
+        const mobileStatus = await syncKeloIdStatus(session);
+        if (mobileStatus.verified) {
+          const mobileRecord: IdentityVerificationRecord = {
+            subjectDid: session.did.toLowerCase(),
+            subjectHandle: session.handle.replace(/^@/, "").toLowerCase(),
+            verificationType: normalizeVerificationType(mobileStatus.verificationType),
+            source: "kelo-id",
+            assignmentMode: "automatic",
+            issuedAt: mobileStatus.verifiedAt || new Date().toISOString(),
+            schemaVersion: 1,
+          };
+          verificationRef.current = mobileRecord;
+          setVerification(mobileRecord);
+          persistVerification(session.did, mobileRecord);
+          setTrialActive(false);
+          setTrialExpiresAt(null);
+          return;
+        }
+      } catch (syncError) {
+        console.warn("Synchronisation Kelo ID/Supabase indisponible :", syncError);
+      }
+
       clearIdentityVerificationCache(session.did);
 
       const record = await getIdentityVerification(session.did);
