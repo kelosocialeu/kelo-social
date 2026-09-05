@@ -1,9 +1,16 @@
 import { createAppViewAgent } from "@/lib/atproto/appview";
 import { getReadAgent } from "@/lib/atproto/read-agent";
 
+function onlyRootPosts(items: any[]) {
+  return items.filter((item: any) => !item?.post?.record?.reply);
+}
+
 /**
  * Feed generator public "What's Hot" : agrège les publications populaires
  * de tout le réseau fédéré (Bluesky, WSocial, Eurosky, Kelo Social...).
+ *
+ * Les réponses/commentaires sont exclus du feed principal : ils restent
+ * accessibles depuis la publication à laquelle ils répondent.
  */
 const DISCOVER_FEED_URI =
   "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot";
@@ -11,7 +18,7 @@ const DISCOVER_FEED_URI =
 export async function getDiscoverFeed(limit = 25, cursor?: string) {
   const agent = createAppViewAgent();
   const res = await agent.api.app.bsky.feed.getFeed({ feed: DISCOVER_FEED_URI, limit, cursor });
-  return { items: res.data.feed, cursor: res.data.cursor };
+  return { items: onlyRootPosts(res.data.feed), cursor: res.data.cursor };
 }
 
 /**
@@ -22,5 +29,5 @@ export async function getDiscoverFeed(limit = 25, cursor?: string) {
 export async function getFollowingFeed(limit = 50, cursor?: string) {
   const agent = await getReadAgent();
   const res = await agent.api.app.bsky.feed.getTimeline({ limit, cursor });
-  return { items: res.data.feed, cursor: res.data.cursor };
+  return { items: onlyRootPosts(res.data.feed), cursor: res.data.cursor };
 }
