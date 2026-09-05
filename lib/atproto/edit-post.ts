@@ -24,12 +24,32 @@ export async function editOwnPost(
   const { agent, session } = await getAuthenticatedAgent();
   const { repo, rkey } = parsePostUri(uri);
 
-  if (repo !== session.did) {
+  const normalizedHandle = session.handle?.replace(/^@/, "").toLowerCase();
+  const normalizedRepo = repo.replace(/^@/, "").toLowerCase();
+  const ownsRecord = repo === session.did || normalizedRepo === normalizedHandle;
+
+  if (!ownsRecord) {
     throw new Error("Vous ne pouvez modifier que vos propres publications.");
   }
 
+  // Récupère d'abord la version autoritative stockée dans le dépôt AT Protocol
+  // du compte. On ne dépend donc pas uniquement de la copie affichée par Kelo Social.
+  let authoritativeRecord: Record<string, any> = originalRecord || {};
+  try {
+    const current = await agent.api.com.atproto.repo.getRecord({
+      repo: session.did,
+      collection: "app.bsky.feed.post",
+      rkey,
+    });
+    if (current.data?.value && typeof current.data.value === "object") {
+      authoritativeRecord = current.data.value as Record<string, any>;
+    }
+  } catch (error) {
+    console.warn("Impossible de relire le record avant modification, utilisation de la copie locale.", error);
+  }
+
   const text = nextText.trim();
-  const hasExistingContent = Boolean(originalRecord?.embed);
+  const hasExistingContent = Boolean(authoritativeRecord?.embed);
 
   if (!text && !hasExistingContent) {
     throw new Error("La publication doit contenir du texte ou un média.");
@@ -43,12 +63,15 @@ export async function editOwnPost(
   if (text) await richText.detectFacets(agent);
 
   const record = {
-    ...originalRecord,
+    ...authoritativeRecord,
     $type: "app.bsky.feed.post",
     text: richText.text,
     facets: richText.facets,
   };
 
+  // putRecord remplace le record existant avec le même rkey directement dans
+  // le dépôt public AT Protocol. Le PDS produit alors un nouveau commit repo,
+  // qui est distribué aux relays et peut être indexé par les autres AppViews.
   const result = await agent.api.com.atproto.repo.putRecord({
     repo: session.did,
     collection: "app.bsky.feed.post",
@@ -56,11 +79,23 @@ export async function editOwnPost(
     record,
   });
 
+  // Vérifie la lecture depuis le PDS après écriture. Cela garantit que Kelo
+  // n'affiche pas seulement une modification locale qui n'aurait pas été écrite.
+  const confirmed = await agent.api.com.atproto.repo.getRecord({
+    repo: session.did,
+    collection: "app.bsky.feed.post",
+    rkey,
+  });
+
+  const confirmedRecord = (confirmed.data?.value && typeof confirmed.data.value === "object")
+    ? confirmed.data.value as Record<string, any>
+    : record;
+
   return {
     uri: result.data.uri,
-    cid: result.data.cid,
-    text: richText.text,
-    facets: richText.facets,
-    record,
+    cid: confirmed.data?.cid || result.data.cid,
+    text: String(confirmedRecord.text ?? richText.text),
+    facets: confirmedRecord.facets ?? richText.facets,
+    record: confirmedRecord,
   };
 }
