@@ -1,5 +1,6 @@
 const SYSTEM_NOTIFICATION_PREFIX = "kelo-system-notifications";
 const LAST_NOTIFICATION_PREFIX = "kelo-system-notifications-last";
+const APP_ICON = "/api/app-icon";
 
 export type SystemNotificationSupport = {
   supported: boolean;
@@ -69,8 +70,8 @@ export async function showSystemNotification(options: {
   const registration = await navigator.serviceWorker.ready;
   await registration.showNotification(options.title, {
     body: options.body,
-    icon: "https://kelosocial.sirv.com/logo.png",
-    badge: "https://kelosocial.sirv.com/logo.png",
+    icon: APP_ICON,
+    badge: APP_ICON,
     tag: options.tag || "kelo-social-notification",
     data: { url: options.url || "/notifications" },
   });
