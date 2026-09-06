@@ -1,5 +1,5 @@
 const APP_NAME = "Kelo Social";
-const DEFAULT_ICON = "https://kelosocial.sirv.com/logo.png";
+const DEFAULT_ICON = "/api/app-icon";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
