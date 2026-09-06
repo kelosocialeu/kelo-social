@@ -16,7 +16,7 @@ import { TranslationProvider } from "@/components/providers/TranslationProvider"
 const APP_NAME = "Kelo Social";
 const APP_TITLE = "Kelo Social — Le réseau social européen, libre et vérifié";
 const APP_DESCRIPTION = "Kelo Social est un réseau social européen décentralisé basé sur AT Protocol. Gardez le contrôle de vos données, vérifiez votre profil avec Kelo ID et rejoignez une communauté moderne, sans publicité.";
-const APP_LOGO = "https://kelosocial.sirv.com/logo.png";
+const APP_LOGO = "/api/app-icon";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.kelosocial.eu"),
