@@ -15,13 +15,13 @@
   "categories": ["social", "communication"],
   "icons": [
     {
-      "src": "https://kelosocial.sirv.com/logo.png",
+      "src": "/api/app-icon",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://kelosocial.sirv.com/logo.png",
+      "src": "/api/app-icon",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
