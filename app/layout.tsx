@@ -16,7 +16,7 @@ import { TranslationProvider } from "@/components/providers/TranslationProvider"
 const APP_NAME = "Kelo Social";
 const APP_TITLE = "Kelo Social — Le réseau social européen, libre et vérifié";
 const APP_DESCRIPTION = "Kelo Social est un réseau social européen décentralisé basé sur AT Protocol. Gardez le contrôle de vos données, vérifiez votre profil avec Kelo ID et rejoignez une communauté moderne, sans publicité.";
-const APP_LOGO = "/api/app-icon";
+const APP_LOGO = "https://kelosocial.sirv.com/logo.png";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.kelosocial.eu"),
@@ -28,7 +28,11 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "default" },
   other: { "mobile-web-app-capable": "yes" },
   formatDetection: { telephone: false },
-  icons: { icon: APP_LOGO, shortcut: APP_LOGO, apple: APP_LOGO },
+  icons: {
+    icon: [{ url: APP_LOGO, type: "image/png" }],
+    shortcut: [{ url: APP_LOGO, type: "image/png" }],
+    apple: [{ url: APP_LOGO, type: "image/png" }],
+  },
   openGraph: {
     type: "website",
     url: "https://www.kelosocial.eu/",
