@@ -66,6 +66,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr">
       <body className="min-h-[100dvh] overflow-x-hidden bg-[#faf9f6] font-sans text-gray-900 antialiased">
+        {/* Mastodon verification link: present in the HTML but invisible to users. */}
+        <a
+          rel="me"
+          href="https://mastodon.social/@kelosocial"
+          aria-hidden="true"
+          tabIndex={-1}
+          className="hidden"
+        >
+          Mastodon
+        </a>
         <AuthProvider>
           <TranslationProvider>
             <DisplayPreferencesBootstrap />
