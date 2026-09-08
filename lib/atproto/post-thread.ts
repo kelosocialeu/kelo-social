@@ -20,9 +20,10 @@ export interface GetPostThreadOptions {
  * Récupère une publication, ses réponses imbriquées et ses éventuels
  * parents depuis l’AppView AT Protocol.
  *
- * Contrairement aux fils classiques, getPostThread ne fournit pas de
- * curseur de pagination. La quantité chargée est contrôlée avec depth
- * et parentHeight.
+ * Lorsqu’une URI correspond à une réponse, on affiche désormais directement
+ * son parent immédiat. Cela permet notamment qu’un clic sur une réponse
+ * depuis l’onglet « Réponses » d’un profil ouvre la publication à laquelle
+ * cette réponse répond, comme sur Bluesky et X/Twitter.
  */
 export async function getPostThread(
   uri: string,
@@ -44,5 +45,14 @@ export async function getPostThread(
       parentHeight,
     });
 
-  return response.data.thread;
+  const thread: any = response.data.thread;
+
+  // Pour une réponse, AT Protocol fournit son parent dans `parent`.
+  // Retourner ce parent fait ouvrir la conversation sur le post auquel
+  // l’utilisateur répondait, plutôt que sur la réponse elle-même.
+  if (thread?.parent?.post?.uri) {
+    return thread.parent;
+  }
+
+  return thread;
 }
