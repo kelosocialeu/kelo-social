@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   Home, Search, Bell, MessageCircle, Hash, ListChecks, Rocket, Bookmark,
   User, Settings, ShieldCheck, BadgeCheck, PenSquare, LogOut, Newspaper, Clapperboard, Gamepad2,
@@ -42,7 +42,6 @@ function isRouteActive(pathname: string, href: string): boolean {
 
 export default function Sidebar({ handle, onLogout }: SidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const { isAdmin, isTrustedVerifier, canCertify } = useAdminRole();
   const { count: unreadNotifications } = useUnreadNotifications();
@@ -53,26 +52,8 @@ export default function Sidebar({ handle, onLogout }: SidebarProps) {
     setPendingHref(null);
   }, [pathname]);
 
-  useEffect(() => {
-    const routes = [
-      ...NAV_ITEMS.map((item) => item.href),
-      "/admin",
-      "/admin/journal",
-      "/admin/certifiers",
-      "/verifier",
-    ];
-
-    const prefetch = () => routes.forEach((route) => router.prefetch(route));
-    const timer = window.setTimeout(prefetch, 250);
-    return () => window.clearTimeout(timer);
-  }, [router]);
-
-  const navigate = (event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-    if (isRouteActive(pathname, href)) return;
-    event.preventDefault();
-    if (pendingHref) return;
-    setPendingHref(href);
-    router.push(href);
+  const markNavigationPending = (href: string) => {
+    if (!isRouteActive(pathname, href)) setPendingHref(href);
   };
 
   const sidebarContent = (
@@ -83,19 +64,19 @@ export default function Sidebar({ handle, onLogout }: SidebarProps) {
           {NAV_ITEMS.map(({ href, key, fallback, icon: Icon }) => {
             const active = isRouteActive(pathname, href);
             const pending = pendingHref === href;
-            return <Link key={href} href={href} prefetch onClick={(event) => navigate(event, href)} aria-current={active ? "page" : undefined} aria-busy={pending || undefined} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 transition-colors ${active ? "bg-kelo-gradient text-white" : "hover:bg-kelo-background"} ${pending ? "opacity-70" : ""}`}>
+            return <Link key={href} href={href} prefetch onClick={() => markNavigationPending(href)} aria-current={active ? "page" : undefined} aria-busy={pending || undefined} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 transition-colors ${active ? "bg-kelo-gradient text-white" : "hover:bg-kelo-background"} ${pending ? "opacity-70" : ""}`}>
               <Icon className="h-5 w-5 flex-shrink-0"/><span className="min-w-0 flex-1 truncate">{t(key, fallback)}</span>
               {href === "/notifications" && unreadNotifications > 0 && <span aria-label={t("nav.unreadNotifications", `${unreadNotifications} notification(s) non lue(s)`, { count: unreadNotifications })} className={`flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-xs font-extrabold ${active ? "bg-white text-kelo-primary" : "bg-kelo-gradient text-white"}`}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}
             </Link>;
           })}
 
           {isAdmin && <>
-            <Link href="/admin" prefetch onClick={(event) => navigate(event, "/admin")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${pathname === "/admin" ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><ShieldCheck className="h-5 w-5"/>{t("nav.admin", "Panneau Admin")}</Link>
-            <Link href="/admin/journal" prefetch onClick={(event) => navigate(event, "/admin/journal")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/admin/journal") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><Newspaper className="h-5 w-5"/>{t("nav.journalMedia", "Médias du Journal")}</Link>
-            <Link href="/admin/certifiers" prefetch onClick={(event) => navigate(event, "/admin/certifiers")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/admin/certifiers") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><BadgeCheck className="h-5 w-5"/>{t("nav.certifiers", "Gérer les certificateurs")}</Link>
+            <Link href="/admin" prefetch onClick={() => markNavigationPending("/admin")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${pathname === "/admin" ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><ShieldCheck className="h-5 w-5"/>{t("nav.admin", "Panneau Admin")}</Link>
+            <Link href="/admin/journal" prefetch onClick={() => markNavigationPending("/admin/journal")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/admin/journal") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><Newspaper className="h-5 w-5"/>{t("nav.journalMedia", "Médias du Journal")}</Link>
+            <Link href="/admin/certifiers" prefetch onClick={() => markNavigationPending("/admin/certifiers")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/admin/certifiers") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><BadgeCheck className="h-5 w-5"/>{t("nav.certifiers", "Gérer les certificateurs")}</Link>
           </>}
 
-          {!isAdmin && (isTrustedVerifier || canCertify) && <Link href="/verifier" prefetch onClick={(event) => navigate(event, "/verifier")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/verifier") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><BadgeCheck className="h-5 w-5"/>{t("nav.verifier", "Panneau certificateur")}</Link>}
+          {!isAdmin && (isTrustedVerifier || canCertify) && <Link href="/verifier" prefetch onClick={() => markNavigationPending("/verifier")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/verifier") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><BadgeCheck className="h-5 w-5"/>{t("nav.verifier", "Panneau certificateur")}</Link>}
         </nav>
       </div>
 
