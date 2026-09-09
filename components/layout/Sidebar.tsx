@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Home, Search, Bell, MessageCircle, Hash, ListChecks, Rocket, Bookmark,
-  User, Users, Settings, ShieldCheck, BadgeCheck, PenSquare, LogOut, Newspaper, Clapperboard, Gamepad2,
+  User, Settings, ShieldCheck, BadgeCheck, PenSquare, LogOut, Newspaper, Clapperboard, Gamepad2,
 } from "lucide-react";
 
 import AccountSwitcher from "@/components/layout/AccountSwitcher";
@@ -57,7 +57,6 @@ export default function Sidebar({ handle, onLogout }: SidebarProps) {
     const routes = [
       ...NAV_ITEMS.map((item) => item.href),
       "/admin",
-      "/admin/people",
       "/admin/journal",
       "/admin/certifiers",
       "/verifier",
@@ -92,7 +91,6 @@ export default function Sidebar({ handle, onLogout }: SidebarProps) {
 
           {isAdmin && <>
             <Link href="/admin" prefetch onClick={(event) => navigate(event, "/admin")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${pathname === "/admin" ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><ShieldCheck className="h-5 w-5"/>{t("nav.admin", "Panneau Admin")}</Link>
-            <Link href="/admin/people" prefetch onClick={(event) => navigate(event, "/admin/people")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/admin/people") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><Users className="h-5 w-5"/>{t("nav.people", "Personnes")}</Link>
             <Link href="/admin/journal" prefetch onClick={(event) => navigate(event, "/admin/journal")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/admin/journal") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><Newspaper className="h-5 w-5"/>{t("nav.journalMedia", "Médias du Journal")}</Link>
             <Link href="/admin/certifiers" prefetch onClick={(event) => navigate(event, "/admin/certifiers")} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/admin/certifiers") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><BadgeCheck className="h-5 w-5"/>{t("nav.certifiers", "Gérer les certificateurs")}</Link>
           </>}
