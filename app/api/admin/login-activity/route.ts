@@ -77,8 +77,48 @@ async function authenticateRequester(session: RequestSession) {
   };
 }
 
+async function getConfiguredAdminIdentity() {
+  const identifier = normalizeHandle(
+    process.env.KELO_ADMIN_ATPROTO_IDENTIFIER || ""
+  );
+  const password = process.env.KELO_ADMIN_ATPROTO_PASSWORD?.trim() || "";
+  const pdsUrl = process.env.KELO_ADMIN_PDS_URL?.trim() || "";
+
+  if (!identifier || !password || !pdsUrl) return null;
+
+  const agent = new AtpAgent({ service: pdsUrl });
+  await agent.login({ identifier, password });
+  const session = await agent.api.com.atproto.server.getSession();
+
+  return {
+    did: normalizeDid(session.data.did || ""),
+    handle: normalizeHandle(session.data.handle || identifier),
+  };
+}
+
+async function isRequesterAdmin(requester: { did: string; handle: string }) {
+  try {
+    const configuredAdmin = await getConfiguredAdminIdentity();
+    if (configuredAdmin) {
+      return (
+        (!!requester.did && requester.did === configuredAdmin.did) ||
+        (!!requester.handle && requester.handle === configuredAdmin.handle)
+      );
+    }
+  } catch (error) {
+    console.error("[admin/login-activity] Vérification du compte admin configuré impossible", error);
+  }
+
+  return (
+    getAdminDids().includes(requester.did) ||
+    getAdminHandles().includes(requester.handle)
+  );
+}
+
 async function getCentralRepo() {
-  if (!REPO_APP_PASSWORD) throw new Error("KELO_ADMIN_ATPROTO_PASSWORD est manquant.");
+  if (!REPO_APP_PASSWORD) {
+    throw new Error("KELO_ADMIN_ATPROTO_PASSWORD est manquant.");
+  }
   const agent = new AtpAgent({ service: REPO_PDS_URL });
   await agent.login({ identifier: REPO_IDENTIFIER, password: REPO_APP_PASSWORD });
   if (!agent.session?.did) throw new Error("Dépôt central indisponible.");
@@ -116,11 +156,7 @@ export async function POST(request: Request) {
     }
 
     const requester = await authenticateRequester(session);
-    const isAdmin =
-      getAdminDids().includes(requester.did) ||
-      getAdminHandles().includes(requester.handle);
-
-    if (!isAdmin) {
+    if (!(await isRequesterAdmin(requester))) {
       return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
     }
 
@@ -151,6 +187,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ records: records.slice(0, 500) });
   } catch (error) {
     console.error("[admin/login-activity]", error);
-    return NextResponse.json({ error: "Impossible de charger les connexions." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Impossible de charger les connexions." },
+      { status: 500 }
+    );
   }
 }
