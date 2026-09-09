@@ -2,88 +2,24 @@ import { NextResponse } from "next/server";
 import { AtpAgent } from "@atproto/api";
 
 const COLLECTION = "eu.kelosocial.certification";
-
+const PDS_URL = process.env.KELO_ADMIN_PDS_URL?.trim() || "https://pds.kelosocial.eu";
+const REPO = process.env.NEXT_PUBLIC_KELO_ADMIN_DID?.trim() || process.env.KELO_ADMIN_ATPROTO_IDENTIFIER?.trim() || "kelosocial.eu";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function requiredEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new Error(`Variable ${name} manquante.`);
-  }
-  return value;
-}
-
-async function createAuthoritativeAgent() {
-  // Les certifications sont écrites avec le compte AT Protocol administrateur
-  // de Kelo Social. On utilise donc exactement les mêmes variables que pour
-  // les autres opérations d'administration, plutôt qu'une ancienne
-  // configuration CERTIFICATION_REPO_* / eurosky.social.
-  const service = requiredEnv("KELO_ADMIN_PDS_URL");
-  const identifier = requiredEnv("KELO_ADMIN_ATPROTO_IDENTIFIER");
-  const password = requiredEnv("KELO_ADMIN_ATPROTO_PASSWORD");
-
-  const agent = new AtpAgent({ service });
-  const response = await agent.login({ identifier, password });
-
-  if (!response.data.did) {
-    throw new Error("Le compte AT Protocol administrateur n'a pas de DID actif.");
-  }
-
-  return { agent, repo: response.data.did };
-}
-
 export async function GET() {
   try {
-    const { agent, repo } = await createAuthoritativeAgent();
+    const agent = new AtpAgent({ service: PDS_URL });
     const records: unknown[] = [];
     let cursor: string | undefined;
-
     do {
-      const response = await agent.api.com.atproto.repo.listRecords({
-        repo,
-        collection: COLLECTION,
-        limit: 100,
-        cursor,
-      });
-
+      const response = await agent.api.com.atproto.repo.listRecords({ repo: REPO, collection: COLLECTION, limit: 100, cursor });
       records.push(...response.data.records.map((item) => item.value));
       cursor = response.data.cursor;
     } while (cursor);
-
-    return NextResponse.json(
-      {
-        records,
-        meta: {
-          count: records.length,
-          repo,
-          fetchedAt: new Date().toISOString(),
-        },
-      },
-      {
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-          Pragma: "no-cache",
-          Expires: "0",
-        },
-      }
-    );
+    return NextResponse.json({ records, meta: { count: records.length, repo: REPO, fetchedAt: new Date().toISOString() } }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("[api/kelo/certifications] lecture impossible", error);
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? `Impossible de charger les certifications Kelo Social : ${error.message}`
-            : "Impossible de charger les certifications Kelo Social.",
-        records: [],
-      },
-      {
-        status: 502,
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-        },
-      }
-    );
+    return NextResponse.json({ error: error instanceof Error ? `Impossible de charger les certifications Kelo Social : ${error.message}` : "Impossible de charger les certifications Kelo Social.", records: [] }, { status: 502, headers: { "Cache-Control": "no-store" } });
   }
 }
