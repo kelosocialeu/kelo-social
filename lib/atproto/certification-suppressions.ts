@@ -4,11 +4,13 @@ export const CERTIFICATION_SUPPRESSION_COLLECTION =
   "eu.kelosocial.certification.suppression";
 
 export const CERTIFICATION_POLICY_REPO_HANDLE =
-  "kelosocial.eu";
+  process.env.KELO_ADMIN_ATPROTO_IDENTIFIER?.trim() || "kelosocial.eu";
 
 export const CERTIFICATION_POLICY_PDS_URL =
+  process.env.KELO_ADMIN_PDS_URL?.trim() ||
   process.env.NEXT_PUBLIC_ADMIN_REPO_PDS_URL?.trim() ||
-  "https://eurosky.social";
+  process.env.KELO_PDS_URL?.trim() ||
+  "https://pds.kelosocial.eu";
 
 export interface CertificationSuppressionRecord {
   subjectDid: string;
@@ -99,7 +101,8 @@ async function fetchFullSuppressionList(): Promise<CertificationSuppressionRecor
 
     fullListLoadedAt = Date.now();
     return records;
-  } catch {
+  } catch (error) {
+    console.error("[certification-suppressions] lecture impossible", error);
     return [];
   }
 }
@@ -110,7 +113,7 @@ export async function listCertificationSuppressions(): Promise<
   if (fullListLoadedAt && Date.now() - fullListLoadedAt < CACHE_DURATION) {
     return Array.from(cache.values())
       .filter((entry) => entry.value)
-      .map((entry) => entry.value!)
+      .map((entry) => entry.value!);
   }
 
   if (!fullListPromise) {
@@ -133,10 +136,6 @@ export async function getCertificationSuppression(
     return cached.value;
   }
 
-  // A suppression is a sparse policy record. Querying getRecord for every DID
-  // produces a 400 RecordNotFound for nearly every account and floods DevTools.
-  // Load the small policy collection once, cache it, and treat absent DIDs as
-  // not suppressed without issuing one failing XRPC request per account.
   await listCertificationSuppressions();
 
   const afterList = cache.get(did);
