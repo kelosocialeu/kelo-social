@@ -1,11 +1,16 @@
 import { AtpAgent } from "@atproto/api";
 
 export const CERTIFICATION_COLLECTION = "eu.kelosocial.certification";
-export const ADMIN_REPO_HANDLE = "kelosocial.eu";
+export const ADMIN_REPO_HANDLE =
+  process.env.KELO_ADMIN_ATPROTO_IDENTIFIER?.trim() || "kelosocial.eu";
 export const KELO_ADMIN_DID = process.env.NEXT_PUBLIC_KELO_ADMIN_DID?.trim() || "";
-export const KELO_ADMIN_HANDLE = "kelosocial.eu";
+export const KELO_ADMIN_HANDLE =
+  process.env.KELO_ADMIN_ATPROTO_IDENTIFIER?.trim() || "kelosocial.eu";
 export const ADMIN_REPO_PDS_URL =
-  process.env.NEXT_PUBLIC_ADMIN_REPO_PDS_URL?.trim() || "https://eurosky.social";
+  process.env.KELO_ADMIN_PDS_URL?.trim() ||
+  process.env.NEXT_PUBLIC_ADMIN_REPO_PDS_URL?.trim() ||
+  process.env.KELO_PDS_URL?.trim() ||
+  "https://pds.kelosocial.eu";
 
 export type CertificationStatus = "certified" | "trusted-verifier";
 
@@ -64,7 +69,7 @@ function parseCertificationRecord(value: unknown): CertificationRecord | null {
     issuerHandle:
       typeof record.issuerHandle === "string" && record.issuerHandle.trim()
         ? normalizeHandle(record.issuerHandle)
-        : KELO_ADMIN_HANDLE,
+        : normalizeHandle(KELO_ADMIN_HANDLE),
   };
 }
 
