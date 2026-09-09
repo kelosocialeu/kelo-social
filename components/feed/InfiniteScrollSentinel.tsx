@@ -11,9 +11,9 @@ interface InfiniteScrollSentinelProps {
    * commence à être chargée.
    *
    * Par défaut :
-   * - mobile : environ 1 200 px ;
-   * - tablette : environ 1 600 px ;
-   * - ordinateur : environ 2 000 px.
+   * - mobile : environ 800 px ;
+   * - tablette : environ 1 200 px ;
+   * - ordinateur : environ 1 600 px.
    */
   preloadDistance?: number;
 }
@@ -58,14 +58,14 @@ export default function InfiniteScrollSentinel({
       const width = window.innerWidth;
 
       if (width < 768) {
-        return 1200;
+        return 800;
       }
 
       if (width < 1280) {
-        return 1600;
+        return 1200;
       }
 
-      return 2000;
+      return 1600;
     };
 
     const triggerLoad = () => {
@@ -113,10 +113,6 @@ export default function InfiniteScrollSentinel({
 
     createObserver();
 
-    /*
-     * Si la fenêtre passe du mode téléphone au mode tablette ou PC,
-     * la distance de préchargement est recalculée.
-     */
     const handleResize = () => {
       createObserver();
     };
