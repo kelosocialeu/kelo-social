@@ -2,9 +2,19 @@ import { NextResponse } from "next/server";
 import { AtpAgent } from "@atproto/api";
 
 const LOGIN_ACTIVITY_COLLECTION = "eu.kelosocial.loginactivity";
-const REPO_IDENTIFIER = process.env.CERTIFICATION_REPO_IDENTIFIER?.trim() || "kelosocial.eu";
-const REPO_PDS_URL = process.env.CERTIFICATION_REPO_PDS_URL?.trim() || "https://eurosky.social";
-const REPO_APP_PASSWORD = process.env.CERTIFICATION_REPO_APP_PASSWORD?.trim() || "";
+const REPO_IDENTIFIER =
+  process.env.KELO_ADMIN_ATPROTO_IDENTIFIER?.trim() ||
+  process.env.CERTIFICATION_REPO_IDENTIFIER?.trim() ||
+  "kelosocial.eu";
+const REPO_PDS_URL =
+  process.env.KELO_ADMIN_PDS_URL?.trim() ||
+  process.env.CERTIFICATION_REPO_PDS_URL?.trim() ||
+  process.env.KELO_PDS_URL?.trim() ||
+  "https://pds.kelosocial.eu";
+const REPO_APP_PASSWORD =
+  process.env.KELO_ADMIN_ATPROTO_PASSWORD?.trim() ||
+  process.env.CERTIFICATION_REPO_APP_PASSWORD?.trim() ||
+  "";
 
 type RequestSession = {
   accessJwt: string;
@@ -68,7 +78,7 @@ async function authenticateRequester(session: RequestSession) {
 }
 
 async function getCentralRepo() {
-  if (!REPO_APP_PASSWORD) throw new Error("CERTIFICATION_REPO_APP_PASSWORD est manquant.");
+  if (!REPO_APP_PASSWORD) throw new Error("KELO_ADMIN_ATPROTO_PASSWORD est manquant.");
   const agent = new AtpAgent({ service: REPO_PDS_URL });
   await agent.login({ identifier: REPO_IDENTIFIER, password: REPO_APP_PASSWORD });
   if (!agent.session?.did) throw new Error("Dépôt central indisponible.");
