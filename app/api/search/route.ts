@@ -5,6 +5,10 @@ const APPVIEWS = [
   "https://api.bsky.app/xrpc",
 ];
 
+const SEARCH_CACHE_HEADERS = {
+  "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+};
+
 function normalize(value: string | null) {
   return (value || "").trim();
 }
@@ -126,9 +130,6 @@ async function searchPostsByKeywords(query: string, limit: number, cursor: strin
 
   const successful = settled.filter((result): result is PromiseFulfilledResult<{ key: string; posts: any[]; cursor: string }> => result.status === "fulfilled");
 
-  // SearchPosts can occasionally be unavailable upstream. Do not turn the whole
-  // Explorer page into an error: return an empty post section so account search
-  // and the rest of the UI remain usable.
   if (successful.length === 0) {
     console.warn("[api/search] all post-search AppViews failed", settled.map((result) => result.status === "rejected" ? String(result.reason) : "ok"));
     return { items: [], cursor: null };
@@ -170,15 +171,20 @@ export async function GET(request: NextRequest) {
       params.set("limit", String(limit));
       if (cursor) params.set("cursor", cursor);
       const data = await fetchJsonFromAppView("app.bsky.actor.searchActors", params);
-      return NextResponse.json({ items: Array.isArray(data.actors) ? data.actors : [], cursor: typeof data.cursor === "string" ? data.cursor : null });
+      return NextResponse.json(
+        { items: Array.isArray(data.actors) ? data.actors : [], cursor: typeof data.cursor === "string" ? data.cursor : null },
+        { headers: SEARCH_CACHE_HEADERS }
+      );
     }
-    if (type === "posts") return NextResponse.json(await searchPostsByKeywords(query, limit, cursor));
+    if (type === "posts") {
+      return NextResponse.json(await searchPostsByKeywords(query, limit, cursor), {
+        headers: SEARCH_CACHE_HEADERS,
+      });
+    }
     return NextResponse.json({ error: "Type de recherche invalide." }, { status: 400 });
   } catch (error) {
     console.error("[api/search]", { type, query, error });
 
-    // Explorer runs account and post searches together. A transient post-search
-    // outage must not reject Promise.all on the client and hide valid accounts.
     if (type === "posts") return NextResponse.json({ items: [], cursor: null, degraded: true });
 
     const upstreamStatus = error && typeof error === "object" && "status" in error
