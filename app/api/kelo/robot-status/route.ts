@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { AtpAgent } from "@atproto/api";
 
 const ROBOT_COLLECTION = "eu.kelosocial.robotaccount";
+const ROBOT_GET_CACHE_HEADERS = {
+  "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+};
 const CERTIFICATION_REPO_IDENTIFIER =
   process.env.CERTIFICATION_REPO_IDENTIFIER?.trim() ||
   process.env.KELO_ADMIN_ATPROTO_IDENTIFIER?.trim() ||
@@ -152,13 +155,16 @@ export async function GET(request: NextRequest) {
     getAtprotoRobotState(actor),
   ]);
 
-  return NextResponse.json({
-    robot: kelo || atproto,
-    kelo,
-    atproto,
-    source: kelo ? "kelo" : atproto ? "atproto" : null,
-    synchronized: atproto,
-  });
+  return NextResponse.json(
+    {
+      robot: kelo || atproto,
+      kelo,
+      atproto,
+      source: kelo ? "kelo" : atproto ? "atproto" : null,
+      synchronized: atproto,
+    },
+    { headers: ROBOT_GET_CACHE_HEADERS }
+  );
 }
 
 export async function POST(request: Request) {
