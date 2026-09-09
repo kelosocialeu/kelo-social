@@ -4,17 +4,22 @@ import { AtpAgent } from "@atproto/api";
 import { CERTIFICATION_SUPPRESSION_COLLECTION } from "@/lib/atproto/certification-suppressions";
 
 const CERTIFICATION_COLLECTION = "eu.kelosocial.certification";
+
+// Configuration actuelle : le dépôt de certification est le compte
+// administrateur AT Protocol de Kelo Social. Les anciennes variables restent
+// uniquement en secours afin d'éviter une régression sur une ancienne
+// configuration de déploiement.
 const CERTIFICATION_REPO_IDENTIFIER =
-  process.env.CERTIFICATION_REPO_IDENTIFIER?.trim() ||
   process.env.KELO_ADMIN_ATPROTO_IDENTIFIER?.trim() ||
+  process.env.CERTIFICATION_REPO_IDENTIFIER?.trim() ||
   "kelosocial.eu";
 const CERTIFICATION_REPO_PDS_URL =
-  process.env.CERTIFICATION_REPO_PDS_URL?.trim() ||
   process.env.KELO_ADMIN_PDS_URL?.trim() ||
-  "https://eurosky.social";
+  process.env.CERTIFICATION_REPO_PDS_URL?.trim() ||
+  "https://pds.kelosocial.eu";
 const CERTIFICATION_REPO_APP_PASSWORD =
-  process.env.CERTIFICATION_REPO_APP_PASSWORD?.trim() ||
   process.env.KELO_ADMIN_ATPROTO_PASSWORD?.trim() ||
+  process.env.CERTIFICATION_REPO_APP_PASSWORD?.trim() ||
   "";
 
 type CertificationStatus = "certified" | "trusted-verifier" | "none";
