@@ -11,6 +11,7 @@ import {
   switchSavedAccount,
 } from "@/lib/session/account-storage";
 import type { AtpSession } from "@/types/auth";
+import VerificationBadge from "@/components/ui/VerificationBadge";
 
 interface AccountSwitcherProps {
   compact?: boolean;
@@ -165,6 +166,10 @@ export default function AccountSwitcher({ compact = false, onBeforeNavigate }: A
   };
 
   const activeProfile = session?.did ? profiles[session.did] : undefined;
+  const activeBadgeActor = activeProfile || (session ? {
+    did: session.did,
+    handle: session.handle,
+  } : undefined);
 
   return (
     <div ref={rootRef} className="relative w-full">
@@ -178,7 +183,10 @@ export default function AccountSwitcher({ compact = false, onBeforeNavigate }: A
         <AccountAvatar avatar={activeProfile?.avatar} handle={session?.handle || "invité"} />
         <span className="min-w-0 flex-1">
           <span className="block text-[11px] font-semibold text-kelo-muted">Compte actif</span>
-          <span className="block truncate text-sm font-extrabold text-kelo-text">@{shortHandle(session?.handle || "invité")}</span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="block min-w-0 truncate text-sm font-extrabold text-kelo-text">@{shortHandle(session?.handle || "invité")}</span>
+            {activeBadgeActor && <VerificationBadge actor={activeBadgeActor} size={18} />}
+          </span>
         </span>
         <ChevronDown className={`h-4 w-4 flex-shrink-0 text-kelo-muted transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -192,6 +200,10 @@ export default function AccountSwitcher({ compact = false, onBeforeNavigate }: A
             {orderedAccounts.map((account) => {
               const active = account.did === session?.did;
               const profile = profiles[account.did];
+              const badgeActor = profile || {
+                did: account.did,
+                handle: account.handle,
+              };
               return (
                 <button
                   key={account.did}
@@ -205,8 +217,11 @@ export default function AccountSwitcher({ compact = false, onBeforeNavigate }: A
                     {profile?.displayName && profile.displayName !== account.handle && (
                       <span className="block truncate text-sm font-extrabold text-kelo-text">{profile.displayName}</span>
                     )}
-                    <span className={`block truncate ${profile?.displayName && profile.displayName !== account.handle ? "text-xs text-kelo-muted" : "text-sm font-bold text-kelo-text"}`}>
-                      @{shortHandle(account.handle)}
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className={`block min-w-0 truncate ${profile?.displayName && profile.displayName !== account.handle ? "text-xs text-kelo-muted" : "text-sm font-bold text-kelo-text"}`}>
+                        @{shortHandle(account.handle)}
+                      </span>
+                      <VerificationBadge actor={badgeActor} size={18} />
                     </span>
                     <span className="block truncate text-[11px] text-kelo-muted">{account.pdsUrl.replace(/^https?:\/\//, "")}</span>
                   </span>
