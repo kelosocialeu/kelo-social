@@ -5,10 +5,28 @@ import {
   IDENTITY_VERIFICATION_COLLECTION,
 } from "@/lib/atproto/identity-verifications";
 
+function normalizeHandle(value: string): string {
+  return value.trim().replace(/^@/, "").toLowerCase();
+}
+
+function normalizeDid(value: string): string {
+  return value.trim().toLowerCase();
+}
+
 function getAdminHandles(): string[] {
-  return (process.env.ADMIN_HANDLES || "")
+  return [
+    process.env.ADMIN_HANDLES || "",
+    process.env.KELO_ADMIN_ATPROTO_IDENTIFIER || "",
+  ]
+    .flatMap((value) => value.split(","))
+    .map(normalizeHandle)
+    .filter(Boolean);
+}
+
+function getAdminDids(): string[] {
+  return (process.env.ADMIN_DIDS || "")
     .split(",")
-    .map((h) => h.trim().toLowerCase())
+    .map(normalizeDid)
     .filter(Boolean);
 }
 
@@ -45,22 +63,20 @@ export async function POST(request: Request) {
     const sessionRes =
       await agent.api.com.atproto.server.getSession();
 
-    const verifiedHandle =
-      sessionRes.data.handle.toLowerCase();
+    const verifiedHandle = normalizeHandle(sessionRes.data.handle || "");
+    const adminDid = normalizeDid(sessionRes.data.did || "");
 
-    const adminDid = sessionRes.data.did;
+    // Utiliser exactement la même définition d'administrateur que /api/admin/role :
+    // le compte KELO_ADMIN_ATPROTO_* doit être reconnu comme administrateur même
+    // si ADMIN_HANDLES/ADMIN_DIDS ne sont pas renseignés.
+    const isAdmin =
+      getAdminDids().includes(adminDid) ||
+      getAdminHandles().includes(verifiedHandle);
 
-    if (
-      !getAdminHandles().includes(verifiedHandle)
-    ) {
+    if (!isAdmin) {
       return NextResponse.json(
-        {
-          error:
-            "Accès réservé aux administrateurs.",
-        },
-        {
-          status: 403,
-        }
+        { error: "Accès réservé aux administrateurs." },
+        { status: 403 }
       );
     }
 
@@ -69,23 +85,17 @@ export async function POST(request: Request) {
       .replace(/^@/, "");
 
     const resolved =
-      await agent.api.com.atproto.identity.resolveHandle(
-        {
-          handle: cleanHandle,
-        }
-      );
+      await agent.api.com.atproto.identity.resolveHandle({
+        handle: cleanHandle,
+      });
 
     const subjectDid = resolved.data.did;
 
-    /**
-     * Suppression
-     */
     if (remove === true) {
       try {
         await agent.api.com.atproto.repo.deleteRecord({
           repo: adminDid,
-          collection:
-            IDENTITY_VERIFICATION_COLLECTION,
+          collection: IDENTITY_VERIFICATION_COLLECTION,
           rkey: subjectDid,
         });
       } catch {}
@@ -95,47 +105,24 @@ export async function POST(request: Request) {
       });
     }
 
-    /**
-     * Création / mise à jour
-     */
-
-    await agent.api.com.atproto.repo.putRecord(
-      {
-        repo: adminDid,
-
-        collection:
-          IDENTITY_VERIFICATION_COLLECTION,
-
-        rkey: subjectDid,
-
-        record: {
-          $type:
-            IDENTITY_VERIFICATION_COLLECTION,
-
-          subjectDid,
-
-          subjectHandle: cleanHandle,
-
-          verificationType,
-
-          source,
-
-          assignmentMode,
-
-          issuedAt:
-            new Date().toISOString(),
-
-          issuerDid: adminDid,
-
-          issuerHandle:
-            verifiedHandle,
-
-          schemaVersion: 1,
-        },
-
-        validate: false,
-      }
-    );
+    await agent.api.com.atproto.repo.putRecord({
+      repo: adminDid,
+      collection: IDENTITY_VERIFICATION_COLLECTION,
+      rkey: subjectDid,
+      record: {
+        $type: IDENTITY_VERIFICATION_COLLECTION,
+        subjectDid,
+        subjectHandle: cleanHandle,
+        verificationType,
+        source,
+        assignmentMode,
+        issuedAt: new Date().toISOString(),
+        issuerDid: adminDid,
+        issuerHandle: verifiedHandle,
+        schemaVersion: 1,
+      },
+      validate: false,
+    });
 
     return NextResponse.json({
       success: true,
@@ -145,9 +132,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error:
-          error.message ||
-          "Erreur serveur.",
+        error: error.message || "Erreur serveur.",
       },
       {
         status: 500,
