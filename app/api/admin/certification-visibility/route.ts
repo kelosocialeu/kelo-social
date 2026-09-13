@@ -12,11 +12,17 @@ type RequestSession = {
 };
 
 const CERTIFICATION_REPO_IDENTIFIER =
-  process.env.CERTIFICATION_REPO_IDENTIFIER?.trim() || "kelosocial.eu";
+  process.env.KELO_ADMIN_ATPROTO_IDENTIFIER?.trim() ||
+  process.env.CERTIFICATION_REPO_IDENTIFIER?.trim() ||
+  "kelosocial.eu";
 const CERTIFICATION_REPO_PDS_URL =
-  process.env.CERTIFICATION_REPO_PDS_URL?.trim() || "https://eurosky.social";
+  process.env.KELO_ADMIN_PDS_URL?.trim() ||
+  process.env.CERTIFICATION_REPO_PDS_URL?.trim() ||
+  "https://pds.kelosocial.eu";
 const CERTIFICATION_REPO_APP_PASSWORD =
-  process.env.CERTIFICATION_REPO_APP_PASSWORD?.trim() || "";
+  process.env.KELO_ADMIN_ATPROTO_PASSWORD?.trim() ||
+  process.env.CERTIFICATION_REPO_APP_PASSWORD?.trim() ||
+  "";
 
 function normalizeHandle(value: string) {
   return value.trim().replace(/^@/, "").toLowerCase();
@@ -27,8 +33,11 @@ function normalizeDid(value: string) {
 }
 
 function getAdminHandles() {
-  return (process.env.ADMIN_HANDLES || "")
-    .split(",")
+  return [
+    process.env.ADMIN_HANDLES || "",
+    process.env.KELO_ADMIN_ATPROTO_IDENTIFIER || "",
+  ]
+    .flatMap((value) => value.split(","))
     .map(normalizeHandle)
     .filter(Boolean);
 }
@@ -43,12 +52,7 @@ function getAdminDids() {
 function isValidSession(value: unknown): value is RequestSession {
   if (!value || typeof value !== "object") return false;
   const session = value as Partial<RequestSession>;
-  return Boolean(
-    session.accessJwt &&
-      session.pdsUrl &&
-      session.handle &&
-      session.did
-  );
+  return Boolean(session.accessJwt && session.pdsUrl && session.handle && session.did);
 }
 
 async function authenticateRequester(session: RequestSession) {
@@ -78,7 +82,7 @@ function isMainAdmin(did: string, handle: string) {
 async function authenticatePolicyRepo() {
   if (!CERTIFICATION_REPO_APP_PASSWORD) {
     throw new Error(
-      "Configuration serveur incomplète : CERTIFICATION_REPO_APP_PASSWORD est manquant."
+      "Configuration serveur incomplète : mot de passe administrateur manquant."
     );
   }
 
@@ -102,12 +106,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const session = body?.session;
-    const subjectDid =
-      typeof body?.subjectDid === "string" ? normalizeDid(body.subjectDid) : "";
-    const subjectHandle =
-      typeof body?.subjectHandle === "string"
-        ? normalizeHandle(body.subjectHandle)
-        : "";
+    const subjectDid = typeof body?.subjectDid === "string" ? normalizeDid(body.subjectDid) : "";
+    const subjectHandle = typeof body?.subjectHandle === "string" ? normalizeHandle(body.subjectHandle) : "";
     const hidden = body?.hidden;
 
     if (!isValidSession(session)) {
@@ -177,8 +177,7 @@ export async function POST(request: Request) {
     console.error("[admin/certification-visibility]", error);
     return NextResponse.json(
       {
-        error:
-          error instanceof Error ? error.message : "Erreur interne du serveur.",
+        error: error instanceof Error ? error.message : "Erreur interne du serveur.",
       },
       { status: 500 }
     );
