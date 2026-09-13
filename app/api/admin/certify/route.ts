@@ -54,7 +54,13 @@ function isValidDid(value: string): boolean {
 }
 
 function getAdminHandles(): string[] {
-  return (process.env.ADMIN_HANDLES || "").split(",").map(normalizeHandle).filter(Boolean);
+  return [
+    process.env.ADMIN_HANDLES || "",
+    process.env.KELO_ADMIN_ATPROTO_IDENTIFIER || "",
+  ]
+    .flatMap((value) => value.split(","))
+    .map(normalizeHandle)
+    .filter(Boolean);
 }
 
 function getAdminDids(): string[] {
@@ -114,9 +120,7 @@ function parseStoredCertification(value: unknown): StoredCertificationRecord | n
 }
 
 function isMainAdmin(did: string, handle: string): boolean {
-  const adminDids = getAdminDids();
-  if (adminDids.length > 0) return adminDids.includes(normalizeDid(did));
-  return getAdminHandles().includes(normalizeHandle(handle));
+  return getAdminDids().includes(normalizeDid(did)) || getAdminHandles().includes(normalizeHandle(handle));
 }
 
 function roundRecordKey(subjectDid: string, issuerDid: string): string {
