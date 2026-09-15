@@ -22,11 +22,6 @@ const PUBLIC_ROUTES = [
   "/kelo-id/callback",
 ];
 
-// On ne précharge que les destinations les plus utilisées. L'ancienne version
-// préchargeait presque toute l'application après chaque changement de page,
-// ce qui pouvait provoquer des pics réseau/CPU et rendre la navigation moins fluide.
-const HIGH_PRIORITY_ROUTES = ["/feed", "/reels", "/messages"];
-
 function matchesRoute(pathname: string, route: string): boolean {
   if (route === "/") return pathname === "/";
   return pathname === route || pathname.startsWith(`${route}/`);
