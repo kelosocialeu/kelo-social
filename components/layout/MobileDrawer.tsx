@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { BadgeCheck, Bell, Bookmark, Bot, Clapperboard, Hash, Home, ListChecks, LogOut, MessageCircle, PenSquare, Rocket, Search, Settings, ShieldCheck, User, X } from "lucide-react";
 import AccountSwitcher from "@/components/layout/AccountSwitcher";
 import Logo from "@/components/ui/Logo";
@@ -33,26 +33,17 @@ function isRouteActive(pathname: string, href: string) {
 
 export default function MobileDrawer({ open, handle, onClose, onLogout, onCreatePost }: MobileDrawerProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { t } = useTranslation();
   const { checked, isAdmin, isTrustedVerifier, canCertify } = useAdminRole();
   const showVerifier = checked && !isAdmin && (isTrustedVerifier || canCertify);
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
-  useEffect(() => {
-    setPendingHref(null);
-  }, [pathname]);
 
-  const navigate = (event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+  const navigate = (_event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     if (isRouteActive(pathname, href)) {
       onClose();
       return;
     }
-    event.preventDefault();
-    if (pendingHref) return;
-    setPendingHref(href);
     onClose();
-    router.push(href);
   };
 
   return <>
@@ -67,7 +58,7 @@ export default function MobileDrawer({ open, handle, onClose, onLogout, onCreate
         <div className="mb-4"><AccountSwitcher onBeforeNavigate={onClose} /></div>
         <button type="button" onClick={() => { onCreatePost(); onClose(); }} className="mb-4 flex w-full touch-manipulation items-center justify-center gap-2 rounded-full bg-kelo-gradient py-3 font-bold text-white shadow-[0_12px_30px_rgba(139,92,246,0.3)] transition active:scale-[0.98]"><PenSquare className="h-4 w-4" />{t("nav.writePost", "Nouveau post")}</button>
         <nav className="flex flex-col gap-1">
-          {NAV_ITEMS.map(({ href, key, fallback, icon: Icon }) => { const active = isRouteActive(pathname, href); const pending = pendingHref === href; return <Link key={href} href={href} prefetch onClick={(event) => navigate(event, href)} aria-current={active ? "page" : undefined} aria-busy={pending || undefined} className={`flex touch-manipulation items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold transition ${active ? "bg-kelo-gradient text-white shadow-sm" : "text-kelo-text hover:bg-white/60"} ${pending ? "opacity-60" : ""}`}><Icon className="h-5 w-5 flex-shrink-0" /><span className="truncate">{t(key, fallback)}</span></Link>; })}
+          {NAV_ITEMS.map(({ href, key, fallback, icon: Icon }) => { const active = isRouteActive(pathname, href); const pending = pendingHref === href; return <Link key={href} href={href} prefetch onClick={(event) => navigate(event, href)} aria-current={active ? "page" : undefined} aria-busy={pending || undefined} className={`flex touch-manipulation items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold transition ${active ? "bg-kelo-gradient text-white shadow-sm" : "text-kelo-text hover:bg-white/60"}`}><Icon className="h-5 w-5 flex-shrink-0" /><span className="truncate">{t(key, fallback)}</span></Link>; })}
           {showVerifier && <Link href="/verifier" prefetch onClick={(event) => navigate(event, "/verifier")} aria-current={isRouteActive(pathname, "/verifier") ? "page" : undefined} className={`flex touch-manipulation items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold transition ${isRouteActive(pathname, "/verifier") ? "bg-kelo-gradient text-white shadow-sm" : "text-kelo-secondary hover:bg-white/60"}`}><BadgeCheck className="h-5 w-5" />{t("nav.verifier", "Panneau certificateur")}</Link>}
           {checked && isAdmin && <div className="mt-3 rounded-2xl border border-kelo-primary/20 bg-white/55 p-2">
             <p className="px-3 pb-1 pt-2 text-[11px] font-extrabold uppercase tracking-wider text-kelo-muted">{t("nav.administration", "Administration")}</p>
