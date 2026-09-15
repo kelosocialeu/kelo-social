@@ -41,13 +41,6 @@ export default function MobileBottomNav({ handle, hidden = false, onCreatePost }
     setCreateMenuOpen(false);
   }, [pathname]);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      [...navItems.map((item) => item.href), profileHref].forEach((href) => router.prefetch(href));
-    }, 150);
-    return () => window.clearTimeout(timer);
-  }, [profileHref, router]);
-
   const navigate = (event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     if (isActive(href) || (href === profileHref && profileActive)) return;
     event.preventDefault();
