@@ -70,11 +70,8 @@ export default function FeedsRail() {
     }
 
     void loadPinnedItems();
-    const handleFocus = () => void loadPinnedItems();
-    window.addEventListener("focus", handleFocus);
     return () => {
       cancelled = true;
-      window.removeEventListener("focus", handleFocus);
     };
   }, []);
 
