@@ -35,7 +35,7 @@ interface IdentityVerificationState {
   closeDialog: () => void;
 }
 
-const UNVERIFIED_REFRESH_MS = 15_000;
+const UNVERIFIED_REFRESH_MS = 60_000;
 const VERIFIED_REFRESH_MS = 2 * 60_000;
 const STORAGE_PREFIX = "kelo.identity-verification.";
 const SUPPORTED_TYPES: IdentityVerificationType[] = [
@@ -93,6 +93,106 @@ function normalizeVerificationType(value: string): IdentityVerificationType {
     : "human";
 }
 
+interface SharedVerificationState {
+  record: IdentityVerificationRecord | null;
+  trialActive: boolean;
+  trialExpiresAt: string | null;
+  updatedAt: number;
+}
+
+const sharedVerificationCache = new Map<string, SharedVerificationState>();
+const sharedVerificationRequests = new Map<string, Promise<SharedVerificationState>>();
+const SHARED_UNVERIFIED_TTL_MS = 30_000;
+const SHARED_VERIFIED_TTL_MS = 2 * 60_000;
+
+async function loadVerificationState(session: NonNullable<ReturnType<typeof getStoredSession>>): Promise<SharedVerificationState> {
+  const did = session.did.toLowerCase();
+  const cached = sharedVerificationCache.get(did);
+  if (cached) {
+    const ttl = cached.record ? SHARED_VERIFIED_TTL_MS : SHARED_UNVERIFIED_TTL_MS;
+    if (Date.now() - cached.updatedAt < ttl) {
+      return cached;
+    }
+  }
+
+  const pending = sharedVerificationRequests.get(did);
+  if (pending) return pending;
+
+  const request = (async (): Promise<SharedVerificationState> => {
+    try {
+      // Kelo ID is the preferred source. Only one request is allowed for a DID
+      // even when dozens of PostCards mount at the same time.
+      try {
+        const mobileStatus = await syncKeloIdStatus(session);
+        if (mobileStatus.verified) {
+          const state: SharedVerificationState = {
+            record: {
+              subjectDid: did,
+              subjectHandle: session.handle.replace(/^@/, "").toLowerCase(),
+              verificationType: normalizeVerificationType(mobileStatus.verificationType),
+              source: "kelo-id",
+              assignmentMode: "automatic",
+              issuedAt: mobileStatus.verifiedAt || new Date().toISOString(),
+              schemaVersion: 1,
+            },
+            trialActive: false,
+            trialExpiresAt: null,
+            updatedAt: Date.now(),
+          };
+          sharedVerificationCache.set(did, state);
+          persistVerification(session.did, state.record);
+          return state;
+        }
+      } catch (syncError) {
+        console.warn("Synchronisation Kelo ID/Supabase indisponible :", syncError);
+      }
+
+      clearIdentityVerificationCache(session.did);
+      const record = await getIdentityVerification(session.did);
+
+      if (record) {
+        const state: SharedVerificationState = {
+          record,
+          trialActive: false,
+          trialExpiresAt: null,
+          updatedAt: Date.now(),
+        };
+        sharedVerificationCache.set(did, state);
+        persistVerification(session.did, record);
+        return state;
+      }
+
+      const { agent } = await getAuthenticatedAgent();
+      const trial = await getOrStartKeloTrial(agent, session.did);
+      const state: SharedVerificationState = {
+        record: null,
+        trialActive: trial.active,
+        trialExpiresAt: trial.expiresAt,
+        updatedAt: Date.now(),
+      };
+      sharedVerificationCache.set(did, state);
+      persistVerification(session.did, null);
+      return state;
+    } catch (error) {
+      console.warn("Vérification d’identité temporairement indisponible :", error);
+      const persisted = readPersistedVerification(session.did);
+      const state: SharedVerificationState = {
+        record: persisted,
+        trialActive: false,
+        trialExpiresAt: null,
+        updatedAt: Date.now(),
+      };
+      sharedVerificationCache.set(did, state);
+      return state;
+    } finally {
+      sharedVerificationRequests.delete(did);
+    }
+  })();
+
+  sharedVerificationRequests.set(did, request);
+  return request;
+}
+
 export function useIdentityVerification(): IdentityVerificationState {
   const [verification, setVerification] =
     useState<IdentityVerificationRecord | null>(null);
@@ -120,7 +220,6 @@ export function useIdentityVerification(): IdentityVerificationState {
     }
 
     const persisted = readPersistedVerification(session.did);
-
     if (!verificationRef.current && persisted) {
       verificationRef.current = persisted;
       setVerification(persisted);
@@ -130,80 +229,20 @@ export function useIdentityVerification(): IdentityVerificationState {
     }
 
     setLoading(true);
-
     try {
-      // Source prioritaire pour les vérifications faites dans l'app Kelo ID.
-      // L'Edge Function vérifie le jeton AT Protocol auprès du PDS avant de lire Supabase.
-      try {
-        const mobileStatus = await syncKeloIdStatus(session);
-        if (mobileStatus.verified) {
-          const mobileRecord: IdentityVerificationRecord = {
-            subjectDid: session.did.toLowerCase(),
-            subjectHandle: session.handle.replace(/^@/, "").toLowerCase(),
-            verificationType: normalizeVerificationType(mobileStatus.verificationType),
-            source: "kelo-id",
-            assignmentMode: "automatic",
-            issuedAt: mobileStatus.verifiedAt || new Date().toISOString(),
-            schemaVersion: 1,
-          };
-          verificationRef.current = mobileRecord;
-          setVerification(mobileRecord);
-          persistVerification(session.did, mobileRecord);
-          setTrialActive(false);
-          setTrialExpiresAt(null);
-          return;
-        }
-      } catch (syncError) {
-        console.warn("Synchronisation Kelo ID/Supabase indisponible :", syncError);
-      }
-
-      clearIdentityVerificationCache(session.did);
-
-      const record = await getIdentityVerification(session.did);
-      verificationRef.current = record;
-      setVerification(record);
-      persistVerification(session.did, record);
-
-      if (record) {
-        setTrialActive(false);
-        setTrialExpiresAt(null);
-      } else {
-        const { agent } = await getAuthenticatedAgent();
-        const trial = await getOrStartKeloTrial(agent, session.did);
-        setTrialActive(trial.active);
-        setTrialExpiresAt(trial.expiresAt);
-      }
-    } catch (error) {
-      console.warn(
-        "Vérification d’identité temporairement indisponible, dernier état conservé :",
-        error
-      );
-
-      const fallback =
-        verificationRef.current ||
-        readPersistedVerification(session.did);
-
-      if (fallback) {
-        verificationRef.current = fallback;
-        setVerification(fallback);
-        setTrialActive(false);
-        setTrialExpiresAt(null);
-      } else {
-        try {
-          const { agent } = await getAuthenticatedAgent();
-          const trial = await getOrStartKeloTrial(agent, session.did);
-          setTrialActive(trial.active);
-          setTrialExpiresAt(trial.expiresAt);
-        } catch {
-          setTrialActive(false);
-          setTrialExpiresAt(null);
-        }
-      }
+      const state = await loadVerificationState(session);
+      verificationRef.current = state.record;
+      setVerification(state.record);
+      setTrialActive(state.trialActive);
+      setTrialExpiresAt(state.trialExpiresAt);
+      if (state.record) persistVerification(session.did, state.record);
     } finally {
       setChecked(true);
       setLoading(false);
     }
   }, []);
+
+
 
   const identityVerified = !!verification;
   const verified = identityVerified || trialActive;
