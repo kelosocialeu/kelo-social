@@ -43,18 +43,6 @@ export default function MobileDrawer({ open, handle, onClose, onLogout, onCreate
     setPendingHref(null);
   }, [pathname]);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      [
-        ...NAV_ITEMS.map((item) => item.href),
-        "/verifier",
-        "/admin",
-        "/admin/certifiers",
-      ].forEach((href) => router.prefetch(href));
-    }, 200);
-    return () => window.clearTimeout(timer);
-  }, [router]);
-
   const navigate = (event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     if (isRouteActive(pathname, href)) {
       onClose();
