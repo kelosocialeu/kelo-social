@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BadgeCheck, Bell, Bookmark, Bot, Clapperboard, Hash, Home, ListChecks, LogOut, MessageCircle, PenSquare, Rocket, Search, Settings, ShieldCheck, User, X } from "lucide-react";
