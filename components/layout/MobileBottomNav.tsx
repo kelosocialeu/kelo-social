@@ -40,6 +40,7 @@ export default function MobileBottomNav({ handle, hidden = false, onCreatePost }
 
   const navigate = (_event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     if (isActive(href) || (href === profileHref && profileActive)) return;
+    void href;
     setCreateMenuOpen(false);
   };
 
