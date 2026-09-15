@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Clapperboard, Home, MessageCircle, Plus, User, X, Video, FileText } from "lucide-react";
 import { useTranslation } from "@/components/providers/TranslationProvider";
 import { OPEN_GLOBAL_COMPOSER_EVENT } from "@/components/feed/GlobalPostComposer";
@@ -15,10 +15,8 @@ interface MobileBottomNavProps {
 
 export default function MobileBottomNav({ handle, hidden = false, onCreatePost }: MobileBottomNavProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { t } = useTranslation();
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
   const reelCaptureRef = useRef<HTMLInputElement>(null);
 
   const navItems = [
@@ -37,17 +35,12 @@ export default function MobileBottomNav({ handle, hidden = false, onCreatePost }
   const profileActive = pathname === "/profile" || pathname.startsWith("/profile/");
 
   useEffect(() => {
-    setPendingHref(null);
     setCreateMenuOpen(false);
   }, [pathname]);
 
-  const navigate = (event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+  const navigate = (_event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     if (isActive(href) || (href === profileHref && profileActive)) return;
-    event.preventDefault();
-    if (pendingHref) return;
     setCreateMenuOpen(false);
-    setPendingHref(href);
-    router.push(href);
   };
 
   const startPost = () => {
@@ -92,11 +85,11 @@ export default function MobileBottomNav({ handle, hidden = false, onCreatePost }
       <nav aria-label={t("nav.mobile", "Navigation mobile")} className={`fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[max(12px,env(safe-area-inset-bottom))] transition-all duration-300 ease-out md:hidden ${hidden ? "pointer-events-none translate-y-[140%] opacity-0" : "translate-y-0 opacity-100"}`}>
         <div className="relative flex h-[68px] w-full max-w-md items-center justify-between rounded-[28px] border border-white/30 bg-white/65 px-2 shadow-[0_18px_55px_rgba(67,24,130,0.28)] backdrop-blur-2xl supports-[backdrop-filter]:bg-white/55">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px]"><div className="absolute -left-8 -top-10 h-28 w-28 rounded-full bg-fuchsia-400/20 blur-2xl"/><div className="absolute -right-8 -bottom-10 h-28 w-28 rounded-full bg-sky-400/20 blur-2xl"/><div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent"/></div>
-          <MobileNavLink {...navItems[0]} active={isActive(navItems[0].href)} pending={pendingHref === navItems[0].href} onNavigate={navigate} />
-          <MobileNavLink {...navItems[1]} active={isActive(navItems[1].href)} pending={pendingHref === navItems[1].href} onNavigate={navigate} />
+          <MobileNavLink {...navItems[0]} active={isActive(navItems[0].href)} pending={false} onNavigate={navigate} />
+          <MobileNavLink {...navItems[1]} active={isActive(navItems[1].href)} pending={false} onNavigate={navigate} />
           <button type="button" onClick={() => setCreateMenuOpen((value) => !value)} aria-label={t("nav.createPost", "Créer")} aria-expanded={createMenuOpen} className="relative z-10 -mt-8 flex h-14 w-14 flex-shrink-0 touch-manipulation items-center justify-center rounded-full bg-kelo-gradient text-white shadow-[0_12px_32px_rgba(139,92,246,0.45)] transition-all duration-200 hover:scale-105 active:scale-95"><span className="absolute inset-0 rounded-full border border-white/35"/><Plus className={`relative h-7 w-7 transition-transform duration-200 ${createMenuOpen ? "rotate-45" : ""}`} strokeWidth={2.4}/></button>
-          <MobileNavLink {...navItems[2]} active={isActive(navItems[2].href)} pending={pendingHref === navItems[2].href} onNavigate={navigate} />
-          <MobileNavLink href={profileHref} label={t("nav.profile", "Profil")} icon={User} active={profileActive} pending={pendingHref === profileHref} onNavigate={navigate}/>
+          <MobileNavLink {...navItems[2]} active={isActive(navItems[2].href)} pending={false} onNavigate={navigate} />
+          <MobileNavLink href={profileHref} label={t("nav.profile", "Profil")} icon={User} active={profileActive} pending={false} onNavigate={navigate}/>
         </div>
       </nav>
     </>
