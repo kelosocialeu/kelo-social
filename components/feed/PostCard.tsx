@@ -94,7 +94,6 @@ export default function PostCard({
   const [liking, setLiking] = useState(false);
   const [reposting, setReposting] = useState(false);
   const [replying, setReplying] = useState(false);
-  const [clock, setClock] = useState(0);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -124,14 +123,9 @@ export default function PostCard({
     setEditText(post.record?.text || "");
   }, [post.uri, post.cid, post.record?.text, post.record?.facets]);
 
-  useEffect(() => {
-    const id = window.setInterval(() => setClock((value) => value + 1), 60000);
-    return () => clearInterval(id);
-  }, []);
-
   const relativeTime = useMemo(
     () => formatRelativeTime(post.record?.createdAt || post.indexedAt),
-    [post.record?.createdAt, post.indexedAt, clock]
+    [post.record?.createdAt, post.indexedAt]
   );
 
   const card = () => {
