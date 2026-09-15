@@ -10,7 +10,7 @@ import {
   getUnreadNotificationCount,
 } from "@/lib/atproto/notifications";
 
-const REFRESH_MS = 20_000;
+const REFRESH_MS = 60_000;
 
 export function useUnreadNotifications() {
   const [count, setCount] = useState(0);
@@ -39,11 +39,8 @@ export function useUnreadNotifications() {
       REFRESH_MS
     );
 
-    window.addEventListener("focus", run);
-
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener("focus", run);
     };
   }, [refresh]);
 
