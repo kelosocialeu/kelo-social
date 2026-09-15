@@ -11,7 +11,7 @@ interface MobileHeaderProps {
   onOpenMenu: () => void;
 }
 
-const NOTIFICATION_COUNT_REFRESH_MS = 20_000;
+const NOTIFICATION_COUNT_REFRESH_MS = 60_000;
 
 export default function MobileHeader({
   onOpenMenu,
