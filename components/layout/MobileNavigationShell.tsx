@@ -49,39 +49,7 @@ export default function MobileNavigationShell({ children }: MobileNavigationShel
     };
   }, [menuOpen]);
 
-  useEffect(() => {
-    if (!checked || !session) return;
 
-    let cancelled = false;
-
-    const prefetchCoreRoutes = () => {
-      if (cancelled) return;
-      HIGH_PRIORITY_ROUTES.forEach((route) => router.prefetch(route));
-      if (handle) router.prefetch(`/profile/${handle}`);
-    };
-
-    const idleWindow = window as Window & {
-      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-
-    let idleId: number | null = null;
-    let timeoutId: number | null = null;
-
-    if (typeof idleWindow.requestIdleCallback === "function") {
-      idleId = idleWindow.requestIdleCallback(prefetchCoreRoutes, { timeout: 1800 });
-    } else {
-      timeoutId = window.setTimeout(prefetchCoreRoutes, 900);
-    }
-
-    return () => {
-      cancelled = true;
-      if (idleId !== null && typeof idleWindow.cancelIdleCallback === "function") {
-        idleWindow.cancelIdleCallback(idleId);
-      }
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
-    };
-  }, [checked, session, handle, router]);
 
   const isConversation = pathname.startsWith("/messages/");
   const isReels = pathname === "/reels" || pathname.startsWith("/reels/");
