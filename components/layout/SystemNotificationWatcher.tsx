@@ -16,7 +16,7 @@ import {
   showSystemNotification,
 } from "@/lib/system-notifications";
 
-const POLL_INTERVAL_MS = 30_000;
+const POLL_INTERVAL_MS = 60_000;
 
 const REASON_TEXT: Record<string, string> = {
   like: "a aimé votre publication",
