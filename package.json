@@ -27,7 +27,8 @@
     "next": "15.5.24",
     "qrcode": "^1.5.4",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "@atproto/oauth-client-browser": "^0.5.7"
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "latest",
