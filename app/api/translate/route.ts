@@ -28,7 +28,9 @@ globalStore.__keloTranslateRate = rateStore;
 
 function normalizeLanguage(value: string) {
   const trimmed = value.trim();
-  if (trimmed.toLowerCase() === "zh-cn") return "zh-CN";
+  const lower = trimmed.toLowerCase();
+  if (lower === "zh-cn" || lower === "zh-hans") return "zh-CN";
+  if (lower === "zh-tw" || lower === "zh-hant") return "zh-TW";
   return trimmed.split("-")[0].toLowerCase();
 }
 
