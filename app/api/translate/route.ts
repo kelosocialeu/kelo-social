@@ -11,9 +11,10 @@ const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX = 60;
 const CONCURRENCY = 8;
 
+// Public translation endpoints are fallbacks only. On Render we must not
+// depend on an old Vercel deployment or on a single upstream provider.
 type CacheEntry = { value: string; source?: string; createdAt: number };
 type RateEntry = { count: number; resetAt: number };
-
 type TranslationResult = { translation: string; source?: string; engine: "cache" | "kelo" | "free-fallback" };
 
 const globalStore = globalThis as typeof globalThis & {
@@ -32,6 +33,11 @@ function normalizeLanguage(value: string) {
   if (lower === "zh-cn" || lower === "zh-hans") return "zh-CN";
   if (lower === "zh-tw" || lower === "zh-hant") return "zh-TW";
   return trimmed.split("-")[0].toLowerCase();
+}
+
+function googleLanguage(value: string) {
+  const normalized = normalizeLanguage(value);
+  return normalized === "fil" ? "tl" : normalized;
 }
 
 function hashText(input: string) {
@@ -99,7 +105,7 @@ function restoreTokens(text: string, values: string[]) {
 }
 
 async function translateWithConfiguredEndpoint(text: string, target: string) {
-  const endpoint = process.env.KELO_TRANSLATE_URL;
+  const endpoint = process.env.KELO_TRANSLATE_URL?.trim();
   if (!endpoint) return null;
 
   const headers: Record<string, string> = { "content-type": "application/json" };
@@ -120,20 +126,20 @@ async function translateWithConfiguredEndpoint(text: string, target: string) {
   return { translation: translation.trim(), source: typeof data.detectedLanguage?.language === "string" ? data.detectedLanguage.language : data.source };
 }
 
-async function translateWithFreeFallback(text: string, target: string) {
+async function translateWithGoogle(text: string, target: string) {
   const url = new URL("https://translate.googleapis.com/translate_a/single");
   url.searchParams.set("client", "gtx");
   url.searchParams.set("sl", "auto");
-  url.searchParams.set("tl", target === "fil" ? "tl" : target);
+  url.searchParams.set("tl", googleLanguage(target));
   url.searchParams.set("dt", "t");
   url.searchParams.set("q", text);
 
   const response = await fetch(url.toString(), {
-    headers: { Accept: "application/json", "User-Agent": "KeloTranslate/1.1 (+https://kelosocial.eu)" },
-    cache: "force-cache",
+    headers: { Accept: "application/json", "User-Agent": "KeloTranslate/2.0 (+https://kelosocial.eu)" },
+    cache: "no-store",
     signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error(`Free translator returned ${response.status}`);
+  if (!response.ok) throw new Error(`Google translator returned ${response.status}`);
 
   const data = await response.json();
   const rows = Array.isArray(data) && Array.isArray(data[0]) ? data[0] : [];
@@ -142,8 +148,35 @@ async function translateWithFreeFallback(text: string, target: string) {
     .join("")
     .trim();
   const source = Array.isArray(data) && typeof data[2] === "string" ? data[2] : undefined;
-  if (!translation) throw new Error("Invalid free translator response");
+  if (!translation) throw new Error("Invalid Google translator response");
   return { translation, source };
+}
+
+async function translateWithMyMemory(text: string, target: string) {
+  const url = new URL("https://api.mymemory.translated.net/get");
+  url.searchParams.set("q", text);
+  url.searchParams.set("langpair", `auto|${googleLanguage(target)}`);
+
+  const response = await fetch(url.toString(), {
+    headers: { Accept: "application/json", "User-Agent": "KeloTranslate/2.0 (+https://kelosocial.eu)" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new Error(`MyMemory translator returned ${response.status}`);
+
+  const data = await response.json();
+  const translation = typeof data?.responseData?.translatedText === "string" ? data.responseData.translatedText.trim() : "";
+  if (!translation) throw new Error("Invalid MyMemory translator response");
+  return { translation, source: typeof data?.responseData?.detectedLanguage === "string" ? data.responseData.detectedLanguage : undefined };
+}
+
+async function translateWithFreeFallback(text: string, target: string) {
+  try {
+    return await translateWithGoogle(text, target);
+  } catch (googleError) {
+    console.warn("Google translation fallback failed", googleError);
+    return await translateWithMyMemory(text, target);
+  }
 }
 
 async function translateOne(text: string, target: string): Promise<TranslationResult> {
@@ -189,6 +222,10 @@ async function translateBatch(texts: string[], target: string) {
 
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, texts.length) }, () => worker()));
   return output;
+}
+
+export async function GET() {
+  return NextResponse.json({ ok: true, service: "kelo-translate", configuredEndpoint: Boolean(process.env.KELO_TRANSLATE_URL) });
 }
 
 export async function OPTIONS() {
