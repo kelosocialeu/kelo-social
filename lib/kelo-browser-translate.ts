@@ -4,14 +4,17 @@ type TranslationResult = {
   engine: "browser" | "server" | "cache";
 };
 
-// v2 invalidates translations cached while an unknown source language was
-// incorrectly interpreted as French.
-const CACHE_PREFIX = "kelo-translate:v2:";
+// v3: server-first translation. Browser detection can be unavailable or
+// inaccurate on some mobile/tablet browsers, especially for short posts.
+const CACHE_PREFIX = "kelo-translate:v3:";
 
 function normalizeLanguage(value: string) {
   const trimmed = (value || "").trim();
   if (!trimmed) return "";
-  return trimmed.toLowerCase() === "zh-cn" ? "zh-CN" : trimmed.split("-")[0].toLowerCase();
+  const lower = trimmed.toLowerCase();
+  if (lower === "zh-cn" || lower === "zh-hans") return "zh-CN";
+  if (lower === "zh-tw" || lower === "zh-hant") return "zh-TW";
+  return trimmed.split("-")[0].toLowerCase();
 }
 
 function targetLanguage(value: string) {
@@ -57,6 +60,20 @@ function writeCache(text: string, target: string, value: string) {
   }
 }
 
+async function translateOnServer(text: string, target: string): Promise<TranslationResult> {
+  const response = await fetch("/api/translate", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text, target: targetLanguage(target) }),
+    cache: "no-store",
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || typeof data.translation !== "string" || !data.translation.trim()) {
+    throw new Error(data.error || "translation unavailable");
+  }
+  return { translation: data.translation.trim(), source: data.source, engine: "server" };
+}
+
 async function translateInBrowser(text: string, target: string): Promise<TranslationResult | null> {
   if (typeof window === "undefined") return null;
   const w = window as any;
@@ -76,8 +93,6 @@ async function translateInBrowser(text: string, target: string): Promise<Transla
     const source = normalizeLanguage(detectedLanguage);
     const normalizedTarget = targetLanguage(target);
 
-    // Unknown source must fall back to the server. It must never be guessed as
-    // French, otherwise a foreign-language post can be returned unchanged.
     if (!source) return null;
     if (source === normalizedTarget) return { translation: text, source, engine: "browser" };
 
@@ -96,34 +111,31 @@ async function translateInBrowser(text: string, target: string): Promise<Transla
   }
 }
 
-async function translateOnServer(text: string, target: string): Promise<TranslationResult> {
-  const response = await fetch("/api/translate", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ text, target: targetLanguage(target) }),
-    cache: "no-store",
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || typeof data.translation !== "string" || !data.translation.trim()) {
-    throw new Error(data.error || "translation unavailable");
-  }
-  return { translation: data.translation.trim(), source: data.source, engine: "server" };
-}
-
 export async function translateKeloText(text: string, target: string): Promise<TranslationResult> {
   const cleanText = text.trim();
   if (!cleanText) return { translation: "", engine: "cache" };
 
-  const cached = readCache(cleanText, target);
+  const normalizedTarget = targetLanguage(target);
+  const cached = readCache(cleanText, normalizedTarget);
   if (cached) return { translation: cached, engine: "cache" };
 
-  const browserResult = await translateInBrowser(cleanText, target);
+  // Always use the Kelo server first. This gives all devices the same language
+  // detection and translation behavior and avoids browser-specific failures.
+  try {
+    const serverResult = await translateOnServer(cleanText, normalizedTarget);
+    if (serverResult.translation.trim()) {
+      writeCache(cleanText, normalizedTarget, serverResult.translation);
+      return serverResult;
+    }
+  } catch {
+    // Continue with the local browser engine when the server is temporarily unavailable.
+  }
+
+  const browserResult = await translateInBrowser(cleanText, normalizedTarget);
   if (browserResult) {
-    writeCache(cleanText, target, browserResult.translation);
+    writeCache(cleanText, normalizedTarget, browserResult.translation);
     return browserResult;
   }
 
-  const serverResult = await translateOnServer(cleanText, target);
-  writeCache(cleanText, target, serverResult.translation);
-  return serverResult;
+  throw new Error("translation unavailable");
 }
