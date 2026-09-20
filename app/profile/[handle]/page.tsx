@@ -12,6 +12,7 @@ import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
 import FollowButton from "@/components/profile/FollowButton";
 import ProfileMoreMenu from "@/components/profile/ProfileMoreMenu";
 import ProfileConnectionsModal from "@/components/profile/ProfileConnectionsModal";
+import TranslatedText from "@/components/content/TranslatedText";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
@@ -456,9 +457,7 @@ export default function ProfilePage() {
           <p className="font-semibold text-kelo-primary">@{targetHandle}</p>
 
           {profile?.description && (
-            <p className="mt-3 whitespace-pre-wrap leading-relaxed text-kelo-text">
-              {profile.description}
-            </p>
+            <TranslatedText text={profile.description} className="mt-3 text-kelo-text" />
           )}
 
           <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
