@@ -252,8 +252,11 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
-  const corsHeaders = { "Access-Control-Allow-Origin": "*" };
+  const corsHeaders = CORS_HEADERS;
   try {
+    if (!isAllowedOrigin(request)) {
+      return NextResponse.json({ error: "Origine non autorisée" }, { status: 403, headers: corsHeaders });
+    }
     if (isRateLimited(request)) {
       return NextResponse.json({ error: "Trop de demandes de traduction" }, { status: 429, headers: corsHeaders });
     }
