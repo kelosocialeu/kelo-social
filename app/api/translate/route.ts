@@ -73,8 +73,27 @@ function writeCache(text: string, target: string, value: string, source?: string
 }
 
 function clientIp(request: NextRequest) {
+  // Prefer the first proxy-provided address; never trust arbitrary query/body input.
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
 }
+
+function isAllowedOrigin(request: NextRequest) {
+  const origin = request.headers.get("origin");
+  if (!origin) return true; // native clients/server-side calls may omit Origin
+  try {
+    const url = new URL(origin);
+    return url.protocol === "https:" && (url.hostname === "kelosocial.eu" || url.hostname === "www.kelosocial.eu");
+  } catch {
+    return false;
+  }
+}
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "https://kelosocial.eu",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Vary": "Origin",
+};
 
 function isRateLimited(request: NextRequest) {
   const key = clientIp(request);
@@ -229,14 +248,7 @@ export async function GET() {
 }
 
 export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    },
-  });
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
 export async function POST(request: NextRequest) {
@@ -263,7 +275,7 @@ export async function POST(request: NextRequest) {
       const results = await translateBatch(texts, target);
       return NextResponse.json(
         { translations: results.map((result) => result.translation), results },
-        { headers: { ...corsHeaders, "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800" } },
+        { headers: { ...corsHeaders, "Cache-Control": "private, no-store" } },
       );
     }
 
@@ -274,7 +286,7 @@ export async function POST(request: NextRequest) {
     const result = await translateOne(text, target);
     return NextResponse.json(
       result,
-      { headers: { ...corsHeaders, "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800" } },
+      { headers: { ...corsHeaders, "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
     console.error("Kelo Translate failed", error);
