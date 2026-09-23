@@ -578,14 +578,11 @@ export default function AdminPage() {
                                     <p className="truncate text-sm font-bold text-kelo-text">
                                       {account.displayName}
                                     </p>
-                                    {(() => {
-                                      const record = getAccountCertificationRecord(account);
-                                      return account.identityVerificationType ? (
-                                        <IdentityVerificationBadge actor={account} size="sm" />
-                                      ) : currentCertification ? (
-                                        <Badge status={currentCertification} size={18} />
-                                      ) : null;
-                                    })()}
+                                            {account.identityVerificationType ? (
+                                      <IdentityVerificationBadge actor={account} size="sm" />
+                                    ) : currentCertification ? (
+                                      <Badge status={currentCertification} size={18} />
+                                    ) : null}
                                   </div>
                                   <p className="truncate text-xs text-kelo-muted">
                                     @{account.handle}
@@ -636,15 +633,9 @@ export default function AdminPage() {
                               @{account.handle}
                             </span>
 
-                            {(() => {
-                              const record = getAccountCertificationRecord(account);
-                              if (false) {
-                                return null;
-                              }
-                              return currentCertification ? (
-                                <Badge status={currentCertification} size={17} />
-                              ) : null;
-                            })()}
+                            {currentCertification ? (
+                              <Badge status={currentCertification} size={17} />
+                            ) : null}
 
                             <button
                               type="button"
@@ -725,12 +716,7 @@ export default function AdminPage() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          {user.category === "ai" ? (
-                            <>
-                            </>
-                          ) : (
-                            <Badge status={user.status} />
-                          )}
+                          <Badge status={user.status} />
                         </div>
                       </div>
                     ))
