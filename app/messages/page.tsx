@@ -18,6 +18,7 @@ import InfiniteScrollSentinel from "@/components/feed/InfiniteScrollSentinel";
 import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
 import MessagingSection from "@/components/settings/MessagingSection";
 import GroupCreationDialog from "@/components/messages/GroupCreationDialog";
+import MessageTranslation from "@/components/messages/MessageTranslation";
 
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
@@ -146,22 +147,22 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
+    <div className="flex min-h-[100dvh] w-full overflow-x-hidden bg-kelo-background font-sans text-kelo-text">
       <Sidebar handle={handle} onLogout={handleLogout} />
 
-      <main className="min-h-screen min-w-0 flex-1 border-x border-kelo-border bg-white pb-20 shadow-kelo">
+      <main className="min-h-[100dvh] min-w-0 flex-1 border-x border-kelo-border bg-white pb-[calc(5rem+env(safe-area-inset-bottom))] shadow-kelo lg:max-w-4xl">
         <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 backdrop-blur-md">
-          <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-5 lg:px-6">
+          <div className="flex items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-5 sm:py-4 lg:px-6">
             <div>
-              <h1 className="text-xl font-extrabold text-kelo-text sm:text-2xl">
+              <h1 className="text-lg font-extrabold text-kelo-text sm:text-2xl">
                 Discussions
               </h1>
-              <p className="mt-1 text-xs text-kelo-muted sm:text-sm">
+              <p className="mt-1 hidden text-xs text-kelo-muted sm:block sm:text-sm">
                 Retrouvez vos conversations ou démarrez-en une nouvelle.
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               {refreshing && conversations.length > 0 && (
                 <span className="hidden text-xs text-kelo-muted sm:inline">
                   Actualisation…
@@ -257,6 +258,8 @@ export default function MessagesPage() {
             const otherMember = otherMembers[0] || conversation.members?.[0];
 
             const lastText = conversation.lastMessage?.text || "";
+            const lastReaction = conversation.lastReaction?.reaction?.value || "";
+            const reactionPreview = lastReaction ? ` · ${lastReaction}` : "";
             const displayName = isGroup
               ? `Groupe · ${(conversation.members || []).length} membres`
               : otherMember?.displayName ||
@@ -267,7 +270,7 @@ export default function MessagesPage() {
               <Link
                 key={conversation.id}
                 href={`/messages/${conversation.id}`}
-                className="group flex items-center gap-3 px-4 py-4 transition-colors hover:bg-kelo-background/60 sm:px-5 lg:px-6"
+                className="group flex min-w-0 items-center gap-3 px-3 py-3.5 transition-colors hover:bg-kelo-background/60 sm:px-5 sm:py-4 lg:px-6"
               >
                 <Avatar
                   src={otherMember?.avatar}
