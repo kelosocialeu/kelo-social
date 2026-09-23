@@ -21,6 +21,7 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
+import AICertificationBadge from "@/components/ui/AICertificationBadge";
 
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { getStoredSession } from "@/services/auth.service";
@@ -41,6 +42,7 @@ import {
 
 type CertificationStatus = "certified" | "trusted-verifier" | "none";
 type VisibleCertificationStatus = Exclude<CertificationStatus, "none">;
+type CertificationCategory = "human" | "company" | "association" | "institution" | "media" | "university" | "ai";
 type AdminSection = "certifications" | "identity-verifications";
 
 type AccountSearchResult = {
@@ -49,6 +51,7 @@ type AccountSearchResult = {
   displayName: string;
   avatar: string | null;
   certificationStatus: VisibleCertificationStatus | null;
+  certificationCategory?: CertificationCategory | null;
 };
 
 const IDENTITY_TYPE_ICONS: Record<IdentityVerificationType, typeof UserRoundCheck> = {
@@ -70,6 +73,8 @@ export default function AdminPage() {
 
   const [certificationStatus, setCertificationStatus] =
     useState<CertificationStatus>("certified");
+  const [certificationCategory, setCertificationCategory] =
+    useState<CertificationCategory>("human");
   const [selectedAccounts, setSelectedAccounts] = useState<AccountSearchResult[]>([]);
   const [accountSuggestions, setAccountSuggestions] = useState<AccountSearchResult[]>([]);
   const [searchingAccounts, setSearchingAccounts] = useState(false);
@@ -219,6 +224,15 @@ export default function AdminPage() {
     return session;
   };
 
+  const getAccountCertificationRecord = (
+    account: AccountSearchResult
+  ): CertificationRecord | null => {
+    const matches = certifiedUsers.filter(
+      (record) => record.subjectDid.trim().toLowerCase() === account.did.trim().toLowerCase()
+    );
+    return matches.find((record) => record.status === "trusted-verifier") || matches.find((record) => record.status === "certified") || null;
+  };
+
   const getAccountCertification = (
     account: AccountSearchResult
   ): VisibleCertificationStatus | null => {
@@ -230,17 +244,9 @@ export default function AdminPage() {
       return account.certificationStatus;
     }
 
-    const matches = certifiedUsers.filter(
-      (record) => record.subjectDid.trim().toLowerCase() === account.did.trim().toLowerCase()
-    );
-
-    if (matches.some((record) => record.status === "trusted-verifier")) {
-      return "trusted-verifier";
-    }
-
-    if (matches.some((record) => record.status === "certified")) {
-      return "certified";
-    }
+    const match = getAccountCertificationRecord(account);
+    if (match?.status === "trusted-verifier") return "trusted-verifier";
+    if (match?.status === "certified") return "certified";
 
     return null;
   };
@@ -283,6 +289,9 @@ export default function AdminPage() {
               session,
               targetHandle: account.handle,
               status: certificationStatus,
+              ...(certificationStatus === "certified"
+                ? { category: certificationCategory }
+                : {}),
             }),
           });
 
@@ -575,12 +584,15 @@ export default function AdminPage() {
                                     <p className="truncate text-sm font-bold text-kelo-text">
                                       {account.displayName}
                                     </p>
-                                    {currentCertification && (
-                                      <Badge
-                                        status={currentCertification}
-                                        size={18}
-                                      />
-                                    )}
+                                    {(() => {
+                                      const record = getAccountCertificationRecord(account);
+                                      if (record?.category === "ai") {
+                                        return <AICertificationBadge size={16} />;
+                                      }
+                                      return currentCertification ? (
+                                        <Badge status={currentCertification} size={18} />
+                                      ) : null;
+                                    })()}
                                   </div>
                                   <p className="truncate text-xs text-kelo-muted">
                                     @{account.handle}
@@ -631,9 +643,15 @@ export default function AdminPage() {
                               @{account.handle}
                             </span>
 
-                            {currentCertification && (
-                              <Badge status={currentCertification} size={17} />
-                            )}
+                            {(() => {
+                              const record = getAccountCertificationRecord(account);
+                              if (record?.category === "ai") {
+                                return <AICertificationBadge size={15} />;
+                              }
+                              return currentCertification ? (
+                                <Badge status={currentCertification} size={17} />
+                              ) : null;
+                            })()}
 
                             <button
                               type="button"
@@ -663,6 +681,24 @@ export default function AdminPage() {
                   </option>
                   <option value="none">Révoquer la certification</option>
                 </Select>
+
+                {certificationStatus === "certified" && (
+                  <Select
+                    label="Type de certification"
+                    value={certificationCategory}
+                    onChange={(event) =>
+                      setCertificationCategory(event.target.value as CertificationCategory)
+                    }
+                  >
+                    <option value="human">👤 Humain</option>
+                    <option value="company">🏢 Entreprise</option>
+                    <option value="association">🤝 Association</option>
+                    <option value="institution">🏛️ Institution</option>
+                    <option value="media">📰 Média</option>
+                    <option value="university">🎓 Université</option>
+                    <option value="ai">🤖 Intelligence artificielle (IA)</option>
+                  </Select>
+                )}
 
                 {error && (
                   <p className="text-sm font-medium text-kelo-danger">{error}</p>
@@ -712,7 +748,16 @@ export default function AdminPage() {
                             {user.subjectDid}
                           </p>
                         </div>
-                        <Badge status={user.status} />
+                        <div className="flex items-center gap-2">
+                          {user.category === "ai" ? (
+                            <>
+                              <AICertificationBadge size={18} />
+                              <span className="text-xs font-bold text-violet-700">IA</span>
+                            </>
+                          ) : (
+                            <Badge status={user.status} />
+                          )}
+                        </div>
                       </div>
                     ))
                   ) : (
