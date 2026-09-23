@@ -150,7 +150,7 @@ export default function MessagesPage() {
     <div className="flex min-h-[100dvh] w-full overflow-x-hidden bg-kelo-background font-sans text-kelo-text">
       <Sidebar handle={handle} onLogout={handleLogout} />
 
-      <main className="min-h-[100dvh] min-w-0 flex-1 border-x border-kelo-border bg-white pb-[calc(5rem+env(safe-area-inset-bottom))] shadow-kelo lg:max-w-4xl">
+      <main className="min-h-[100dvh] min-w-0 flex-1 border-x border-kelo-border bg-white pb-[calc(5rem+env(safe-area-inset-bottom))] shadow-kelo">
         <div className="sticky top-0 z-10 border-b border-kelo-border bg-white/90 backdrop-blur-md">
           <div className="flex items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-5 sm:py-4 lg:px-6">
             <div>
