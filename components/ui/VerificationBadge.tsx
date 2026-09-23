@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 import Badge from "@/components/ui/Badge";
+import AICertificationBadge from "@/components/ui/AICertificationBadge";
 import Logo from "@/components/ui/Logo";
 import Avatar from "@/components/feed/Avatar";
 import {
@@ -74,6 +75,7 @@ export default function VerificationBadge({ actor, size = 16 }: VerificationBadg
     return null;
   }, [nativeBadge, keloCertifications, suppressed]);
   if (!badgeType) return null;
+  const aiCertification = keloCertifications.find((record) => record.status === "certified" && record.category === "ai");
 
   const handleClick = async (event: React.MouseEvent<HTMLDivElement>) => {
     event.preventDefault(); event.stopPropagation(); setOpen(true);
@@ -108,10 +110,10 @@ export default function VerificationBadge({ actor, size = 16 }: VerificationBadg
   };
 
   return <>
-    <div onClick={handleClick} className="relative inline-flex cursor-pointer"><Badge status={badgeType === "trusted-verifier" ? "trusted-verifier" : "certified"} size={size} /></div>
+    <div onClick={handleClick} className="relative inline-flex cursor-pointer">{aiCertification ? <AICertificationBadge size={Math.max(16, Math.round(size * 0.82))} /> : <Badge status={badgeType === "trusted-verifier" ? "trusted-verifier" : "certified"} size={size} />}</div>
     {open && <><div className="fixed inset-0 z-30 bg-black/10" onClick={() => setOpen(false)} />
       {badgeType === "verified" ? <div className="fixed left-1/2 top-1/2 z-40 max-h-[80vh] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-kelo-border bg-white p-5 shadow-kelo" onClick={(e) => e.stopPropagation()}>
-        <p className="mb-3 text-sm font-bold text-kelo-text">Compte certifié</p>
+        <p className="mb-3 text-sm font-bold text-kelo-text">{aiCertification ? "Compte IA certifié" : "Compte certifié"}</p>
         {loadingIssuer && <p className="text-sm text-kelo-muted">Chargement...</p>}
         {!loadingIssuer && issuers.length > 0 && <><p className="mb-2 text-xs text-kelo-muted">{issuers.length > 1 ? `Certifié par ${issuers.length} certificateurs de confiance :` : "Certifié par :"}</p><div className="space-y-1">{issuers.map((issuer) => <Link key={issuer.did || issuer.handle} href={`/profile/${issuer.handle}`} className="flex items-center gap-3 rounded-xl p-2 hover:bg-kelo-background" onClick={() => setOpen(false)}><Avatar src={issuer.avatar} fallback={issuer.handle[0]?.toUpperCase() || "K"} size="sm" /><div className="min-w-0 flex-1"><div className="flex min-w-0 items-center gap-2"><p className="truncate text-sm font-bold text-kelo-text">{issuer.displayName || issuer.handle}</p>{issuer.trusted && <span className="inline-flex shrink-0 items-center justify-center"><Badge status="trusted-verifier" size={22} /></span>}</div><p className="truncate text-xs text-kelo-muted">@{issuer.handle}{issuer.source === "kelo" ? " · Kelo" : " · AT Protocol"}</p></div></Link>)}</div></>}
         {!loadingIssuer && issuerError && <p className="text-sm text-kelo-muted">Les détails des certificateurs sont temporairement indisponibles. La certification reste active.</p>}
