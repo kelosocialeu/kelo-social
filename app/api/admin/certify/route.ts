@@ -23,11 +23,13 @@ const CERTIFICATION_REPO_APP_PASSWORD =
   "";
 
 type CertificationStatus = "certified" | "trusted-verifier" | "none";
+type CertificationCategory = "human" | "company" | "association" | "institution" | "media" | "university" | "ai";
 
 interface StoredCertificationRecord {
   subjectDid: string;
   subjectHandle: string;
   status: Exclude<CertificationStatus, "none">;
+  category?: CertificationCategory;
   issuedAt: string;
   issuerDid?: string;
   issuerHandle?: string;
@@ -113,6 +115,7 @@ function parseStoredCertification(value: unknown): StoredCertificationRecord | n
     subjectDid: record.subjectDid,
     subjectHandle: normalizeHandle(record.subjectHandle),
     status: record.status,
+    category: typeof record.category === "string" && ["human", "company", "association", "institution", "media", "university", "ai"].includes(record.category) ? record.category as CertificationCategory : undefined,
     issuedAt: record.issuedAt,
     issuerDid: typeof record.issuerDid === "string" && record.issuerDid.trim() ? normalizeDid(record.issuerDid) : undefined,
     issuerHandle: typeof record.issuerHandle === "string" && record.issuerHandle.trim() ? normalizeHandle(record.issuerHandle) : undefined,
@@ -198,10 +201,12 @@ export async function POST(request: Request) {
     const rawTargetHandle = typeof body?.targetHandle === "string" ? body.targetHandle : "";
     const rawTargetDid = typeof body?.targetDid === "string" ? body.targetDid : "";
     const status = body?.status;
+    const category = body?.category;
 
     if (!isValidSession(session)) return NextResponse.json({ error: "Session invalide ou incomplète. Reconnectez-vous." }, { status: 401 });
     if (!rawTargetHandle.trim()) return NextResponse.json({ error: "Handle du compte cible manquant." }, { status: 400 });
     if (!isValidStatus(status)) return NextResponse.json({ error: "Statut de certification invalide." }, { status: 400 });
+    if (status !== "none" && category !== undefined && (typeof category !== "string" || !["human", "company", "association", "institution", "media", "university", "ai"].includes(category))) return NextResponse.json({ error: "Catégorie de certification invalide." }, { status: 400 });
 
     const requester = await authenticateRequester(session);
     if (!requester.did || !requester.handle) return NextResponse.json({ error: "Impossible de vérifier l’identité du compte connecté." }, { status: 401 });
@@ -250,9 +255,9 @@ export async function POST(request: Request) {
     if (requesterIsAdmin) await makeCertificationVisibleLocally(certificationRepo.agent, certificationRepo.repoDid, subjectDid);
 
     const issuedAt = existingOwnRecord?.issuedAt || new Date().toISOString();
-    const response = await certificationRepo.agent.api.com.atproto.repo.putRecord({ repo: certificationRepo.repoDid, collection: CERTIFICATION_COLLECTION, rkey: recordKey, record: { $type: CERTIFICATION_COLLECTION, subjectDid, subjectHandle: targetHandle, status, issuedAt, issuerDid: requester.did, issuerHandle: requester.handle }, validate: false });
+    const response = await certificationRepo.agent.api.com.atproto.repo.putRecord({ repo: certificationRepo.repoDid, collection: CERTIFICATION_COLLECTION, rkey: recordKey, record: { $type: CERTIFICATION_COLLECTION, subjectDid, subjectHandle: targetHandle, status, ...(category ? { category } : {}), issuedAt, issuerDid: requester.did, issuerHandle: requester.handle }, validate: false });
 
-    return NextResponse.json({ success: true, action: existingOwnRecord ? "updated" : "certified", uri: response.data.uri, cid: response.data.cid, subjectDid, subjectHandle: targetHandle, status, issuedAt, issuerDid: requester.did, issuerHandle: requester.handle });
+    return NextResponse.json({ success: true, action: existingOwnRecord ? "updated" : "certified", uri: response.data.uri, cid: response.data.cid, subjectDid, subjectHandle: targetHandle, status, ...(category ? { category } : {}), issuedAt, issuerDid: requester.did, issuerHandle: requester.handle });
   } catch (error) {
     console.error("[admin/certify] Erreur", error);
     return NextResponse.json({ error: publicErrorMessage(error) }, { status: 500 });
