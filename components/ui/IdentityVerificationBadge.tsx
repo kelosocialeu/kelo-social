@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
+  Bot,
   GraduationCap,
   HeartHandshake,
   Landmark,
@@ -36,6 +37,7 @@ const TYPE_ICONS: Record<IdentityVerificationType, typeof UserRound> = {
   university: GraduationCap,
   association: HeartHandshake,
   institution: Landmark,
+  ai: Bot,
 };
 
 const TYPE_STYLES: Record<
