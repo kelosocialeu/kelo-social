@@ -268,6 +268,62 @@ export async function markConversationRead(
   );
 }
 
+
+export async function addConversationReaction(
+  convoId: string,
+  messageId: string,
+  value: string
+) {
+  await requireIdentityVerification();
+  const emoji = Array.from(value.trim())[0];
+  if (!emoji) throw new Error("Réaction invalide.");
+  const agent = await getChatAgent();
+  const response = await agent.api.chat.bsky.convo.addReaction(
+    { convoId, messageId, value: emoji },
+    { headers: CHAT_PROXY_HEADER, encoding: "application/json" }
+  );
+  return response.data.message;
+}
+
+export async function removeConversationReaction(
+  convoId: string,
+  messageId: string,
+  value: string
+) {
+  await requireIdentityVerification();
+  const emoji = Array.from(value.trim())[0];
+  if (!emoji) throw new Error("Réaction invalide.");
+  const agent = await getChatAgent();
+  const response = await agent.api.chat.bsky.convo.removeReaction(
+    { convoId, messageId, value: emoji },
+    { headers: CHAT_PROXY_HEADER, encoding: "application/json" }
+  );
+  return response.data.message;
+}
+
+export async function reportConversationMember(
+  memberDid: string,
+  reasonType: string,
+  description?: string
+) {
+  await requireIdentityVerification();
+  if (!memberDid?.startsWith("did:")) throw new Error("Compte invalide.");
+  const agent = await getChatAgent();
+  const reportingAgent = agent.withProxy(
+    "atproto_labeler",
+    process.env.NEXT_PUBLIC_MODERATION_LABELER_DID?.trim() ||
+      "did:plc:ar7c4by46qjdydhdevvrndac"
+  );
+  await reportingAgent.api.com.atproto.moderation.createReport(
+    {
+      reasonType,
+      reason: description?.trim().slice(0, 2000) || undefined,
+      subject: { $type: "com.atproto.admin.defs#repoRef", did: memberDid },
+    },
+    { encoding: "application/json" }
+  );
+}
+
 export async function resolveHandleToDid(
   handle: string
 ): Promise<string> {
