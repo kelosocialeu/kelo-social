@@ -5,6 +5,10 @@ const APPVIEWS = [
   "https://api.bsky.app/xrpc",
 ];
 
+function normalizeActorQuery(query: string) {
+  return query.trim().replace(/^@+/, "").trim();
+}
+
 const SEARCH_CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
 };
@@ -81,7 +85,7 @@ export async function GET(request: NextRequest) {
   try {
     if (type === "accounts") {
       const params = new URLSearchParams();
-      params.set("q", query);
+      params.set("q", normalizeActorQuery(query));
       params.set("limit", String(limit));
       if (cursor) params.set("cursor", cursor);
 
