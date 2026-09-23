@@ -286,8 +286,6 @@ export default function AdminPage() {
               session,
               targetHandle: account.handle,
               status: certificationStatus,
-              ...(certificationStatus === "certified"
-                : {}),
             }),
           });
 
