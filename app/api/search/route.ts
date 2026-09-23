@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const APPVIEWS = [
-  "https://public.api.bsky.app/xrpc",
   "https://api.bsky.app/xrpc",
+  "https://public.api.bsky.app/xrpc",
 ];
 
 function normalizeActorQuery(query: string) {
@@ -63,7 +63,9 @@ async function searchPosts(query: string, limit: number, cursor: string) {
   const params = new URLSearchParams();
   params.set("q", query);
   params.set("limit", String(limit));
-  if (cursor) params.set("cursor", cursor);
+  params.set("sort", "latest");
+  // Anonymous search pagination with `cursor` is currently rejected by Bluesky AppView.
+  void cursor;
 
   const data = await fetchJsonFromAppView("app.bsky.feed.searchPosts", params);
   return {
