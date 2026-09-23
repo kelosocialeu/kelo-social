@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  Bot,
   UserRoundCheck,
   X,
 } from "lucide-react";
@@ -60,6 +61,7 @@ const IDENTITY_TYPE_ICONS: Record<IdentityVerificationType, typeof UserRoundChec
   university: GraduationCap,
   association: HeartHandshake,
   institution: Landmark,
+  ai: Bot,
 };
 
 export default function AdminPage() {
@@ -786,6 +788,7 @@ export default function AdminPage() {
                       <option value="university">Université vérifiée</option>
                       <option value="association">Association vérifiée</option>
                       <option value="institution">Institution vérifiée</option>
+                      <option value="ai">IA autorisée</option>
                     </Select>
 
                     <Select
