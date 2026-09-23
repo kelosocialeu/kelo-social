@@ -13,13 +13,11 @@ export const ADMIN_REPO_PDS_URL =
   "https://pds.kelosocial.eu";
 
 export type CertificationStatus = "certified" | "trusted-verifier";
-export type CertificationCategory = "human" | "company" | "association" | "institution" | "media" | "university" | "ai";
 
 export interface CertificationRecord {
   subjectDid: string;
   subjectHandle: string;
   status: CertificationStatus;
-  category?: CertificationCategory;
   issuedAt: string;
   issuerDid?: string;
   issuerHandle?: string;
@@ -45,10 +43,6 @@ function normalizeHandle(value: string): string {
   return value.trim().replace(/^@/, "").toLowerCase();
 }
 
-function isCertificationCategory(value: unknown): value is CertificationCategory {
-  return ["human", "company", "association", "institution", "media", "university", "ai"].includes(value as string);
-}
-
 function isCertificationStatus(value: unknown): value is CertificationStatus {
   return value === "certified" || value === "trusted-verifier";
 }
@@ -67,7 +61,6 @@ function parseCertificationRecord(value: unknown): CertificationRecord | null {
     subjectDid: record.subjectDid.trim(),
     subjectHandle: normalizeHandle(record.subjectHandle),
     status: record.status,
-    category: isCertificationCategory(record.category) ? record.category : undefined,
     issuedAt: record.issuedAt,
     issuerDid:
       typeof record.issuerDid === "string" && record.issuerDid.trim()
