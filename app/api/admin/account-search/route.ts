@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   listCertifications,
   type CertificationStatus,
+  type CertificationCategory,
 } from "@/lib/atproto/certifications";
 import { listCertificationSuppressions } from "@/lib/atproto/certification-suppressions";
 
@@ -127,13 +128,13 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    const certificationsByDid = new Map<string, CertificationStatus>();
+    const certificationsByDid = new Map<string, { status: CertificationStatus; category?: CertificationCategory }>();
     for (const certification of certifications) {
       const did = normalizeDid(certification.subjectDid);
       const current = certificationsByDid.get(did);
 
       if (certification.status === "trusted-verifier" || !current) {
-        certificationsByDid.set(did, certification.status);
+        certificationsByDid.set(did, { status: certification.status, category: certification.category });
       }
     }
 
@@ -143,7 +144,8 @@ export async function GET(request: NextRequest) {
 
     const actors = searchedActors.map((actor) => {
       const did = normalizeDid(actor.did!);
-      const keloStatus = certificationsByDid.get(did) || null;
+      const keloCertification = certificationsByDid.get(did) || null;
+      const keloStatus = keloCertification?.status || null;
       const hiddenOnKelo = suppressedDids.has(did);
 
       const blueskyTrustedVerifier =
@@ -167,6 +169,7 @@ export async function GET(request: NextRequest) {
         displayName: actor.displayName || actor.handle!,
         avatar: actor.avatar || null,
         certificationStatus,
+        certificationCategory: keloCertification?.category || null,
         sourceCertificationStatus,
         hiddenOnKelo,
         certificationSources: {
