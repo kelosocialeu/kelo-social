@@ -108,7 +108,9 @@ export default function VerificationBadge({ actor, size = 16 }: VerificationBadg
   };
 
   return <>
-    <div onClick={handleClick} className="relative inline-flex cursor-pointer items-center gap-1">\n      {badgeType && <Badge status={badgeType === "trusted-verifier" ? "trusted-verifier" : "certified"} size={size} />}\n      {identityVerification && <IdentityVerificationBadge actor={actor} size="sm" />}\n    </div>
+    <div onClick={handleClick} className="relative inline-flex cursor-pointer items-center gap-1">
+      {badgeType && <Badge status={badgeType === "trusted-verifier" ? "trusted-verifier" : "certified"} size={size} />}
+    </div>
     {open && badgeType && <><div className="fixed inset-0 z-30 bg-black/10" onClick={() => setOpen(false)} />
       {badgeType === "verified" ? <div className="fixed left-1/2 top-1/2 z-40 max-h-[80vh] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-kelo-border bg-white p-5 shadow-kelo" onClick={(e) => e.stopPropagation()}>
         <p className="mb-3 text-sm font-bold text-kelo-text">Compte certifié</p>
