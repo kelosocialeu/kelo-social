@@ -586,7 +586,7 @@ export default function AdminPage() {
                                     </p>
                                     {(() => {
                                       const record = getAccountCertificationRecord(account);
-                                      if (record?.category === "ai") {
+                                      if (account.certificationCategory === "ai" || record?.category === "ai") {
                                         return <AICertificationBadge size={16} />;
                                       }
                                       return currentCertification ? (
@@ -645,7 +645,7 @@ export default function AdminPage() {
 
                             {(() => {
                               const record = getAccountCertificationRecord(account);
-                              if (record?.category === "ai") {
+                              if (account.certificationCategory === "ai" || record?.category === "ai") {
                                 return <AICertificationBadge size={15} />;
                               }
                               return currentCertification ? (
