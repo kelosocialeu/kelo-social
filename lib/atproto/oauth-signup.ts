@@ -17,8 +17,8 @@ const metadata = {
   scope: "atproto",
   grant_types: ["authorization_code", "refresh_token"] as ["authorization_code", "refresh_token"],
   response_types: ["code"] as ["code"],
-  token_endpoint_auth_method: "none",
-  application_type: "web",
+  token_endpoint_auth_method: "none" as const,
+  application_type: "web" as const,
   dpop_bound_access_tokens: true,
 };
 
