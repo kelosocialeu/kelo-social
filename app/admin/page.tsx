@@ -21,7 +21,7 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
-import AICertificationBadge from "@/components/ui/AICertificationBadge";
+import IdentityVerificationBadge from "@/components/ui/IdentityVerificationBadge";
 
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { getStoredSession } from "@/services/auth.service";
@@ -42,7 +42,6 @@ import {
 
 type CertificationStatus = "certified" | "trusted-verifier" | "none";
 type VisibleCertificationStatus = Exclude<CertificationStatus, "none">;
-type CertificationCategory = "human" | "company" | "association" | "institution" | "media" | "university" | "ai";
 type AdminSection = "certifications" | "identity-verifications";
 
 type AccountSearchResult = {
@@ -51,7 +50,6 @@ type AccountSearchResult = {
   displayName: string;
   avatar: string | null;
   certificationStatus: VisibleCertificationStatus | null;
-  certificationCategory?: CertificationCategory | null;
 };
 
 const IDENTITY_TYPE_ICONS: Record<IdentityVerificationType, typeof UserRoundCheck> = {
@@ -73,8 +71,6 @@ export default function AdminPage() {
 
   const [certificationStatus, setCertificationStatus] =
     useState<CertificationStatus>("certified");
-  const [certificationCategory, setCertificationCategory] =
-    useState<CertificationCategory>("human");
   const [selectedAccounts, setSelectedAccounts] = useState<AccountSearchResult[]>([]);
   const [accountSuggestions, setAccountSuggestions] = useState<AccountSearchResult[]>([]);
   const [searchingAccounts, setSearchingAccounts] = useState(false);
@@ -586,8 +582,8 @@ export default function AdminPage() {
                                     </p>
                                     {(() => {
                                       const record = getAccountCertificationRecord(account);
-                                      if (account.certificationCategory === "ai" || record?.category === "ai") {
-                                        return <AICertificationBadge size={16} />;
+                                      if (false) {
+                                        return null;
                                       }
                                       return currentCertification ? (
                                         <Badge status={currentCertification} size={18} />
@@ -645,8 +641,8 @@ export default function AdminPage() {
 
                             {(() => {
                               const record = getAccountCertificationRecord(account);
-                              if (account.certificationCategory === "ai" || record?.category === "ai") {
-                                return <AICertificationBadge size={15} />;
+                              if (false) {
+                                return null;
                               }
                               return currentCertification ? (
                                 <Badge status={currentCertification} size={17} />
@@ -682,23 +678,6 @@ export default function AdminPage() {
                   <option value="none">Révoquer la certification</option>
                 </Select>
 
-                {certificationStatus === "certified" && (
-                  <Select
-                    label="Type de certification"
-                    value={certificationCategory}
-                    onChange={(event) =>
-                      setCertificationCategory(event.target.value as CertificationCategory)
-                    }
-                  >
-                    <option value="human">👤 Humain</option>
-                    <option value="company">🏢 Entreprise</option>
-                    <option value="association">🤝 Association</option>
-                    <option value="institution">🏛️ Institution</option>
-                    <option value="media">📰 Média</option>
-                    <option value="university">🎓 Université</option>
-                    <option value="ai">🤖 Intelligence artificielle (IA)</option>
-                  </Select>
-                )}
 
                 {error && (
                   <p className="text-sm font-medium text-kelo-danger">{error}</p>
