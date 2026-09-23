@@ -7,7 +7,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Flag, Settings2, UsersRound, X } from "lucide-react";
+import { Settings2, UsersRound, X } from "lucide-react";
 
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
@@ -19,7 +19,6 @@ import VerificationRequiredDialog from "@/components/verification/VerificationRe
 import MessagingSection from "@/components/settings/MessagingSection";
 import GroupCreationDialog from "@/components/messages/GroupCreationDialog";
 import MessageTranslation from "@/components/messages/MessageTranslation";
-import MessageReportDialog from "@/components/messages/MessageReportDialog";
 
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
@@ -46,7 +45,6 @@ export default function MessagesPage() {
   const [startError, setStartError] = useState<string | null>(null);
   const [showMessagingSettings, setShowMessagingSettings] = useState(false);
   const [showGroupCreation, setShowGroupCreation] = useState(false);
-  const [reportMemberDid, setReportMemberDid] = useState<string | null>(null);
 
   const {
     checked: verificationChecked,
@@ -308,28 +306,11 @@ export default function MessagesPage() {
                       ) : null}
                     </div>
 
-                    <div className="flex flex-shrink-0 items-center gap-1">
-                      {conversation.unreadCount > 0 && (
-                        <span className="rounded-full bg-kelo-gradient px-2.5 py-1 text-xs font-bold text-white">
-                          {conversation.unreadCount}
-                        </span>
-                      )}
-                      {!isGroup && otherMember?.did && (
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            setReportMemberDid(otherMember.did);
-                          }}
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-kelo-muted hover:bg-kelo-background hover:text-kelo-danger"
-                          aria-label="Signaler cette conversation"
-                          title="Signaler"
-                        >
-                          <Flag className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
+                    {conversation.unreadCount > 0 && (
+                      <span className="flex-shrink-0 rounded-full bg-kelo-gradient px-2.5 py-1 text-xs font-bold text-white">
+                        {conversation.unreadCount}
+                      </span>
+                    )}
                   </div>
 
                   <p className="mt-1 truncate text-sm text-kelo-muted">
@@ -413,12 +394,6 @@ export default function MessagesPage() {
           </div>
         </div>
       )}
-
-      <MessageReportDialog
-        open={!!reportMemberDid}
-        memberDid={reportMemberDid || undefined}
-        onClose={() => setReportMemberDid(null)}
-      />
 
       <VerificationRequiredDialog
         open={dialogOpen}
