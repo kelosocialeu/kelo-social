@@ -5,6 +5,7 @@ import {
   type CertificationStatus,
 } from "@/lib/atproto/certifications";
 import { listCertificationSuppressions } from "@/lib/atproto/certification-suppressions";
+import { listIdentityVerifications, type IdentityVerificationType } from "@/lib/atproto/identity-verifications";
 
 const APPVIEW_BASE_URL = "https://public.api.bsky.app/xrpc";
 const SEARCH_URL = `${APPVIEW_BASE_URL}/app.bsky.actor.searchActors`;
@@ -115,7 +116,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [searchedActors, certifications, suppressions] = await Promise.all([
+    const [searchedActors, certifications, suppressions, identityVerifications] = await Promise.all([
       searchActors(query),
       listCertifications().catch((error) => {
         console.error("[admin/account-search] certifications", error);
@@ -123,6 +124,10 @@ export async function GET(request: NextRequest) {
       }),
       listCertificationSuppressions().catch((error) => {
         console.error("[admin/account-search] suppressions", error);
+        return [];
+      }),
+      listIdentityVerifications().catch((error) => {
+        console.error("[admin/account-search] identity verifications", error);
         return [];
       }),
     ]);
@@ -135,6 +140,11 @@ export async function GET(request: NextRequest) {
       if (certification.status === "trusted-verifier" || !current) {
         certificationsByDid.set(did, { status: certification.status });
       }
+    }
+
+    const identityByDid = new Map<string, IdentityVerificationType>();
+    for (const verification of identityVerifications) {
+      identityByDid.set(normalizeDid(verification.subjectDid), verification.verificationType);
     }
 
     const suppressedDids = new Set(
@@ -170,6 +180,7 @@ export async function GET(request: NextRequest) {
         certificationStatus,
         sourceCertificationStatus,
         hiddenOnKelo,
+        identityVerificationType: identityByDid.get(did) || null,
         certificationSources: {
           kelo: keloStatus,
           atproto: {
