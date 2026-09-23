@@ -15,7 +15,7 @@ const metadata = {
   policy_uri: "https://kelosocial.eu/privacy",
   redirect_uris: [KELO_OAUTH_CALLBACK] as [string],
   scope: "atproto",
-  grant_types: ["authorization_code", "refresh_token"],
+  grant_types: ["authorization_code", "refresh_token"] as ["authorization_code", "refresh_token"],
   response_types: ["code"] as ["code"],
   token_endpoint_auth_method: "none",
   application_type: "web",
