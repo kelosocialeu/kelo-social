@@ -78,6 +78,11 @@ const TYPE_STYLES: Record<
     iconBackground: "from-blue-600 via-indigo-600 to-violet-600",
     iconText: "text-white",
   },
+  ai: {
+    border: "from-violet-500 via-fuchsia-500 to-pink-500",
+    iconBackground: "from-violet-600 via-fuchsia-600 to-pink-600",
+    iconText: "text-white",
+  },
 };
 
 const SIZE_CLASSES = {
