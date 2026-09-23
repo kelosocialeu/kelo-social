@@ -3,7 +3,22 @@ import { AtpAgent } from "@atproto/api";
 
 import {
   IDENTITY_VERIFICATION_COLLECTION,
+  IdentityVerificationType,
+  IdentityVerificationSource,
+  IdentityVerificationAssignmentMode,
 } from "@/lib/atproto/identity-verifications";
+
+function isVerificationType(value: unknown): value is IdentityVerificationType {
+  return ["human", "enterprise", "media", "university", "association", "institution", "ai"].includes(String(value));
+}
+
+function isVerificationSource(value: unknown): value is IdentityVerificationSource {
+  return value === "kelo-id" || value === "kelo-verify";
+}
+
+function isAssignmentMode(value: unknown): value is IdentityVerificationAssignmentMode {
+  return value === "automatic" || value === "manual";
+}
 
 function normalizeHandle(value: string): string {
   return value.trim().replace(/^@/, "").toLowerCase();
@@ -78,6 +93,10 @@ export async function POST(request: Request) {
         { error: "Accès réservé aux administrateurs." },
         { status: 403 }
       );
+    }
+
+    if (!isVerificationType(verificationType) || !isVerificationSource(source) || !isAssignmentMode(assignmentMode)) {
+      return NextResponse.json({ error: "Type de vérification invalide." }, { status: 400 });
     }
 
     const cleanHandle = targetHandle
