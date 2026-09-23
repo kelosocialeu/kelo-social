@@ -320,7 +320,7 @@ export default function BatchCertificationManager({
         </div>
       )}
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+      <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <Select
           label="Action à appliquer"
           value={status}
