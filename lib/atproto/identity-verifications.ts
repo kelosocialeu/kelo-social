@@ -11,7 +11,8 @@ export type IdentityVerificationType =
   | "media"
   | "university"
   | "association"
-  | "institution";
+  | "institution"
+  | "ai";
 
 export type IdentityVerificationSource = "kelo-id" | "kelo-verify";
 export type IdentityVerificationAssignmentMode = "automatic" | "manual";
@@ -48,7 +49,7 @@ function normalizeHandle(value: string): string {
 }
 
 function isIdentityVerificationType(value: unknown): value is IdentityVerificationType {
-  return ["human", "enterprise", "media", "university", "association", "institution"].includes(String(value));
+  return ["human", "enterprise", "media", "university", "association", "institution", "ai"].includes(String(value));
 }
 
 function isIdentityVerificationSource(value: unknown): value is IdentityVerificationSource {
@@ -191,6 +192,7 @@ export const IDENTITY_VERIFICATION_LABELS: Record<IdentityVerificationType, stri
   university: "Université vérifiée",
   association: "Association vérifiée",
   institution: "Institution vérifiée",
+  ai: "IA autorisée",
 };
 
 export const IDENTITY_VERIFICATION_SOURCE_LABELS: Record<IdentityVerificationSource, string> = {
