@@ -45,7 +45,8 @@ export default function MessagesPage() {
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [showMessagingSettings, setShowMessagingSettings] = useState(false);
-  const [showGroupCreation, setShowGroupCreation] = useState(false);\n  const [reportMemberDid, setReportMemberDid] = useState<string | null>(null);
+  const [showGroupCreation, setShowGroupCreation] = useState(false);
+  const [reportMemberDid, setReportMemberDid] = useState<string | null>(null);
 
   const {
     checked: verificationChecked,
