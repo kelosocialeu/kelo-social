@@ -37,7 +37,6 @@ import {
   IdentityVerificationType,
   IdentityVerificationSource,
   IDENTITY_VERIFICATION_LABELS,
-  IDENTITY_VERIFICATION_LABELS,
   IDENTITY_VERIFICATION_SOURCE_LABELS,
 } from "@/lib/atproto/identity-verifications";
 
