@@ -8,6 +8,7 @@ import Select from "@/components/ui/Select";
 import { getStoredSession } from "@/services/auth.service";
 
 type CertificationStatus = "certified" | "trusted-verifier" | "none";
+type CertificationCategory = "human" | "company" | "association" | "institution" | "media" | "university" | "ai";
 type AdminAction = CertificationStatus | "robot-on" | "robot-off";
 
 type Actor = {
@@ -30,6 +31,7 @@ export default function BatchCertificationManager({
   const [results, setResults] = useState<Actor[]>([]);
   const [selected, setSelected] = useState<Actor[]>([]);
   const [status, setStatus] = useState<AdminAction>("certified");
+  const [category, setCategory] = useState<CertificationCategory>("human");
   const [searching, setSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
@@ -131,6 +133,7 @@ export default function BatchCertificationManager({
                   targetHandle: normalizeHandle(actor.handle),
                   ...(targetDid ? { targetDid } : {}),
                   status: status as CertificationStatus,
+                  ...(status === "certified" ? { category } : {}),
                 };
 
             const response = await fetch(endpoint, {
@@ -329,6 +332,17 @@ export default function BatchCertificationManager({
           <option value="robot-on">🤖 Ajouter le logo robot</option>
           <option value="robot-off">Retirer le logo robot</option>
         </Select>
+        {status === "certified" && (
+          <Select label="Type de certification" value={category} onChange={(event) => setCategory(event.target.value as CertificationCategory)}>
+            <option value="human">👤 Humain</option>
+            <option value="company">🏢 Entreprise</option>
+            <option value="association">🤝 Association</option>
+            <option value="institution">🏛️ Institution</option>
+            <option value="media">📰 Média</option>
+            <option value="university">🎓 Université</option>
+            <option value="ai">🤖 IA</option>
+          </Select>
+        )}
         <Button
           type="button"
           onClick={applyToAll}
