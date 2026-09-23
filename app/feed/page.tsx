@@ -96,16 +96,35 @@ export default function FeedPage() {
     setSearching(true);
     setSearchError(null);
     const timeout = setTimeout(async () => {
+      let postFailed = false;
+      let actorFailed = false;
+
       try {
-        const [foundPosts, foundActors] = await Promise.all([searchNetworkPosts(trimmed), searchNetworkActors(trimmed)]);
-        setSearchPosts(formatSearchPosts(foundPosts));
+        const foundActors = await searchNetworkActors(trimmed);
         setSearchProfiles(foundActors);
       } catch (err) {
-        console.error("Search error:", err);
-        setSearchError(t("common.error", "La recherche a échoué. Réessayez dans un instant."));
-        setSearchPosts([]);
+        console.error("Account search error:", err);
+        actorFailed = true;
         setSearchProfiles([]);
+      }
+
+      try {
+        const foundPosts = await searchNetworkPosts(trimmed);
+        setSearchPosts(formatSearchPosts(foundPosts));
+      } catch (err) {
+        console.error("Post search error:", err);
+        postFailed = true;
+        setSearchPosts([]);
       } finally {
+        if (postFailed && actorFailed) {
+          setSearchError(t("common.error", "La recherche est temporairement indisponible. Réessayez dans un instant."));
+        } else if (postFailed) {
+          setSearchError(t("search.postsUnavailable", "Les publications ne sont temporairement pas disponibles. Les comptes restent consultables."));
+        } else if (actorFailed) {
+          setSearchError(t("search.accountsUnavailable", "Les comptes ne sont temporairement pas disponibles. Les publications restent consultables."));
+        } else {
+          setSearchError(null);
+        }
         setSearching(false);
       }
     }, 400);
