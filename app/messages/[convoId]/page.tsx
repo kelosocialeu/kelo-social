@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Laugh } from "lucide-react";
+import { Flag, Laugh } from "lucide-react";
 
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
 import AccountBadges from "@/components/ui/AccountBadges";
 import KeloEmojiPicker from "@/components/ui/KeloEmojiPicker";
+import MessageReactions from "@/components/messages/MessageReactions";
+import MessageTranslation from "@/components/messages/MessageTranslation";
+import MessageReportDialog from "@/components/messages/MessageReportDialog";
 import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useIdentityVerification } from "@/hooks/useIdentityVerification";
@@ -39,6 +42,7 @@ export default function ConversationPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [reportMemberDid, setReportMemberDid] = useState<string | null>(null);
   const { checked: verificationChecked, verified, dialogOpen, requireVerification, closeDialog } = useIdentityVerification();
   const bottomRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -129,26 +133,40 @@ export default function ConversationPage() {
   };
   const handleLogout = () => { localStorage.clear(); window.location.href = "/login"; };
 
+  const updateMessage = (updatedMessage: any) => {
+    if (!updatedMessage?.id) return;
+    setMessages((previous) => previous.map((message) =>
+      String(message.id) === String(updatedMessage.id) ? updatedMessage : message
+    ));
+  };
+
   if (!checked) return <div className="flex min-h-screen items-center justify-center bg-kelo-background font-sans text-kelo-muted">Vérification de votre session...</div>;
 
   return (
-    <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
+    <div className="flex min-h-[100dvh] w-full overflow-x-hidden bg-kelo-background font-sans text-kelo-text">
       <Sidebar handle={handle} onLogout={handleLogout} />
-      <main className="flex min-h-screen min-w-0 flex-1 flex-col border-x border-kelo-border bg-white shadow-kelo">
+      <main className="flex min-h-[100dvh] min-w-0 flex-1 flex-col border-x border-kelo-border bg-white shadow-kelo">
         <header className="sticky top-0 z-20 flex min-h-[78px] items-center gap-3 border-b border-kelo-border bg-white/95 px-4 py-3 backdrop-blur-md sm:px-5 lg:px-6">
           <button type="button" onClick={() => router.push("/messages")} aria-label="Retour aux discussions" className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-xl text-kelo-muted transition-colors hover:bg-kelo-background hover:text-kelo-text">←</button>
           {otherUser?.handle ? <Link href={`/profile/${otherUser.handle}`} className="flex min-w-0 items-center gap-3 rounded-xl transition-opacity hover:opacity-80"><Avatar src={otherUser.avatar} fallback={otherUser.handle?.[0]?.toUpperCase() || "U"} size="sm" /><div className="min-w-0"><div className="flex min-w-0 flex-wrap items-center gap-2"><h1 className="max-w-full truncate text-base font-extrabold text-kelo-text sm:text-lg">{otherUser.displayName}</h1><AccountBadges actor={otherUser} identitySize="sm" certificationSize={15} gap="xs" /></div><p className="truncate text-xs text-kelo-muted sm:text-sm">@{otherUser.handle}</p><p className="mt-0.5 text-[11px] text-kelo-muted sm:text-xs">Conversation privée</p></div></Link> : <div className="min-w-0"><h1 className="text-lg font-extrabold text-kelo-text">Discussion</h1><p className="text-xs text-kelo-muted">Conversation privée</p></div>}
           {refreshing && messages.length > 0 && <span className="ml-auto text-xs text-kelo-muted">Actualisation…</span>}
         </header>
         <section className="flex min-h-0 flex-1 flex-col">
-          <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-5 lg:px-6">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 pb-6 sm:px-5 lg:px-6">
             {loading && messages.length === 0 && <p className="py-10 text-center text-sm text-kelo-muted">Chargement...</p>}
             {error && messages.length === 0 && <p className="py-10 text-center text-sm text-kelo-danger">{error}</p>}
             {messages.map((message: any, index: number) => {
               const isMine = message.sender?.did === myDid;
               const senderHandle = message.sender?.handle || otherUser?.handle;
               const senderAvatar = message.sender?.avatar || otherUser?.avatar;
-              return <div key={message.id || index} className={`mb-4 flex items-end gap-2 ${isMine ? "justify-end" : "justify-start"}`}>{!isMine && senderHandle && <Link href={`/profile/${senderHandle}`} className="flex-shrink-0 transition-opacity hover:opacity-80"><Avatar src={senderAvatar} fallback={senderHandle[0]?.toUpperCase() || "U"} size="sm" /></Link>}<div className={`max-w-[78%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm sm:max-w-[68%] lg:max-w-[60%] ${isMine ? "rounded-br-md bg-kelo-gradient text-white" : "rounded-bl-md bg-kelo-background text-kelo-text"}`}>{message.text}</div></div>;
+              return <div key={message.id || index} className={`mb-4 flex items-end gap-2 ${isMine ? "justify-end" : "justify-start"}`}>{!isMine && senderHandle && <Link href={`/profile/${senderHandle}`} className="flex-shrink-0 transition-opacity hover:opacity-80"><Avatar src={senderAvatar} fallback={senderHandle[0]?.toUpperCase() || "U"} size="sm" /></Link>}<div className={`max-w-[78%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm sm:max-w-[68%] lg:max-w-[60%] ${isMine ? "rounded-br-md bg-kelo-gradient text-white" : "rounded-bl-md bg-kelo-background text-kelo-text"}`}><div className="relative w-full">
+                    <div className={`flex items-start gap-1 ${isMine ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[82%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm sm:max-w-[72%] lg:max-w-[60%] ${isMine ? "rounded-br-md bg-kelo-gradient text-white" : "rounded-bl-md bg-kelo-background text-kelo-text"}`}>{message.text}</div>
+                      {!isMine && message.sender?.did && <button type="button" onClick={() => setReportMemberDid(message.sender.did)} className="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-kelo-muted hover:bg-kelo-background hover:text-kelo-danger" aria-label="Signaler le message" title="Signaler"><Flag className="h-4 w-4" /></button>}
+                    </div>
+                    <MessageReactions convoId={convoId} message={message} myDid={myDid} onMessageUpdated={updateMessage} />
+                    <MessageTranslation text={message.text || ""} />
+                  </div></div>;
             })}
             {!loading && !error && messages.length === 0 && <div className="flex min-h-[50vh] items-center justify-center px-6"><div className="max-w-sm text-center"><div className="text-4xl" aria-hidden="true">💬</div><h2 className="mt-4 text-lg font-bold text-kelo-text">Commencez la discussion</h2><p className="mt-2 text-sm text-kelo-muted">Envoyez votre premier message.</p></div></div>}
             <div ref={bottomRef} />
@@ -167,6 +185,7 @@ export default function ConversationPage() {
           </form>
         </section>
       </main>
+      <MessageReportDialog open={!!reportMemberDid} memberDid={reportMemberDid || undefined} onClose={() => setReportMemberDid(null)} />
       <VerificationRequiredDialog open={dialogOpen} onClose={closeDialog} />
     </div>
   );
