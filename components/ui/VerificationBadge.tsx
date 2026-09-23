@@ -41,7 +41,7 @@ export default function VerificationBadge({ actor, size = 16 }: VerificationBadg
   const [nativeActor, setNativeActor] = useState<any>(cached?.nativeActor ?? actor);
   const [keloCertifications, setKeloCertifications] = useState<CertificationRecord[]>(cached?.kelo ?? []);
   const [suppressed, setSuppressed] = useState<boolean>(cached?.suppressed ?? false);
-    const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false);
   const [issuers, setIssuers] = useState<IssuerProfile[]>([]);
   const [loadingIssuer, setLoadingIssuer] = useState(false);
   const [issuerError, setIssuerError] = useState(false);
@@ -50,11 +50,10 @@ export default function VerificationBadge({ actor, size = 16 }: VerificationBadg
     let cancelled = false;
     async function load() {
       try {
-        const [publicVerification, allKeloRecords, localSuppression, identityRecord] = await Promise.all([
+        const [publicVerification, allKeloRecords, localSuppression] = await Promise.all([
           getPublicNativeVerification(actor),
           did ? listCertifications() : Promise.resolve([] as CertificationRecord[]),
           did ? isCertificationSuppressed(did) : Promise.resolve(false),
-          did ? getIdentityVerification(did) : Promise.resolve(null),
         ]);
         if (cancelled) return;
         const enriched = publicVerification ? { ...actor, verification: publicVerification } : actor;
