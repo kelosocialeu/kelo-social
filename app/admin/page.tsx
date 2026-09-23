@@ -37,6 +37,7 @@ import {
   IdentityVerificationType,
   IdentityVerificationSource,
   IDENTITY_VERIFICATION_LABELS,
+  IDENTITY_VERIFICATION_LABELS,
   IDENTITY_VERIFICATION_SOURCE_LABELS,
 } from "@/lib/atproto/identity-verifications";
 
@@ -50,6 +51,7 @@ type AccountSearchResult = {
   displayName: string;
   avatar: string | null;
   certificationStatus: VisibleCertificationStatus | null;
+  identityVerificationType?: IdentityVerificationType | null;
 };
 
 const IDENTITY_TYPE_ICONS: Record<IdentityVerificationType, typeof UserRoundCheck> = {
@@ -581,10 +583,9 @@ export default function AdminPage() {
                                     </p>
                                     {(() => {
                                       const record = getAccountCertificationRecord(account);
-                                      if (false) {
-                                        return null;
-                                      }
-                                      return currentCertification ? (
+                                      return account.identityVerificationType ? (
+                                        <IdentityVerificationBadge actor={account} size="sm" />
+                                      ) : currentCertification ? (
                                         <Badge status={currentCertification} size={18} />
                                       ) : null;
                                     })()}
