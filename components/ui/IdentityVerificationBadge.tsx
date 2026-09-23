@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
-  Bot,
   GraduationCap,
   HeartHandshake,
   Landmark,
@@ -30,14 +29,13 @@ interface IdentityVerificationBadgeProps {
   showLabel?: boolean;
 }
 
-const TYPE_ICONS: Record<IdentityVerificationType, typeof UserRound> = {
+const TYPE_ICONS: Record<Exclude<IdentityVerificationType, "ai">, typeof UserRound> = {
   human: UserRound,
   enterprise: Building2,
   media: Newspaper,
   university: GraduationCap,
   association: HeartHandshake,
   institution: Landmark,
-  ai: Bot,
 };
 
 const TYPE_STYLES: Record<
@@ -152,7 +150,8 @@ export default function IdentityVerificationBadge({
 
   if (loading || !record) return null;
 
-  const Icon = TYPE_ICONS[record.verificationType];
+  const isAi = record.verificationType === "ai";
+  const Icon = isAi ? null : TYPE_ICONS[record.verificationType as Exclude<IdentityVerificationType, "ai">];
   const style = TYPE_STYLES[record.verificationType];
   const sizing = SIZE_CLASSES[size];
 
@@ -171,7 +170,11 @@ export default function IdentityVerificationBadge({
       >
         <span className={`flex h-full w-full items-center gap-1 bg-slate-950/95 ${sizing.inner}`}>
           <span className={`flex flex-shrink-0 items-center justify-center bg-gradient-to-br ${style.iconBackground} ${sizing.iconWrapper}`}>
-            <Icon className={`${style.iconText} ${sizing.icon}`} />
+            {isAi ? (
+              <span className={`font-black tracking-tight text-white ${sizing.label}`}>AI</span>
+            ) : (
+              Icon && <Icon className={`${style.iconText} ${sizing.icon}`} />
+            )}
           </span>
 
           {showLabel && (
@@ -195,7 +198,11 @@ export default function IdentityVerificationBadge({
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${style.iconBackground}`}>
-                  <Icon className="h-6 w-6 text-white" />
+                  {isAi ? (
+                    <span className="text-lg font-black tracking-tight text-white">AI</span>
+                  ) : (
+                    Icon && <Icon className="h-6 w-6 text-white" />
+                  )}
                 </div>
                 <div>
                   <h2 id="identity-verification-title" className="text-base font-extrabold text-kelo-text">{label}</h2>
