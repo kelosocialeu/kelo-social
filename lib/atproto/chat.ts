@@ -275,7 +275,7 @@ export async function addConversationReaction(
   value: string
 ) {
   await requireIdentityVerification();
-  const emoji = Array.from(value.trim())[0];
+  const emoji = value.trim();
   if (!emoji) throw new Error("Réaction invalide.");
   const agent = await getChatAgent();
   const response = await agent.api.chat.bsky.convo.addReaction(
@@ -291,7 +291,7 @@ export async function removeConversationReaction(
   value: string
 ) {
   await requireIdentityVerification();
-  const emoji = Array.from(value.trim())[0];
+  const emoji = value.trim();
   if (!emoji) throw new Error("Réaction invalide.");
   const agent = await getChatAgent();
   const response = await agent.api.chat.bsky.convo.removeReaction(
