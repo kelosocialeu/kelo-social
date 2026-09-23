@@ -286,7 +286,6 @@ export default function AdminPage() {
               targetHandle: account.handle,
               status: certificationStatus,
               ...(certificationStatus === "certified"
-                ? { category: certificationCategory }
                 : {}),
             }),
           });
@@ -730,8 +729,6 @@ export default function AdminPage() {
                         <div className="flex items-center gap-2">
                           {user.category === "ai" ? (
                             <>
-                              <AICertificationBadge size={18} />
-                              <span className="text-xs font-bold text-violet-700">IA</span>
                             </>
                           ) : (
                             <Badge status={user.status} />
