@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   listCertifications,
   type CertificationStatus,
-  type CertificationCategory,
 } from "@/lib/atproto/certifications";
 import { listCertificationSuppressions } from "@/lib/atproto/certification-suppressions";
 
@@ -128,13 +127,13 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    const certificationsByDid = new Map<string, { status: CertificationStatus; category?: CertificationCategory }>();
+    const certificationsByDid = new Map<string, { status: CertificationStatus }>();
     for (const certification of certifications) {
       const did = normalizeDid(certification.subjectDid);
       const current = certificationsByDid.get(did);
 
       if (certification.status === "trusted-verifier" || !current) {
-        certificationsByDid.set(did, { status: certification.status, category: certification.category });
+        certificationsByDid.set(did, { status: certification.status });
       }
     }
 
@@ -169,7 +168,6 @@ export async function GET(request: NextRequest) {
         displayName: actor.displayName || actor.handle!,
         avatar: actor.avatar || null,
         certificationStatus,
-        certificationCategory: keloCertification?.category || null,
         sourceCertificationStatus,
         hiddenOnKelo,
         certificationSources: {
