@@ -3,7 +3,7 @@
 import { BrowserOAuthClient } from "@atproto/oauth-client-browser";
 
 export const KELO_PDS_OAUTH = "https://pds.kelosocial.eu";
-export const KELO_OAUTH_CLIENT_ID = "https://kelosocial.eu/oauth/client-metadata.json";
+export const KELO_OAUTH_CLIENT_ID = "https://kelosocial.eu/oauth-client-metadata.json";
 export const KELO_OAUTH_CALLBACK = "https://kelosocial.eu/signup/oauth/callback";
 
 const metadata = {
@@ -41,6 +41,7 @@ export async function startKeloPdsSignup() {
     state: "kelo-signup",
     scope: "atproto",
     ui_locales: "fr en",
+    prompt: "create",
   });
 }
 
