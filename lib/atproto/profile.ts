@@ -125,10 +125,18 @@ export async function getActorProfile(actor: string) {
   }
 }
 
+export type ActorFeedFilter =
+  | "posts_with_replies"
+  | "posts_no_replies"
+  | "posts_with_media"
+  | "posts_and_author_threads"
+  | "posts_with_video";
+
 export async function getActorFeed(
   actor: string,
   limit = 30,
-  cursor?: string
+  cursor?: string,
+  filter: ActorFeedFilter = "posts_with_replies"
 ) {
   const normalizedActor = normalizeActor(actor);
 
@@ -138,6 +146,7 @@ export async function getActorFeed(
         actor: normalizedActor,
         limit,
         cursor,
+        filter,
       });
       return { items: response.data.feed, cursor: response.data.cursor };
     },
@@ -146,6 +155,7 @@ export async function getActorFeed(
         actor: normalizedActor,
         limit,
         cursor,
+        filter,
       });
       return { items: response.data.feed, cursor: response.data.cursor };
     }
