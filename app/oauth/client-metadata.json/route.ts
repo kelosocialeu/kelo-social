@@ -4,7 +4,7 @@ export const dynamic = "force-static";
 
 export async function GET() {
   return NextResponse.json({
-    client_id: "https://kelosocial.eu/oauth/client-metadata.json",
+    client_id: "https://kelosocial.eu/oauth-client-metadata.json",
     client_name: "Kelo Social",
     client_uri: "https://kelosocial.eu",
     logo_uri: "https://kelosocial.sirv.com/logo.png",
