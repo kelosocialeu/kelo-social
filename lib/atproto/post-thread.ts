@@ -47,12 +47,9 @@ export async function getPostThread(
 
   const thread: any = response.data.thread;
 
-  // Pour une réponse, AT Protocol fournit son parent dans `parent`.
-  // Retourner ce parent fait ouvrir la conversation sur le post auquel
-  // l’utilisateur répondait, plutôt que sur la réponse elle-même.
-  if (thread?.parent?.post?.uri) {
-    return thread.parent;
-  }
-
+  // Toujours conserver exactement la publication demandée comme racine.
+  // `parent` est uniquement le contexte amont fourni par AT Protocol :
+  // le remplacer ici pouvait faire disparaître les réponses attachées à
+  // la publication isolée affichée par l’utilisateur.
   return thread;
 }
