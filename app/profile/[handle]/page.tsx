@@ -192,7 +192,14 @@ export default function ProfilePage() {
       }
 
       if (activeTab === "Posts") {
-        const response = await getActorFeed(targetHandle, 30, cursor);
+        // "Posts" = publications de l’auteur + republications.
+        // Les réponses sont explicitement exclues au niveau AT Protocol.
+        const response = await getActorFeed(
+          targetHandle,
+          30,
+          cursor,
+          "posts_no_replies"
+        );
         return {
           items: formatFeed(response.items),
           cursor: response.cursor,
@@ -213,9 +220,12 @@ export default function ProfilePage() {
         };
       }
 
-      const filter = activeTab === "Média" || activeTab === "Vidéos"
-        ? "posts_with_media"
-        : "posts_with_replies";
+      const filter =
+        activeTab === "Réponses"
+          ? "posts_with_replies"
+          : activeTab === "Vidéos"
+            ? "posts_with_video"
+            : "posts_with_media";
 
       const response = await (agent.api.app.bsky.feed as any).getAuthorFeed({
         actor: targetHandle,
@@ -228,9 +238,9 @@ export default function ProfilePage() {
       const filteredFeed =
         activeTab === "Réponses"
           ? rawFeed.filter(isReply)
-          : activeTab === "Vidéos"
-            ? rawFeed.filter(isVideoPost)
-            : rawFeed.filter(isMediaPost);
+          : rawFeed.filter((item: any) => !isReply(item)).filter(
+              activeTab === "Vidéos" ? isVideoPost : isMediaPost
+            );
 
       return {
         items: formatFeed(filteredFeed),
