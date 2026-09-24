@@ -428,6 +428,7 @@ export default function ProfilePage() {
                     <FollowButton
                       did={profile.did}
                       initialFollowingUri={profile?.viewer?.following ?? null}
+                      initialFollowedByUri={profile?.viewer?.followedBy ?? null}
                     />
                     <ProfileMoreMenu
                       did={profile.did}
