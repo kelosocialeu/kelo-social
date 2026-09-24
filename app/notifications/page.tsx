@@ -193,7 +193,14 @@ export default function NotificationsPage() {
                   </span>
                   <AccountBadges actor={notification.author} identitySize="sm" certificationSize={15} gap="xs" />
                   {notification.author?.handle && (
-                    <span className="max-w-full truncate text-xs text-kelo-muted">@{notification.author.handle}</span>
+                    <Link
+                      href={`/profile/${encodeURIComponent(notification.author.handle)}`}
+                      onClick={(event) => event.stopPropagation()}
+                      className="max-w-full truncate text-xs font-semibold text-kelo-primary hover:underline"
+                      aria-label={`Voir le profil @${notification.author.handle}`}
+                    >
+                      @${notification.author.handle}
+                    </Link>
                   )}
                 </div>
                 <p className="mt-1 text-sm text-kelo-muted">
