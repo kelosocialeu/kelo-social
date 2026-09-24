@@ -34,8 +34,8 @@ export default function PostEmbed({ embed }: PostEmbedProps) {
     const selected = openImage === null ? null : images[openImage];
     return <>
       <div className={`mt-3 grid gap-1 overflow-hidden rounded-2xl border border-kelo-border ${images.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
-        {images.map((img: any, i: number) => <button key={i} type="button" className="block min-h-0 cursor-zoom-in overflow-hidden bg-black/5" onClick={(e) => { e.stopPropagation(); setOpenImage(i); }} aria-label="Agrandir l’image">
-          <img src={img.thumb} alt={img.alt || ""} className="h-full max-h-96 w-full object-cover transition-transform duration-200 hover:scale-[1.01]" />
+        {images.map((img: any, i: number) => <button key={i} type="button" className="flex min-h-0 cursor-zoom-in items-center justify-center overflow-hidden bg-black/5" onClick={(e) => { e.stopPropagation(); setOpenImage(i); }} aria-label="Agrandir l’image">
+          <img src={img.thumb} alt={img.alt || ""} className="h-auto max-h-[32rem] min-h-0 w-full object-contain transition-transform duration-200 hover:scale-[1.01]" />
         </button>)}
       </div>
       {selected && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Image agrandie" onClick={(e) => { e.stopPropagation(); setOpenImage(null); }}>
