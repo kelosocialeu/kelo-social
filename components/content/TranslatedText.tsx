@@ -14,8 +14,7 @@ function LinkifiedBio({ text }: { text: string }) {
     <p className="whitespace-pre-wrap leading-relaxed">
       {parts.map((part, index) => {
         if (!part) return null;
-        if (URL_PATTERN.test(part)) {
-          URL_PATTERN.lastIndex = 0;
+        if (/^(https?:\/\/|www\.)/i.test(part)) {
           const href = part.startsWith("http") ? part : `https://${part}`;
           return (
             <a key={`url-${index}`} href={href} target="_blank" rel="noopener noreferrer" className="break-all font-semibold text-kelo-primary hover:underline">
