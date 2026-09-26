@@ -34,6 +34,13 @@ type PaletteDefinition = {
 const solid = (color: string) => `linear-gradient(90deg,${color} 0%,${color} 100%)`;
 
 export const KELO_PALETTES: Record<KeloPalette, PaletteDefinition> = {
+  custom: {
+    primary: "#7d4cff",
+    primaryRgb: "125 76 255",
+    secondary: "#d54cff",
+    secondaryRgb: "213 76 255",
+    gradient: solid("#7d4cff"),
+  },
   default: {
     primary: "#7d4cff",
     primaryRgb: "125 76 255",
