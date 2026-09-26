@@ -27,7 +27,6 @@ function CertifiedBadge({ size }: { size: number }) {
       xmlns="http://www.w3.org/2000/svg"
       role="img"
       aria-label={LABELS.certified}
-      title={LABELS.certified}
       className="inline-block flex-shrink-0"
     >
       <defs>
