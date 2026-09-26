@@ -44,7 +44,7 @@ const CLASSIC_PALETTES: Array<{ key: KeloPalette; label: string }> = [
 ];
 
 export default function DisplaySection() {
-  const [prefs, setPrefs] = useState<DisplayPreferences>(() => ({ theme: "system", textScale: "100", reduceMotion: false, palette: "default" }));
+  const [prefs, setPrefs] = useState<DisplayPreferences>(() => ({ theme: "system", textScale: "100", reduceMotion: false, palette: "default", customColor: "#7d4cff" }));
 
   useEffect(() => { setPrefs(getDisplayPreferences()); }, []);
 
