@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LogOut } from "lucide-react";
+import { LogOut, Settings2 } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import SettingsNav,{SettingsSection} from "@/components/settings/SettingsNav";
 import AccountSection from "@/components/settings/AccountSection";
@@ -19,22 +19,66 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useTranslation } from "@/components/providers/TranslationProvider";
 
 const SECTION_KEYS:Record<SettingsSection,[string,string]>={
-  account:["settings.account","Compte et sécurité"], identity:["settings.identity","Identité et domaine"], moderation:["settings.moderation","Modération"], privacy:["settings.privacy","Confidentialité"], appearance:["settings.display","Affichage"], language:["settings.languageContent","Langues et centres d’intérêt"], notifications:["settings.notifications","Notifications et flux"], messaging:["settings.messaging","Messagerie"], legal:["settings.legal","Informations juridiques"],
+  account:["settings.account","Compte et sécurité"],identity:["settings.identity","Identité et domaine"],moderation:["settings.moderation","Modération"],privacy:["settings.privacy","Confidentialité"],appearance:["settings.display","Affichage"],language:["settings.languageContent","Langues et centres d’intérêt"],notifications:["settings.notifications","Notifications et flux"],messaging:["settings.messaging","Messagerie"],legal:["settings.legal","Informations juridiques"],
 };
 
 export default function SettingsPage(){
-  const {checked,handle}=useRequireAuth(); const {t}=useTranslation(); const [section,setSection]=useState<SettingsSection>("account");
-  const [sectionKey,sectionFallback]=SECTION_KEYS[section]; const sectionTitle=t(sectionKey,sectionFallback);
+  const {checked,handle}=useRequireAuth();
+  const {t}=useTranslation();
+  const [section,setSection]=useState<SettingsSection>("account");
+  const [sectionKey,sectionFallback]=SECTION_KEYS[section];
+  const sectionTitle=t(sectionKey,sectionFallback);
   const handleLogout=()=>{localStorage.clear();window.location.href="/login"};
-  if(!checked)return <div className="flex min-h-screen items-center justify-center bg-kelo-background font-sans text-kelo-muted">{t("common.loading","Vérification de votre session...")}</div>;
-  return <div className="flex min-h-screen w-full bg-kelo-background font-sans text-kelo-text">
+
+  if(!checked)return <div className="flex min-h-screen items-center justify-center bg-kelo-background px-5 text-center font-sans text-kelo-muted">{t("common.loading","Vérification de votre session...")}</div>;
+
+  return <div className="settings-page min-h-screen w-full font-sans text-kelo-text">
     <Sidebar handle={handle} onLogout={handleLogout}/>
-    <main className="min-h-screen min-w-0 flex-1 bg-white pb-24 md:border-x md:border-kelo-border md:pb-0">
-      <header className="sticky top-[calc(56px+env(safe-area-inset-top))] z-20 border-b border-kelo-border bg-white/95 px-4 py-3.5 backdrop-blur md:top-0 sm:px-5 md:py-4"><div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4"><div className="min-w-0"><h1 className="text-xl font-extrabold text-kelo-text">{t("settings.title","Paramètres")}</h1>{handle&&<p className="mt-0.5 truncate text-sm text-kelo-muted">@{handle}</p>}</div><button type="button" onClick={handleLogout} className="flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-kelo-border px-3 text-sm font-bold text-kelo-muted transition hover:bg-red-50 hover:text-red-600 lg:hidden"><LogOut className="h-4 w-4"/><span className="hidden sm:inline">{t("nav.logout","Déconnexion")}</span></button></div></header>
-      <div className="mx-auto grid w-full max-w-7xl md:grid-cols-[250px_minmax(0,1fr)] lg:grid-cols-[290px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="border-b border-kelo-border md:sticky md:top-[73px] md:h-[calc(100vh-73px)] md:self-start md:overflow-y-auto md:border-b-0 md:border-r"><SettingsNav active={section} onChange={setSection}/><div className="hidden border-t border-kelo-border p-3 lg:block"><button type="button" onClick={handleLogout} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-red-50"><LogOut className="h-[19px] w-[19px]"/></span>{t("nav.logout","Se déconnecter")}</button></div></aside>
-        <section className="min-w-0 bg-white"><div className="border-b border-kelo-border px-4 py-3.5 sm:px-6 md:px-7 md:py-5"><h2 className="text-lg font-bold text-kelo-text">{sectionTitle}</h2></div><div className="settings-bluesky-section min-w-0">{section==="account"&&<><AccountSection/><RobotAccountSection/></>}{section==="identity"&&<IdentitySection/>}{section==="appearance"&&<KeloIdFeatureLock feature="les paramètres d’affichage" mode="block"><DisplaySection/></KeloIdFeatureLock>}{section==="moderation"&&<ModerationSection/>}{section==="privacy"&&<PrivacySection/>}{section==="notifications"&&<NotificationFeedSection/>}{section==="language"&&<LanguageContentSection/>}{section==="messaging"&&<MessagingSection/>}{section==="legal"&&<LegalSection/>}</div></section>
+    <main className="settings-main min-w-0 flex-1 pb-24 md:pb-8">
+      <header className="settings-header">
+        <div className="settings-header-inner">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="settings-header-icon"><Settings2 className="h-4 w-4"/></span>
+              <span className="text-xs font-bold uppercase tracking-[.14em] text-kelo-muted">Kelo Social</span>
+            </div>
+            <h1>{t("settings.title","Paramètres")}</h1>
+            {handle&&<p>@{handle}</p>}
+          </div>
+          <button type="button" onClick={handleLogout} className="settings-logout-mobile lg:hidden">
+            <LogOut className="h-4 w-4"/><span className="hidden sm:inline">{t("nav.logout","Déconnexion")}</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="settings-layout">
+        <aside className="settings-sidebar">
+          <SettingsNav active={section} onChange={setSection}/>
+          <div className="settings-sidebar-logout hidden lg:block">
+            <button type="button" onClick={handleLogout}><LogOut className="h-[18px] w-[18px]"/>{t("nav.logout","Se déconnecter")}</button>
+          </div>
+        </aside>
+
+        <section className="settings-content">
+          <div className="settings-content-head">
+            <div className="min-w-0">
+              <p>{t("settings.title","Paramètres")}</p>
+              <h2>{sectionTitle}</h2>
+            </div>
+          </div>
+          <div className="settings-content-body">
+            {section==="account"&&<><AccountSection/><RobotAccountSection/></>}
+            {section==="identity"&&<IdentitySection/>}
+            {section==="appearance"&&<KeloIdFeatureLock feature="les paramètres d’affichage" mode="block"><DisplaySection/></KeloIdFeatureLock>}
+            {section==="moderation"&&<ModerationSection/>}
+            {section==="privacy"&&<PrivacySection/>}
+            {section==="notifications"&&<NotificationFeedSection/>}
+            {section==="language"&&<LanguageContentSection/>}
+            {section==="messaging"&&<MessagingSection/>}
+            {section==="legal"&&<LegalSection/>}
+          </div>
+        </section>
       </div>
     </main>
-  </div>
+  </div>;
 }
