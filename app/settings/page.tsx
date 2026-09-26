@@ -32,7 +32,7 @@ export default function SettingsPage(){
 
   if(!checked)return <div className="flex min-h-screen items-center justify-center bg-kelo-background px-5 text-center font-sans text-kelo-muted">{t("common.loading","Vérification de votre session...")}</div>;
 
-  return <div className="settings-page min-h-screen w-full font-sans text-kelo-text">
+  return <div className="settings-page min-h-screen w-full font-sans text-kelo-text md:flex">
     <Sidebar handle={handle} onLogout={handleLogout}/>
     <main className="settings-main min-w-0 flex-1 pb-24 md:pb-8">
       <header className="settings-header">
