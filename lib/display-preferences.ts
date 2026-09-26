@@ -12,13 +12,15 @@ export type KeloPalette =
   | "classic-rose"
   | "classic-orange"
   | "classic-red"
-  | "classic-black";
+  | "classic-black"
+  | "custom";
 
 export interface DisplayPreferences {
   theme: KeloTheme;
   textScale: TextScale;
   reduceMotion: boolean;
   palette: KeloPalette;
+  customColor: string;
 }
 
 type PaletteDefinition = {
@@ -92,11 +94,38 @@ export const KELO_PALETTES: Record<KeloPalette, PaletteDefinition> = {
 
 const STORAGE_KEY = "kelo.display.preferences";
 
+function hexToRgb(hex: string): [number, number, number] {
+  const value = hex.replace("#", "");
+  const normalized = value.length === 3 ? value.split("").map((x) => x + x).join("") : value;
+  const n = Number.parseInt(normalized, 16);
+  if (!Number.isFinite(n)) return [125, 76, 255];
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function customPalette(color: string): PaletteDefinition {
+  const [r, g, b] = hexToRgb(color);
+  const secondary = [
+    Math.min(255, Math.round(r * 0.78 + 255 * 0.22)),
+    Math.min(255, Math.round(g * 0.55 + 90 * 0.45)),
+    Math.min(255, Math.round(b * 0.9 + 255 * 0.1)),
+  ];
+  const secondaryRgb = secondary.join(" ");
+  const secondaryCss = `rgb(${secondaryRgb})`;
+  return {
+    primary: color,
+    primaryRgb: `${r} ${g} ${b}`,
+    secondary: secondaryCss,
+    secondaryRgb,
+    gradient: `linear-gradient(135deg, ${color} 0%, ${color} 52%, ${secondaryCss} 100%)`,
+  };
+}
+
 export const DEFAULT_DISPLAY_PREFERENCES: DisplayPreferences = {
   theme: "system",
   textScale: "100",
   reduceMotion: false,
   palette: "default",
+  customColor: "#7d4cff",
 };
 
 export function getDisplayPreferences(): DisplayPreferences {
@@ -114,7 +143,7 @@ export function applyDisplayPreferences(prefs: DisplayPreferences): void {
 
   const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
   const dark = prefs.theme === "dark" || (prefs.theme === "system" && prefersDark);
-  const palette = KELO_PALETTES[prefs.palette] || KELO_PALETTES.default;
+  const palette = prefs.palette === "custom" ? customPalette(prefs.customColor) : (KELO_PALETTES[prefs.palette] || KELO_PALETTES.default);
   const root = document.documentElement;
 
   root.classList.toggle("kelo-theme-dark", dark);
