@@ -12,12 +12,54 @@ const LABELS: Record<CertificationStatus, string> = {
   "trusted-verifier": "Certificateur de confiance",
 };
 
-// Images hébergées sur Sirv : rond dégradé pour "certifié",
-// fleur à pétales dégradée pour "certificateur de confiance".
-const IMAGES: Record<CertificationStatus, string> = {
-  certified: "https://kelosocial.sirv.com/ChatGPT%20Image%2025%20juil.%202026%2C%2022_56_32.png",
-  "trusted-verifier": "https://kelosocial.sirv.com/1784816368891-removebg-preview.png",
-};
+// Le badge de certification est rendu directement en SVG pour éviter toute
+// dépendance à une image distante. Le badge "certificateur de confiance"
+// conserve son visuel existant.
+const TRUSTED_VERIFIER_IMAGE =
+  "https://kelosocial.sirv.com/1784816368891-removebg-preview.png";
+
+function CertifiedBadge({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 1024 1024"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label={LABELS.certified}
+      title={LABELS.certified}
+      className="inline-block flex-shrink-0"
+    >
+      <defs>
+        <linearGradient
+          id="kelo-certified-gradient"
+          x1="12%"
+          y1="8%"
+          x2="88%"
+          y2="92%"
+        >
+          <stop offset="0%" stopColor="#55B8FF" />
+          <stop offset="52%" stopColor="#6578F5" />
+          <stop offset="100%" stopColor="#B347FF" />
+        </linearGradient>
+      </defs>
+      <circle
+        cx="512"
+        cy="512"
+        r="374"
+        fill="url(#kelo-certified-gradient)"
+      />
+      <path
+        d="M320 540 L462 682 L715 405"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth="74"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export default function Badge({ status, size = 18 }: BadgeProps) {
   // "none" signifie notamment qu'une certification existe peut-être encore
@@ -26,9 +68,13 @@ export default function Badge({ status, size = 18 }: BadgeProps) {
     return null;
   }
 
+  if (status === "certified") {
+    return <CertifiedBadge size={size} />;
+  }
+
   return (
     <img
-      src={IMAGES[status]}
+      src={TRUSTED_VERIFIER_IMAGE}
       alt={LABELS[status]}
       title={LABELS[status]}
       style={{ width: size, height: size }}
