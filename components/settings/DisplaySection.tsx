@@ -71,6 +71,26 @@ export default function DisplaySection() {
           })}
         </div>
 
+        <div className="mt-6 rounded-2xl border border-kelo-border bg-kelo-background/40 p-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h4 className="text-sm font-extrabold text-kelo-text">Votre couleur</h4>
+              <p className="mt-1 text-xs leading-5 text-kelo-muted">Choisissez votre propre couleur d’accent. Kelo Social crée automatiquement un dégradé assorti et l’applique à toute l’interface.</p>
+            </div>
+            <label className="flex shrink-0 items-center gap-3 rounded-xl border border-kelo-border bg-white px-3 py-2">
+              <input
+                type="color"
+                value={prefs.customColor}
+                onChange={(event) => update({ palette: "custom", customColor: event.target.value })}
+                className="h-10 w-10 cursor-pointer rounded-lg border-0 bg-transparent p-0"
+                aria-label="Choisir une couleur personnalisée"
+              />
+              <span className="font-mono text-xs font-bold text-kelo-text">{prefs.customColor.toUpperCase()}</span>
+            </label>
+          </div>
+          <div className="mt-3 h-3 rounded-full" style={{ background: prefs.palette === "custom" ? KELO_PALETTES.default.gradient.replace(/#[0-9a-f]{6}/gi, prefs.customColor) : "var(--gradient)" }} />
+        </div>
+
         <h4 className="mt-6 text-sm font-extrabold text-kelo-text">Couleurs classiques</h4>
         <p className="mt-1 text-xs leading-5 text-kelo-muted">Pour une interface plus sobre, sans dégradé.</p>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
