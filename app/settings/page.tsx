@@ -14,7 +14,6 @@ import NotificationFeedSection from "@/components/settings/NotificationFeedSecti
 import LanguageContentSection from "@/components/settings/LanguageContentSection";
 import MessagingSection from "@/components/settings/MessagingSection";
 import LegalSection from "@/components/settings/LegalSection";
-import KeloIdFeatureLock from "@/components/verification/KeloIdFeatureLock";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useTranslation } from "@/components/providers/TranslationProvider";
 
@@ -69,7 +68,7 @@ export default function SettingsPage(){
           <div className="settings-content-body">
             {section==="account"&&<><AccountSection/><RobotAccountSection/></>}
             {section==="identity"&&<IdentitySection/>}
-            {section==="appearance"&&<KeloIdFeatureLock feature="les paramètres d’affichage" mode="block"><DisplaySection/></KeloIdFeatureLock>}
+            {section==="appearance"&&<DisplaySection/>}
             {section==="moderation"&&<ModerationSection/>}
             {section==="privacy"&&<PrivacySection/>}
             {section==="notifications"&&<NotificationFeedSection/>}
