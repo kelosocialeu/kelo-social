@@ -32,7 +32,7 @@ export default function SettingsNav({active,onChange}:SettingsNavProps){
   const {t}=useTranslation();
   return (
     <>
-      <div className="settings-mobile-nav md:hidden">
+      <div className="settings-mobile-nav xl:hidden">
         <div className="settings-mobile-scroll" role="tablist" aria-label={t("settings.sections","Sections des paramètres")}>
           {GROUPS.map(group=>group.items.map(item=>{
             const Icon=item.icon, selected=active===item.key;
@@ -45,7 +45,7 @@ export default function SettingsNav({active,onChange}:SettingsNavProps){
         </div>
       </div>
 
-      <nav className="settings-desktop-nav hidden md:block" aria-label={t("settings.sections","Sections des paramètres")}>
+      <nav className="settings-desktop-nav hidden xl:block" aria-label={t("settings.sections","Sections des paramètres")}>
         {GROUPS.map(group=>(
           <section key={group.titleKey} className="settings-nav-group">
             <h2>{t(group.titleKey,group.titleFallback)}</h2>
