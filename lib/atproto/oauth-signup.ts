@@ -3,8 +3,10 @@
 import { BrowserOAuthClient } from "@atproto/oauth-client-browser";
 
 export const KELO_PDS_OAUTH = "https://pds.kelosocial.eu";
-export const KELO_OAUTH_CLIENT_ID = "https://kelosocial.eu/oauth-client-metadata.json";
-export const KELO_OAUTH_CALLBACK = "https://kelosocial.eu/signup/oauth/callback";
+export const KELO_OAUTH_CLIENT_ID =
+  "https://kelosocial.eu/oauth-client-metadata.json";
+export const KELO_OAUTH_CALLBACK =
+  "https://kelosocial.eu/signup/oauth/callback";
 
 const metadata = {
   client_id: KELO_OAUTH_CLIENT_ID,
@@ -15,7 +17,10 @@ const metadata = {
   policy_uri: "https://kelosocial.eu/privacy",
   redirect_uris: [KELO_OAUTH_CALLBACK] as [string],
   scope: "atproto",
-  grant_types: ["authorization_code", "refresh_token"] as ["authorization_code", "refresh_token"],
+  grant_types: ["authorization_code", "refresh_token"] as [
+    "authorization_code",
+    "refresh_token",
+  ],
   response_types: ["code"] as ["code"],
   token_endpoint_auth_method: "none" as const,
   application_type: "web" as const,
@@ -32,14 +37,15 @@ export function getKeloOAuthClient() {
       responseMode: "query",
     });
   }
+
   return client;
 }
 
 export async function startKeloPdsSignup() {
   sessionStorage.setItem("kelo-oauth-return", "/login");
+
   await getKeloOAuthClient().signIn(KELO_PDS_OAUTH, {
     scope: "atproto",
-    prompt: "create",
   });
 }
 
