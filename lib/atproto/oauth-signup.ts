@@ -46,6 +46,7 @@ export async function startKeloPdsSignup() {
 
   await getKeloOAuthClient().signIn(KELO_PDS_OAUTH, {
     scope: "atproto",
+    prompt: "create",
   });
 }
 
