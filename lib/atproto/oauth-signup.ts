@@ -38,9 +38,7 @@ export function getKeloOAuthClient() {
 export async function startKeloPdsSignup() {
   sessionStorage.setItem("kelo-oauth-return", "/login");
   await getKeloOAuthClient().signIn(KELO_PDS_OAUTH, {
-    state: "kelo-signup",
     scope: "atproto",
-    ui_locales: "fr en",
     prompt: "create",
   });
 }
