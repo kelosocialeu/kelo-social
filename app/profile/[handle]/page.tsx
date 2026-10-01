@@ -235,12 +235,42 @@ export default function ProfilePage() {
       });
 
       const rawFeed = response?.data?.feed || [];
-      const filteredFeed =
-        activeTab === "Réponses"
-          ? rawFeed.filter(isReply)
-          : rawFeed.filter((item: any) => !isReply(item)).filter(
-              activeTab === "Vidéos" ? isVideoPost : isMediaPost
-            );
+
+      if (activeTab === "Réponses") {
+        const parentUris = Array.from(new Set(
+          rawFeed
+            .filter(isReply)
+            .map((item: any) => item?.post?.record?.reply?.parent?.uri)
+            .filter((value: unknown): value is string => typeof value === "string")
+        ));
+
+        let parents = new Map<string, any>();
+        if (parentUris.length > 0) {
+          try {
+            const parentResponse = await agent.api.app.bsky.feed.getPosts({ uris: parentUris });
+            parents = new Map(parentResponse.data.posts.map((post: any) => [post.uri, post]));
+          } catch (error) {
+            console.warn("Impossible de charger les publications parentes des réponses :", error);
+          }
+        }
+
+        const repliesWithParents = rawFeed
+          .filter(isReply)
+          .map((item: any) => {
+            const formatted = formatFeed([item])[0];
+            const parentUri = item?.post?.record?.reply?.parent?.uri;
+            return formatted ? { ...formatted, parentPost: parents.get(parentUri) || null } : null;
+          })
+          .filter(Boolean);
+
+        return {
+          items: repliesWithParents,
+          cursor: response?.data?.cursor,
+        };
+      }
+      const filteredFeed = rawFeed.filter((item: any) => !isReply(item)).filter(
+        activeTab === "Vidéos" ? isVideoPost : isMediaPost
+      );
 
       return {
         items: formatFeed(filteredFeed),
@@ -342,6 +372,54 @@ export default function ProfilePage() {
           myHandle && post?.author?.handle?.toLowerCase() === myHandle.toLowerCase()
         );
 
+        if (activeTab === "Réponses") {
+          const parent = post.parentPost;
+          return (
+            <div key={post.uri} className="relative border-b border-kelo-border p-4 sm:p-5">
+              {parent && (
+                <div className="relative ml-2 pl-7">
+                  <div className="absolute left-2 top-0 bottom-0 w-px bg-kelo-border" aria-hidden="true" />
+                  <div className="absolute left-2 bottom-0 h-6 w-5 rounded-bl-2xl border-b border-l border-kelo-border" aria-hidden="true" />
+                  <div className="rounded-2xl border border-kelo-border/80 bg-kelo-background/45 p-3">
+                    <p className="mb-2 text-xs font-bold text-kelo-muted">En réponse à @{parent.author?.handle}</p>
+                    <PostCard post={{
+                      uri: parent.uri,
+                      cid: parent.cid,
+                      author: parent.author,
+                      record: parent.record,
+                      embed: parent.embed,
+                      likeCount: parent.likeCount || 0,
+                      repostCount: parent.repostCount || 0,
+                      replyCount: parent.replyCount || 0,
+                      viewer: parent.viewer || {},
+                    }} disableThreadLink />
+                  </div>
+                </div>
+              )}
+              <div className="relative mt-1 ml-2 pl-7">
+                <div className="absolute left-2 top-0 h-7 w-5 rounded-tl-2xl border-l border-t border-kelo-border" aria-hidden="true" />
+                <PostCard
+                  post={post}
+                  isMine={postIsMine}
+                  isBookmarked={isBookmarked(post.uri)}
+                  replyOpen={activeReplyUri === post.uri}
+                  replyText={replyText}
+                  onToggleReply={() => setActiveReplyUri(activeReplyUri === post.uri ? null : post.uri)}
+                  onReplyTextChange={setReplyText}
+                  onSendReply={() => {
+                    setReplyText("");
+                    setActiveReplyUri(null);
+                  }}
+                  onBookmark={() => toggleBookmark(post)}
+                  onDelete={() => handleDelete(post.uri)}
+                  onBlocked={handleModeration}
+                  onMuted={handleModeration}
+                />
+              </div>
+            </div>
+          );
+        }
+
         return (
           <PostCard
             key={post.uri}
@@ -350,9 +428,8 @@ export default function ProfilePage() {
             isBookmarked={isBookmarked(post.uri)}
             replyOpen={activeReplyUri === post.uri}
             replyText={replyText}
-            onToggleReply={() =>
-              setActiveReplyUri(activeReplyUri === post.uri ? null : post.uri)
-            }
+            onToggleReply={() => setActiveReplyUri(activeReplyUri === post.uri ? null : post.uri)}
+            replyText={replyText}
             onReplyTextChange={setReplyText}
             onSendReply={() => {
               setReplyText("");
