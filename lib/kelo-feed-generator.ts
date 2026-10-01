@@ -4,10 +4,10 @@ const APPVIEW_URL = "https://public.api.bsky.app";
 const SOURCE_FEED = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot";
 
 export const KELO_FEED_GENERATOR_DID =
-  process.env.KELO_FEED_GENERATOR_PUBLISHER_DID || "did:web:feeds.kelosocial.eu";
+  process.env.KELO_FEED_GENERATOR_SERVICE_DID || "did:web:kelosocial.eu";
 
 export const KELO_FEED_SERVICE_URL =
-  process.env.KELO_FEED_GENERATOR_SERVICE_URL || "https://feeds.kelosocial.eu";
+  process.env.KELO_FEED_GENERATOR_SERVICE_URL || "https://kelosocial.eu";
 
 export const KELO_FEED_URIS = {
   "very-low": `at://${KELO_FEED_GENERATOR_DID}/app.bsky.feed.generator/kelo-very-low`,
