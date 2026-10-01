@@ -458,21 +458,38 @@ function PostThreadContent() {
               </div>
 
               {threadReplies.length > 0 ? (
-                <div className="divide-y divide-kelo-border">
-                  {threadReplies.map((node) => (
-                    <ThreadReply
-                      key={node.post.uri}
-                      node={node}
-                      myDid={myDid}
-                      activeReplyUri={activeReplyUri}
-                      replyText={replyText}
-                      setActiveReplyUri={setActiveReplyUri}
-                      setReplyText={setReplyText}
-                      onReplySent={handleReplySubmit}
-                      onBookmark={toggleBookmark}
-                      onDelete={handleDelete}
-                    />
-                  ))}
+                <div className="relative ml-6 border-l-2 border-kelo-border pl-4">
+                  {threadReplies.map((node, index) => {
+                    const isLast = index === threadReplies.length - 1;
+
+                    return (
+                      <div key={node.post.uri} className="relative">
+                        <span
+                          aria-hidden="true"
+                          className="absolute -left-4 top-7 h-px w-4 bg-kelo-border"
+                        />
+
+                        {isLast && (
+                          <span
+                            aria-hidden="true"
+                            className="absolute -left-5 top-0 bottom-0 w-1 bg-white"
+                          />
+                        )}
+
+                        <ThreadReply
+                          node={node}
+                          myDid={myDid}
+                          activeReplyUri={activeReplyUri}
+                          replyText={replyText}
+                          setActiveReplyUri={setActiveReplyUri}
+                          setReplyText={setReplyText}
+                          onReplySent={handleReplySubmit}
+                          onBookmark={toggleBookmark}
+                          onDelete={handleDelete}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="px-6 py-12 text-center">
