@@ -62,10 +62,17 @@ export default function FeedPage() {
   const [searchPosts, setSearchPosts] = useState<any[] | null>(null);
   const [searchProfiles, setSearchProfiles] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>("pourvous");
+  const [algorithmRevision, setAlgorithmRevision] = useState(0);
   const [loadingPost, setLoadingPost] = useState(false);
   const [activeReplyUri, setActiveReplyUri] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const { isBookmarked, toggleBookmark } = useBookmarks();
+
+  useEffect(() => {
+    const onAlgorithmChange = () => setAlgorithmRevision((value) => value + 1);
+    window.addEventListener("kelo-algorithm-changed", onAlgorithmChange);
+    return () => window.removeEventListener("kelo-algorithm-changed", onAlgorithmChange);
+  }, []);
 
   useEffect(() => {
     if (!checked) return;
@@ -83,7 +90,7 @@ export default function FeedPage() {
     const { items, cursor: nextCursor } = await getDiscoverFeed(25, cursor);
     const ranked = await rankKeloFeed(items, nextCursor);
     return { items: formatFeed(ranked.items), cursor: ranked.cursor };
-  }, [activeTab, checked]);
+  }, [activeTab, checked, algorithmRevision]);
 
   const { items: posts, setItems: setPosts, loading, loadingMore, hasMore, error: feedError, loadMore } = useInfiniteFeed(fetchFeedPage, [activeTab, checked]);
 
