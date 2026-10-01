@@ -46,8 +46,9 @@ export default function LandingPage() {
   ];
 
   return (
-    <main className={`min-h-screen transition-colors duration-300 ${dark ? "bg-gray-950 text-white" : "bg-[#FCFCFF] text-gray-950"}`}>
-      <header className={`border-b transition-colors duration-300 ${dark ? "border-gray-800" : "border-[#E7E8F5]"}`}>
+    <main className={`relative min-h-screen overflow-hidden transition-colors duration-300 ${dark ? "bg-[#09091A] text-white" : "bg-[#F8F9FF] text-gray-950"}`}>
+      <div className="pointer-events-none fixed inset-0 -z-0 overflow-hidden"><div className="absolute -left-32 top-24 h-80 w-80 rounded-full bg-[#2563FF]/10 blur-3xl animate-[float_10s_ease-in-out_infinite]" /><div className="absolute right-[-10rem] top-1/3 h-96 w-96 rounded-full bg-[#8B5CFF]/10 blur-3xl animate-[float_12s_ease-in-out_infinite_reverse]" /><div className="absolute left-1/3 bottom-[-10rem] h-80 w-80 rounded-full bg-[#EC4899]/8 blur-3xl animate-[float_14s_ease-in-out_infinite]" /></div>
+      <header className={`border-b backdrop-blur-xl transition-colors duration-300 ${dark ? "border-white/10 bg-[#09091A]/80" : "border-white/70 bg-white/75 shadow-sm"}`}>
         <div className="mx-auto flex min-h-14 max-w-5xl items-center justify-between gap-3 px-4">
           <Link href="/" aria-label="Kelo Social" className="shrink-0">
             <span className="inline-flex rounded-2xl p-1 transition-transform duration-200 hover:scale-105">
@@ -74,7 +75,7 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <section className={`relative overflow-hidden border-b transition-colors duration-300 ${dark ? "border-gray-800 bg-[#111126]" : "border-gray-100 bg-[#F7F8FF]"}`}>
+      <section className={`relative overflow-hidden border-b transition-colors duration-300 ${dark ? "border-white/10 bg-gradient-to-b from-[#11112B] via-[#15133A] to-[#09091A]" : "border-[#E7E8F5] bg-gradient-to-br from-[#EEF4FF] via-[#F8F5FF] to-[#FFF1FA]"}`}>
         <div className="pointer-events-none absolute -left-20 top-10 h-44 w-44 rounded-full bg-[#2563FF]/15 blur-3xl animate-[float_7s_ease-in-out_infinite]" />
         <div className="pointer-events-none absolute -right-16 bottom-0 h-52 w-52 rounded-full bg-[#8B5CFF]/15 blur-3xl animate-[float_9s_ease-in-out_infinite_reverse]" />
         <div className="pointer-events-none absolute left-[8%] bottom-8 h-28 w-28 rounded-full bg-[#22D3EE]/10 blur-3xl animate-[float_8s_ease-in-out_infinite_reverse]" />
@@ -83,14 +84,14 @@ export default function LandingPage() {
         <div className="pointer-events-none absolute left-[18%] top-1/4 h-3 w-3 rounded-full bg-[#2563FF]/50 shadow-[0_0_22px_#2563FF] animate-[orbit_6s_ease-in-out_infinite]" />
         <div className="pointer-events-none absolute right-[20%] top-1/3 h-2 w-2 rounded-full bg-[#8B5CFF]/60 shadow-[0_0_18px_#8B5CFF] animate-[orbit_5s_ease-in-out_infinite_reverse]" />
         <div className="pointer-events-none absolute right-[34%] bottom-1/4 h-2 w-2 rounded-full bg-[#F59E0B]/60 shadow-[0_0_16px_#F59E0B] animate-[orbit_7s_ease-in-out_infinite]" />
-        <div className="relative mx-auto max-w-3xl px-4 py-14 text-center sm:py-20">
+        <div className="relative mx-auto max-w-4xl px-4 py-16 text-center sm:py-24">
           <div className="mx-auto mb-6 h-1 w-20 rounded-full bg-gradient-to-r from-[#22D3EE] via-[#6D5DFB] to-[#EC4899] animate-[pulseLine_2.5s_ease-in-out_infinite]" />
           <p className="animate-[fadeIn_0.5s_ease-out] text-sm font-semibold text-[#6D5DFB]">{t("landing.beta", "Kelo Social · Version bêta")}</p>
-          <h1 className="mx-auto mt-3 max-w-2xl text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl">
+          <h1 className="mx-auto mt-3 max-w-3xl text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl">
             {t("landing.hero.title", "Le réseau social qui vous permet de")}
             <span className="block bg-gradient-to-r from-[#2563FF] via-[#6D5DFB] to-[#8B5CFF] bg-clip-text text-transparent animate-[softGlow_4s_ease-in-out_infinite]">{t("landing.hero.emphasis", "reprendre le contrôle de votre expérience.")}</span>
           </h1>
-          <p className={`mx-auto mt-4 max-w-xl text-base leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{t("landing.hero.description", "Une expérience sociale moderne construite avec l’AT Protocol, avec des choix d’algorithme et une architecture ouverte.")}</p>
+          <p className={`mx-auto mt-4 max-w-2xl text-base leading-7 ${dark ? "text-gray-300" : "text-gray-600"}`}>{t("landing.hero.description", "Une expérience sociale moderne construite avec l’AT Protocol, avec des choix d’algorithme et une architecture ouverte.")}</p>
           <div className="mx-auto mt-6 flex max-w-md flex-col gap-2 sm:max-w-none sm:flex-row sm:justify-center">
             <Link href="/signup" className="group inline-flex min-h-11 items-center justify-center rounded-xl bg-gradient-to-r from-[#2563FF] via-[#6D5DFB] to-[#8B5CFF] px-5 font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">{t("landing.hero.join", "Rejoindre Kelo Social")} <span className="ml-2 transition-transform duration-200 group-hover:translate-x-1">→</span></Link>
             <Link href="/login" className={`inline-flex min-h-11 items-center justify-center rounded-lg border px-5 font-bold transition-all hover:-translate-y-0.5 ${dark ? "border-gray-700 bg-gray-950 text-gray-100 hover:bg-gray-800" : "border-gray-300 bg-white text-gray-800 hover:bg-gray-50"}`}>{t("landing.hero.existing", "J’ai déjà un compte")}</Link>
@@ -99,7 +100,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-5xl px-4 py-10 sm:py-14 animate-[fadeUp_0.6s_ease-out_both]">
+      <section className="relative mx-auto max-w-6xl px-4 py-14 sm:py-20 animate-[fadeUp_0.6s_ease-out_both]">
         <div className="mx-auto max-w-xl text-center">
           <p className="text-sm font-semibold text-[#6D5DFB]">{t("landing.why.eyebrow", "Pourquoi Kelo Social ?")}</p>
           <h2 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">{t("landing.why.title", "Une expérience simple et claire.")}</h2>
@@ -108,8 +109,8 @@ export default function LandingPage() {
         <div className="relative mt-7 grid gap-3 md:grid-cols-3">
           <div className="pointer-events-none absolute left-[16%] right-[16%] top-1/2 hidden h-px bg-gradient-to-r from-[#2563FF]/20 via-[#6D5DFB]/40 to-[#8B5CFF]/20 md:block" />
           {features.map(([title, description], index) => (
-            <article key={title} className={`group relative z-10 rounded-2xl border p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${dark ? "border-gray-800 bg-gray-900/90" : "border-[#E2E4F5] bg-white shadow-sm"}`} style={{ animation: `fadeUp 0.45s ease-out ${index * 80}ms both` }}>
-              <div className="mb-4 h-1 w-8 rounded-full bg-gradient-to-r from-[#2563FF] via-[#8B5CFF] to-[#EC4899] transition-all duration-300 group-hover:w-12" />
+            <article key={title} className={`group relative z-10 overflow-hidden rounded-3xl border p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${dark ? "border-gray-800 bg-gray-900/90" : "border-[#E2E4F5] bg-white shadow-sm"}`} style={{ animation: `fadeUp 0.45s ease-out ${index * 80}ms both` }}>
+              <div className="mb-5 h-1.5 w-10 rounded-full bg-gradient-to-r from-[#2563FF] via-[#8B5CFF] to-[#EC4899] transition-all duration-300 group-hover:w-12" />
               <h3 className="text-base font-bold">{title}</h3>
               <p className={`mt-2 text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{description}</p>
             </article>
@@ -117,7 +118,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-            <section className={`border-y transition-colors duration-300 ${dark ? "border-gray-800 bg-[#171733]" : "border-[#E7E8F5] bg-gradient-to-br from-[#F5F7FF] via-white to-[#F8F3FF]"}`}>
+            <section className={`relative overflow-hidden border-y transition-colors duration-300 ${dark ? "border-white/10 bg-gradient-to-r from-[#16163A] via-[#21174A] to-[#35152F]" : "border-[#E7E8F5] bg-gradient-to-r from-[#EEF4FF] via-[#F5F0FF] to-[#FFF0F7]"}`}>
         <div className="mx-auto max-w-3xl px-4 py-9 text-center">
           <p className="text-sm font-semibold text-[#6D5DFB]">{t("landing.about.eyebrow", "Kelo Social")}</p>
           <h2 className="mt-1 text-2xl font-extrabold tracking-tight">{t("landing.about.title", "Un réseau social pensé pour vous.")}</h2>
@@ -127,9 +128,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-3xl px-4 py-8 text-center animate-[fadeUp_0.7s_ease-out_both]">
+      <section className="mx-auto max-w-4xl px-4 py-14 text-center animate-[fadeUp_0.7s_ease-out_both]">
         <p className="text-sm font-semibold text-[#6D5DFB]">{t("landing.atproto.eyebrow", "Technologie")}</p>
-        <h2 className="mt-1 text-xl font-extrabold tracking-tight">{t("landing.atproto.title", "AT Protocol, c’est quoi ?")}</h2>
+        <h2 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">{t("landing.atproto.title", "AT Protocol, c’est quoi ?")}</h2>
         <p className={`mx-auto mt-2 max-w-2xl text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>
           {t("landing.atproto.description", "Une technologie ouverte qui permet à différents services sociaux de communiquer entre eux et rend votre identité plus portable.")}
         </p>
