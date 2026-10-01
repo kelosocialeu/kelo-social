@@ -13,7 +13,7 @@ export async function GET() {
     "@context": ["https://www.w3.org/ns/did/v1"],
     id: KELO_FEED_GENERATOR_DID,
     service: [{
-      id: `${KELO_FEED_GENERATOR_DID}#bsky_fg`,
+      id: "#bsky_fg",
       type: "BskyFeedGenerator",
       serviceEndpoint: KELO_FEED_SERVICE_URL,
     }],
