@@ -237,8 +237,8 @@ export default function ProfilePage() {
       const rawFeed = response?.data?.feed || [];
 
       if (activeTab === "Réponses") {
-        const parentUris: string[] = Array.from(
-          new Set(
+        const parentUris = Array.from(
+          new Set<string>(
             rawFeed
               .filter(isReply)
               .map((item: any) => item?.post?.record?.reply?.parent?.uri)
