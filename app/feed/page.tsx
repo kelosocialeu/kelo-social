@@ -137,7 +137,11 @@ export default function FeedPage() {
     return { items: formatFeed(items), cursor: nextCursor };
   }, [activeTab, checked, algorithmLevel, algorithmRevision]);
 
-  const { items: posts, setItems: setPosts, loading, loadingMore, hasMore, error: feedError, loadMore } = useInfiniteFeed(fetchFeedPage, [activeTab, checked]);
+  const { items: posts, setItems: setPosts, loading, loadingMore, hasMore, error: feedError, loadMore } = useInfiniteFeed(
+    fetchFeedPage,
+    [activeTab, checked, algorithmLevel, algorithmRevision],
+    { cacheKey: "home-" + activeTab + "-" + (algorithmLevel || "unset") + "-" + algorithmRevision }
+  );
 
   useEffect(() => {
     const trimmed = searchQuery.trim();
@@ -312,7 +316,18 @@ export default function FeedPage() {
                 replyText={replyText}
                 onToggleReply={() => setActiveReplyUri(activeReplyUri === post.uri ? null : post.uri)}
                 onReplyTextChange={setReplyText}
-                onSendReply={() => { alert(t("common.success", "Commentaire publié !")); setReplyText(""); setActiveReplyUri(null); }}
+                onSendReply={() => {
+                  setPosts((previousPosts) =>
+                    previousPosts.map((item) =>
+                      item.uri === post.uri
+                        ? { ...item, replyCount: (item.replyCount || 0) + 1 }
+                        : item
+                    )
+                  );
+                  alert(t("common.success", "Commentaire publié !"));
+                  setReplyText("");
+                  setActiveReplyUri(null);
+                }}
                 onBookmark={() => toggleBookmark(post)}
                 onDelete={() => handleDeletePost(post.uri)}
                 onBlocked={() => removeAuthorPosts(post.author?.did)}
