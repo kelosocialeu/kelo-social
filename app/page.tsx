@@ -89,7 +89,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-xl text-center">
           <p className="text-sm font-semibold text-violet-500">{t("landing.why.eyebrow", "Pourquoi Kelo Social ?")}</p>
           <h2 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">{t("landing.why.title", "Une expérience simple et claire.")}</h2>
-          <p className={`mt-3 text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{t("landing.why.description", "Kelo Social vous donne davantage de choix tout en gardant une interface facile à comprendre.")}</p>
+          <p className={`mt-3 text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{t("landing.why.description", "Kelo Social est un réseau social simple où vous gardez davantage de contrôle sur votre expérience.")}</p>
         </div>
         <div className="mt-7 grid gap-3 md:grid-cols-3">
           {features.map(([title, description], index) => (
@@ -101,14 +101,22 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className={`border-y transition-colors duration-300 ${dark ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-gray-50"}`}>
+            <section className={`border-y transition-colors duration-300 ${dark ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-gray-50"}`}>
         <div className="mx-auto max-w-3xl px-4 py-9 text-center">
-          <p className="text-sm font-semibold text-violet-500">{t("landing.atproto.eyebrow", "En quelques mots")}</p>
-          <h2 className="mt-1 text-2xl font-extrabold tracking-tight">{t("landing.atproto.title", "C’est quoi AT Protocol ?")}</h2>
+          <p className="text-sm font-semibold text-violet-500">{t("landing.about.eyebrow", "Kelo Social")}</p>
+          <h2 className="mt-1 text-2xl font-extrabold tracking-tight">{t("landing.about.title", "Un réseau social pensé pour vous.")}</h2>
           <p className={`mx-auto mt-3 max-w-2xl text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>
-            {t("landing.atproto.description", "AT Protocol est une technologie ouverte conçue pour permettre à plusieurs services sociaux de communiquer entre eux. Elle aide à rendre les données et l’identité plus portables, au lieu de les enfermer dans une seule plateforme.")}
+            {t("landing.about.description", "Kelo Social vous permet de publier, discuter et découvrir du contenu dans une interface claire. Vous pouvez choisir votre expérience algorithmique et utiliser Kelo ID pour la vérification.")}
           </p>
         </div>
+      </section>
+
+      <section className="mx-auto max-w-3xl px-4 py-8 text-center">
+        <p className="text-sm font-semibold text-violet-500">{t("landing.atproto.eyebrow", "Technologie")}</p>
+        <h2 className="mt-1 text-xl font-extrabold tracking-tight">{t("landing.atproto.title", "AT Protocol, c’est quoi ?")}</h2>
+        <p className={`mx-auto mt-2 max-w-2xl text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>
+          {t("landing.atproto.description", "Une technologie ouverte qui permet à différents services sociaux de communiquer entre eux et rend votre identité plus portable.")}
+        </p>
       </section>
 
       <footer className={`border-t transition-colors duration-300 ${dark ? "border-gray-800" : "border-gray-100"}`}>
