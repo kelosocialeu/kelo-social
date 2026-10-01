@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { BrainCircuit, Check, Clock3, Sparkles } from "lucide-react";
 import { useTranslation } from "@/components/providers/TranslationProvider";
+import { getSavedKeloAlgorithm, isKeloAlgorithmLevel, saveKeloAlgorithm, type KeloAlgorithmLevel } from "@/lib/kelo-algorithm-preference";
 
 const LEVELS = [
   { id:"very-low", title:"Très peu", duration:"Environ 30 min/jour", description:"L’algorithme privilégie votre langue et vos centres d’intérêt, tout en introduisant aussi des contenus moins susceptibles de vous intéresser. L’objectif est de proposer une découverte mesurée puis de réduire progressivement l’intensité.", gradient:"from-[#22D3EE] to-[#2563FF]" },
@@ -13,17 +14,38 @@ const LEVELS = [
 
 export default function AlgorithmSection(){
   const {t}=useTranslation();
-  const [selected,setSelected]=useState("medium");
+  const [selected,setSelected]=useState<KeloAlgorithmLevel | null>(null);
+  const [saving,setSaving]=useState(false);
 
   useEffect(()=>{
-    const saved=window.localStorage.getItem("kelo-algorithm-level");
-    if(saved && LEVELS.some(level=>level.id===saved)) setSelected(saved);
+    let cancelled=false;
+    const load=async()=>{
+      const remote=await getSavedKeloAlgorithm();
+      if(cancelled) return;
+      if(remote){
+        window.localStorage.setItem("kelo-algorithm-level",remote);
+        setSelected(remote);
+        return;
+      }
+      const local=window.localStorage.getItem("kelo-algorithm-level");
+      if(isKeloAlgorithmLevel(local)) setSelected(local);
+    };
+    void load();
+    return()=>{cancelled=true;};
   },[]);
 
-  const choose=(id:string)=>{
-    setSelected(id);
-    window.localStorage.setItem("kelo-algorithm-level",id);
-    window.dispatchEvent(new Event("kelo-algorithm-changed"));
+  const choose=async(id:KeloAlgorithmLevel)=>{
+    setSaving(true);
+    try{
+      await saveKeloAlgorithm(id);
+      setSelected(id);
+      window.localStorage.setItem("kelo-algorithm-level",id);
+      window.dispatchEvent(new Event("kelo-algorithm-changed"));
+    }catch(error){
+      console.error("Algorithm preference save error:",error);
+    }finally{
+      setSaving(false);
+    }
   };
 
   return <div className="space-y-5">
@@ -49,7 +71,7 @@ export default function AlgorithmSection(){
     <div className="grid gap-3 xl:grid-cols-2">
       {LEVELS.map((level,index)=>{
         const active=selected===level.id;
-        return <button key={level.id} type="button" onClick={()=>choose(level.id)} aria-pressed={active}
+        return <button key={level.id} type="button" onClick={()=>choose(level.id)} aria-pressed={active} disabled={saving}
           className={`group relative overflow-hidden rounded-2xl border p-5 text-left transition-all duration-200 hover:-translate-y-0.5 ${active ? "border-violet-400/70 bg-violet-50/70 shadow-lg shadow-violet-500/10 dark:border-violet-400/50 dark:bg-violet-500/10" : "border-kelo-border bg-kelo-surface hover:border-violet-300"}`}>
           <div className={`mb-4 h-1.5 w-12 rounded-full bg-gradient-to-r ${level.gradient} transition-all group-hover:w-16`}/>
           <div className="flex items-start justify-between gap-4">
@@ -64,6 +86,6 @@ export default function AlgorithmSection(){
         </button>;
       })}
     </div>
-    <p className="px-1 text-xs text-kelo-muted">Votre choix est enregistré sur cet appareil. Il sera utilisé par le système de recommandation lorsque le contrôle algorithmique sera appliqué au fil.</p>
+    <p className="px-1 text-xs text-kelo-muted">Votre choix est enregistré sur votre compte et sur cet appareil. Il sera utilisé par le système de recommandation lors de vos prochaines connexions.</p>
   </div>;
 }
