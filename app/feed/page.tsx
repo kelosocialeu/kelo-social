@@ -17,6 +17,8 @@ import { getDiscoverFeed, getKeloAlgorithmFeed } from "@/lib/atproto/feed";
 import { getFollowingTimeline } from "@/lib/atproto/timeline";
 import { createPost, deleteOwnPost } from "@/lib/atproto/posts";
 import { getStoredSession } from "@/services/auth.service";
+import AlgorithmChoiceModal from "@/components/feed/AlgorithmChoiceModal";
+import { getSavedKeloAlgorithm, isKeloAlgorithmLevel, saveKeloAlgorithm, type KeloAlgorithmLevel } from "@/lib/kelo-algorithm-preference";
 import { searchNetworkPosts, searchNetworkActors } from "@/lib/atproto/search";
 
 type Tab = "pourvous" | "decouvrir";
@@ -62,6 +64,9 @@ export default function FeedPage() {
   const [searchProfiles, setSearchProfiles] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>("pourvous");
   const [algorithmRevision, setAlgorithmRevision] = useState(0);
+  const [algorithmLevel, setAlgorithmLevel] = useState<KeloAlgorithmLevel | null>(null);
+  const [algorithmChecking, setAlgorithmChecking] = useState(true);
+  const [savingAlgorithm, setSavingAlgorithm] = useState(false);
   const [loadingPost, setLoadingPost] = useState(false);
   const [activeReplyUri, setActiveReplyUri] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
@@ -79,18 +84,58 @@ export default function FeedPage() {
     if (session) setMyDid(session.did);
   }, [checked]);
 
+  useEffect(() => {
+    if (!checked) return;
+    let cancelled = false;
+
+    const loadAlgorithmChoice = async () => {
+      setAlgorithmChecking(true);
+      try {
+        const saved = await getSavedKeloAlgorithm();
+        if (cancelled) return;
+
+        if (saved) {
+          window.localStorage.setItem("kelo-algorithm-level", saved);
+          setAlgorithmLevel(saved);
+          return;
+        }
+
+        const local = window.localStorage.getItem("kelo-algorithm-level");
+        if (isKeloAlgorithmLevel(local)) {
+          setAlgorithmLevel(local);
+          try {
+            await saveKeloAlgorithm(local);
+          } catch {
+            // Keep the local choice usable if the remote record is temporarily unavailable.
+          }
+        } else {
+          setAlgorithmLevel(null);
+        }
+      } catch (error) {
+        console.warn("Kelo algorithm preference could not be loaded:", error);
+        const local = window.localStorage.getItem("kelo-algorithm-level");
+        setAlgorithmLevel(isKeloAlgorithmLevel(local) ? local : null);
+      } finally {
+        if (!cancelled) setAlgorithmChecking(false);
+      }
+    };
+
+    void loadAlgorithmChoice();
+    return () => {
+      cancelled = true;
+    };
+  }, [checked]);
+
   const fetchFeedPage = useCallback(async (cursor?: string) => {
-    if (!checked) return { items: [], cursor: undefined };
+    if (!checked || !algorithmLevel) return { items: [], cursor: undefined };
     if (activeTab === "decouvrir") {
       const { items, cursor: nextCursor } = await getDiscoverFeed(25, cursor);
       return { items: formatFeed(items), cursor: nextCursor };
     }
 
-    const selected = window.localStorage.getItem("kelo-algorithm-level") || "medium";
-    const level = selected === "very-low" || selected === "medium" || selected === "medium-addictive" || selected === "addictive" ? selected : "medium";
-    const { items, cursor: nextCursor } = await getKeloAlgorithmFeed(level, 25, cursor);
+    const { items, cursor: nextCursor } = await getKeloAlgorithmFeed(algorithmLevel, 25, cursor);
     return { items: formatFeed(items), cursor: nextCursor };
-  }, [activeTab, checked, algorithmRevision]);
+  }, [activeTab, checked, algorithmLevel, algorithmRevision]);
 
   const { items: posts, setItems: setPosts, loading, loadingMore, hasMore, error: feedError, loadMore } = useInfiniteFeed(fetchFeedPage, [activeTab, checked]);
 
@@ -193,7 +238,33 @@ export default function FeedPage() {
     return <div className="flex min-h-screen items-center justify-center bg-kelo-background font-sans text-kelo-muted">{t("common.loading", "Vérification de votre session...")}</div>;
   }
 
+  if (algorithmChecking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-kelo-background">
+        <div className="h-14 w-14 animate-spin">
+          <img src="https://kelosocial.sirv.com/logo.png" alt={t("common.loading", "Chargement")} className="h-full w-full object-contain" />
+        </div>
+      </div>
+    );
+  }
+
   const isSearching = searchQuery.trim().length >= 2;
+
+  const handleAlgorithmChoice = async (level: KeloAlgorithmLevel) => {
+    setSavingAlgorithm(true);
+    try {
+      await saveKeloAlgorithm(level);
+      window.localStorage.setItem("kelo-algorithm-level", level);
+      setAlgorithmLevel(level);
+      setAlgorithmRevision((value) => value + 1);
+      window.dispatchEvent(new Event("kelo-algorithm-changed"));
+    } catch (error) {
+      console.error("Algorithm choice save error:", error);
+      alert(t("common.error", "Impossible d’enregistrer votre choix. Réessayez dans un instant."));
+    } finally {
+      setSavingAlgorithm(false);
+    }
+  };
   const displayedPosts = isSearching ? searchPosts ?? [] : posts;
 
   return (
@@ -299,6 +370,10 @@ export default function FeedPage() {
           )}
         </aside>
       </div>
+
+      {!algorithmLevel && (
+        <AlgorithmChoiceModal saving={savingAlgorithm} onChoose={handleAlgorithmChoice} />
+      )}
     </div>
   );
 }
