@@ -170,8 +170,8 @@ function PostThreadContent() {
 
       try {
         const thread = await getPostThread(uri, {
-          depth: 6,
-          parentHeight: 20,
+          depth: 100,
+          parentHeight: 100,
         });
 
         if (cancelled) {
@@ -399,24 +399,27 @@ function PostThreadContent() {
                           style={{
                             paddingLeft:
                               cappedDepth > 0
-                                ? `${Math.min(
-                                    cappedDepth * 14,
-                                    56
-                                  )}px`
+                                ? `${Math.min(cappedDepth * 18, 72)}px`
                                 : undefined,
                           }}
                         >
                           {depth > 0 && (
-                            <span
-                              aria-hidden="true"
-                              className="absolute bottom-0 top-0 w-px bg-kelo-border"
-                              style={{
-                                left: `${Math.max(
-                                  cappedDepth * 14 - 7,
-                                  7
-                                )}px`,
-                              }}
-                            />
+                            <>
+                              <span
+                                aria-hidden="true"
+                                className="absolute bottom-0 top-0 w-px bg-kelo-border"
+                                style={{
+                                  left: Math.max(cappedDepth * 18 - 9, 9),
+                                }}
+                              />
+                              <span
+                                aria-hidden="true"
+                                className="absolute left-0 top-0 h-7 rounded-bl-2xl border-b border-l border-kelo-border"
+                                style={{
+                                  width: Math.max(cappedDepth * 18 - 9, 18),
+                                }}
+                              />
+                            </>
                           )}
 
                           <PostCard
