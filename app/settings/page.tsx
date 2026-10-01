@@ -12,13 +12,14 @@ import ModerationSection from "@/components/settings/ModerationSection";
 import PrivacySection from "@/components/settings/PrivacySection";
 import NotificationFeedSection from "@/components/settings/NotificationFeedSection";
 import LanguageContentSection from "@/components/settings/LanguageContentSection";
+import AlgorithmSection from "@/components/settings/AlgorithmSection";
 import MessagingSection from "@/components/settings/MessagingSection";
 import LegalSection from "@/components/settings/LegalSection";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useTranslation } from "@/components/providers/TranslationProvider";
 
 const SECTION_KEYS:Record<SettingsSection,[string,string]>={
-  account:["settings.account","Compte et sécurité"],identity:["settings.identity","Identité et domaine"],moderation:["settings.moderation","Modération"],privacy:["settings.privacy","Confidentialité"],appearance:["settings.display","Affichage"],language:["settings.languageContent","Langues et centres d’intérêt"],notifications:["settings.notifications","Notifications et flux"],messaging:["settings.messaging","Messagerie"],legal:["settings.legal","Informations juridiques"],
+  account:["settings.account","Compte et sécurité"],identity:["settings.identity","Identité et domaine"],moderation:["settings.moderation","Modération"],privacy:["settings.privacy","Confidentialité"],appearance:["settings.display","Affichage"],language:["settings.languageContent","Langues et centres d’intérêt"],notifications:["settings.notifications","Notifications et flux"],algorithm:["settings.algorithm","Algorithme"],messaging:["settings.messaging","Messagerie"],legal:["settings.legal","Informations juridiques"],
 };
 
 export default function SettingsPage(){
@@ -72,6 +73,7 @@ export default function SettingsPage(){
             {section==="moderation"&&<ModerationSection/>}
             {section==="privacy"&&<PrivacySection/>}
             {section==="notifications"&&<NotificationFeedSection/>}
+            {section==="algorithm"&&<AlgorithmSection/>}
             {section==="language"&&<LanguageContentSection/>}
             {section==="messaging"&&<MessagingSection/>}
             {section==="legal"&&<LegalSection/>}
