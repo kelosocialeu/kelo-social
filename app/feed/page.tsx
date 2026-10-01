@@ -14,6 +14,7 @@ import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useTranslation } from "@/components/providers/TranslationProvider";
 import { getDiscoverFeed } from "@/lib/atproto/feed";
+import { rankKeloFeed } from "@/lib/kelo-algorithm";
 import { getFollowingTimeline } from "@/lib/atproto/timeline";
 import { createPost, deleteOwnPost } from "@/lib/atproto/posts";
 import { getStoredSession } from "@/services/auth.service";
@@ -78,8 +79,10 @@ export default function FeedPage() {
       const { items, cursor: nextCursor } = await getDiscoverFeed(25, cursor);
       return { items: formatFeed(items), cursor: nextCursor };
     }
-    const { items, cursor: nextCursor } = await getFollowingTimeline(25, cursor);
-    return { items: formatFeed(items), cursor: nextCursor };
+
+    const { items, cursor: nextCursor } = await getDiscoverFeed(25, cursor);
+    const ranked = await rankKeloFeed(items, nextCursor);
+    return { items: formatFeed(ranked.items), cursor: ranked.cursor };
   }, [activeTab, checked]);
 
   const { items: posts, setItems: setPosts, loading, loadingMore, hasMore, error: feedError, loadMore } = useInfiniteFeed(fetchFeedPage, [activeTab, checked]);
