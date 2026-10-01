@@ -75,13 +75,14 @@ export default function LandingPage() {
       </header>
 
       <section className={`relative overflow-hidden border-b transition-colors duration-300 ${dark ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-gray-50"}`}>
-        <div className="pointer-events-none absolute -left-24 top-8 h-48 w-48 rounded-full bg-blue-500/10 blur-3xl animate-[float_7s_ease-in-out_infinite]" />
-        <div className="pointer-events-none absolute -right-24 bottom-0 h-56 w-56 rounded-full bg-violet-500/10 blur-3xl animate-[float_9s_ease-in-out_infinite_reverse]" />
+        <div className="pointer-events-none absolute -left-20 top-10 h-44 w-44 rounded-full bg-[#2563FF]/15 blur-3xl animate-[float_7s_ease-in-out_infinite]" />
+        <div className="pointer-events-none absolute -right-16 bottom-0 h-52 w-52 rounded-full bg-[#8B5CFF]/15 blur-3xl animate-[float_9s_ease-in-out_infinite_reverse]" />
+        <div className="pointer-events-none absolute left-1/2 top-1/2 h-px w-40 -translate-x-1/2 bg-gradient-to-r from-transparent via-[#6D5DFB]/30 to-transparent" />
         <div className="relative mx-auto max-w-3xl px-4 py-12 text-center sm:py-16">
-          <p className="animate-[fadeIn_0.5s_ease-out] text-sm font-semibold text-violet-500">{t("landing.beta", "Kelo Social · Version bêta")}</p>
+          <p className="animate-[fadeIn_0.5s_ease-out] text-sm font-semibold text-[#6D5DFB]">{t("landing.beta", "Kelo Social · Version bêta")}</p>
           <h1 className="mx-auto mt-3 max-w-2xl text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl">
             {t("landing.hero.title", "Le réseau social qui vous laisse")}
-            <span className="block bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent animate-[softGlow_4s_ease-in-out_infinite]">{t("landing.hero.emphasis", "reprendre le contrôle.")}</span>
+            <span className="block bg-gradient-to-r from-[#2563FF] via-[#6D5DFB] to-[#8B5CFF] bg-clip-text text-transparent animate-[softGlow_4s_ease-in-out_infinite]">{t("landing.hero.emphasis", "reprendre le contrôle.")}</span>
           </h1>
           <p className={`mx-auto mt-4 max-w-xl text-base leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{t("landing.hero.description", "Une expérience sociale moderne construite sur AT Protocol, avec des choix d’algorithme et une architecture ouverte.")}</p>
           <div className="mx-auto mt-6 flex max-w-md flex-col gap-2 sm:max-w-none sm:flex-row sm:justify-center">
@@ -98,10 +99,11 @@ export default function LandingPage() {
           <h2 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">{t("landing.why.title", "Une expérience simple et claire.")}</h2>
           <p className={`mt-3 text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{t("landing.why.description", "Kelo Social est un réseau social simple où vous gardez davantage de contrôle sur votre expérience.")}</p>
         </div>
-        <div className="mt-7 grid gap-3 md:grid-cols-3">
+        <div className="relative mt-7 grid gap-3 md:grid-cols-3">
+          <div className="pointer-events-none absolute left-[16%] right-[16%] top-1/2 hidden h-px bg-gradient-to-r from-[#2563FF]/20 via-[#6D5DFB]/40 to-[#8B5CFF]/20 md:block" />
           {features.map(([title, description], index) => (
-            <article key={title} className={`group rounded-2xl border p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${dark ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`} style={{ animation: `fadeUp 0.45s ease-out ${index * 80}ms both` }}>
-              <div className="mb-4 h-1 w-8 rounded-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all duration-300 group-hover:w-12" />
+            <article key={title} className={`group relative z-10 rounded-2xl border p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${dark ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`} style={{ animation: `fadeUp 0.45s ease-out ${index * 80}ms both` }}>
+              <div className="mb-4 h-1 w-8 rounded-full bg-gradient-to-r from-[#2563FF] to-[#8B5CFF] transition-all duration-300 group-hover:w-12" />
               <h3 className="text-base font-bold">{title}</h3>
               <p className={`mt-2 text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{description}</p>
             </article>
@@ -111,7 +113,7 @@ export default function LandingPage() {
 
             <section className={`border-y transition-colors duration-300 ${dark ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-gray-50"}`}>
         <div className="mx-auto max-w-3xl px-4 py-9 text-center">
-          <p className="text-sm font-semibold text-violet-500">{t("landing.about.eyebrow", "Kelo Social")}</p>
+          <p className="text-sm font-semibold text-[#6D5DFB]">{t("landing.about.eyebrow", "Kelo Social")}</p>
           <h2 className="mt-1 text-2xl font-extrabold tracking-tight">{t("landing.about.title", "Un réseau social pensé pour vous.")}</h2>
           <p className={`mx-auto mt-3 max-w-2xl text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>
             {t("landing.about.description", "Kelo Social vous permet de publier, discuter et découvrir du contenu dans une interface claire. Vous pouvez choisir votre expérience algorithmique et utiliser Kelo ID pour la vérification.")}
@@ -120,7 +122,7 @@ export default function LandingPage() {
       </section>
 
       <section className="mx-auto max-w-3xl px-4 py-8 text-center">
-        <p className="text-sm font-semibold text-violet-500">{t("landing.atproto.eyebrow", "Technologie")}</p>
+        <p className="text-sm font-semibold text-[#6D5DFB]">{t("landing.atproto.eyebrow", "Technologie")}</p>
         <h2 className="mt-1 text-xl font-extrabold tracking-tight">{t("landing.atproto.title", "AT Protocol, c’est quoi ?")}</h2>
         <p className={`mx-auto mt-2 max-w-2xl text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>
           {t("landing.atproto.description", "Une technologie ouverte qui permet à différents services sociaux de communiquer entre eux et rend votre identité plus portable.")}
