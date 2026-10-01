@@ -237,12 +237,14 @@ export default function ProfilePage() {
       const rawFeed = response?.data?.feed || [];
 
       if (activeTab === "Réponses") {
-        const parentUris = Array.from(new Set(
-          rawFeed
-            .filter(isReply)
-            .map((item: any) => item?.post?.record?.reply?.parent?.uri)
-            .filter((value: unknown): value is string => typeof value === "string")
-        ));
+        const parentUris: string[] = Array.from(
+          new Set(
+            rawFeed
+              .filter(isReply)
+              .map((item: any) => item?.post?.record?.reply?.parent?.uri)
+              .filter((value: unknown): value is string => typeof value === "string")
+          )
+        );
 
         let parents = new Map<string, any>();
         if (parentUris.length > 0) {
