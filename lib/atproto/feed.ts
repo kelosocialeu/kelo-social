@@ -38,8 +38,17 @@ export async function getKeloAlgorithmFeed(
   if (!response.ok) throw new Error("Kelo Feed Generator indisponible.");
 
   const skeleton = await response.json() as { feed?: Array<{ post: string }>; cursor?: string };
-  const uris = (skeleton.feed || []).map((item) => item.post);
-  if (!uris.length) return { items: [], cursor: skeleton.cursor };
+  const uris = (skeleton.feed || [])
+    .map((item) => item?.post)
+    .filter((uri): uri is string => typeof uri === "string" && uri.length > 0);
+
+  // Le générateur Kelo peut temporairement ne renvoyer aucun élément
+  // (par exemple pendant un rafraîchissement du service). Le feed principal
+  // ne doit jamais devenir vide pour cette raison : on revient alors au feed
+  // public fédéré, qui fournit les publications racines.
+  if (!uris.length) {
+    return getDiscoverFeed(limit, cursor);
+  }
 
   const agent = createAppViewAgent();
   const hydrated = await agent.api.app.bsky.feed.getPosts({ uris });
