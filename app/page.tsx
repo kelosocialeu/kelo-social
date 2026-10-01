@@ -77,11 +77,14 @@ export default function LandingPage() {
       <section className={`relative overflow-hidden border-b transition-colors duration-300 ${dark ? "border-gray-800 bg-[#111126]" : "border-gray-100 bg-[#F7F8FF]"}`}>
         <div className="pointer-events-none absolute -left-20 top-10 h-44 w-44 rounded-full bg-[#2563FF]/15 blur-3xl animate-[float_7s_ease-in-out_infinite]" />
         <div className="pointer-events-none absolute -right-16 bottom-0 h-52 w-52 rounded-full bg-[#8B5CFF]/15 blur-3xl animate-[float_9s_ease-in-out_infinite_reverse]" />
+        <div className="pointer-events-none absolute left-[8%] bottom-8 h-28 w-28 rounded-full bg-[#22D3EE]/10 blur-3xl animate-[float_8s_ease-in-out_infinite_reverse]" />
+        <div className="pointer-events-none absolute right-[8%] top-10 h-32 w-32 rounded-full bg-[#EC4899]/10 blur-3xl animate-[float_6s_ease-in-out_infinite]" />
         <div className="pointer-events-none absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#6D5DFB]/10 animate-[spinSlow_18s_linear_infinite]" />
         <div className="pointer-events-none absolute left-[18%] top-1/4 h-3 w-3 rounded-full bg-[#2563FF]/50 shadow-[0_0_22px_#2563FF] animate-[orbit_6s_ease-in-out_infinite]" />
         <div className="pointer-events-none absolute right-[20%] top-1/3 h-2 w-2 rounded-full bg-[#8B5CFF]/60 shadow-[0_0_18px_#8B5CFF] animate-[orbit_5s_ease-in-out_infinite_reverse]" />
+        <div className="pointer-events-none absolute right-[34%] bottom-1/4 h-2 w-2 rounded-full bg-[#F59E0B]/60 shadow-[0_0_16px_#F59E0B] animate-[orbit_7s_ease-in-out_infinite]" />
         <div className="relative mx-auto max-w-3xl px-4 py-14 text-center sm:py-20">
-          <div className="mx-auto mb-6 h-1 w-16 rounded-full bg-gradient-to-r from-[#2563FF] to-[#8B5CFF] animate-[pulseLine_2.5s_ease-in-out_infinite]" />
+          <div className="mx-auto mb-6 h-1 w-20 rounded-full bg-gradient-to-r from-[#22D3EE] via-[#6D5DFB] to-[#EC4899] animate-[pulseLine_2.5s_ease-in-out_infinite]" />
           <p className="animate-[fadeIn_0.5s_ease-out] text-sm font-semibold text-[#6D5DFB]">{t("landing.beta", "Kelo Social · Version bêta")}</p>
           <h1 className="mx-auto mt-3 max-w-2xl text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl">
             {t("landing.hero.title", "Le réseau social qui vous permet de")}
@@ -106,7 +109,7 @@ export default function LandingPage() {
           <div className="pointer-events-none absolute left-[16%] right-[16%] top-1/2 hidden h-px bg-gradient-to-r from-[#2563FF]/20 via-[#6D5DFB]/40 to-[#8B5CFF]/20 md:block" />
           {features.map(([title, description], index) => (
             <article key={title} className={`group relative z-10 rounded-2xl border p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${dark ? "border-gray-800 bg-gray-900/90" : "border-[#E2E4F5] bg-white shadow-sm"}`} style={{ animation: `fadeUp 0.45s ease-out ${index * 80}ms both` }}>
-              <div className="mb-4 h-1 w-8 rounded-full bg-gradient-to-r from-[#2563FF] to-[#8B5CFF] transition-all duration-300 group-hover:w-12" />
+              <div className="mb-4 h-1 w-8 rounded-full bg-gradient-to-r from-[#2563FF] via-[#8B5CFF] to-[#EC4899] transition-all duration-300 group-hover:w-12" />
               <h3 className="text-base font-bold">{title}</h3>
               <p className={`mt-2 text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{description}</p>
             </article>
