@@ -9,10 +9,10 @@ const DISCOVER_FEED_URI =
   "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot";
 
 export const KELO_ALGORITHM_FEED_URIS = {
-  "very-low": "at://did:web:feeds.kelosocial.eu/app.bsky.feed.generator/kelo-very-low",
-  medium: "at://did:web:feeds.kelosocial.eu/app.bsky.feed.generator/kelo-medium",
-  "medium-addictive": "at://did:web:feeds.kelosocial.eu/app.bsky.feed.generator/kelo-medium-addictive",
-  addictive: "at://did:web:feeds.kelosocial.eu/app.bsky.feed.generator/kelo-addictive",
+  "very-low": "at://did:web:kelosocial.eu/app.bsky.feed.generator/kelo-very-low",
+  medium: "at://did:web:kelosocial.eu/app.bsky.feed.generator/kelo-medium",
+  "medium-addictive": "at://did:web:kelosocial.eu/app.bsky.feed.generator/kelo-medium-addictive",
+  addictive: "at://did:web:kelosocial.eu/app.bsky.feed.generator/kelo-addictive",
 } as const;
 
 export async function getDiscoverFeed(limit = 25, cursor?: string) {
