@@ -429,7 +429,6 @@ export default function ProfilePage() {
             replyOpen={activeReplyUri === post.uri}
             replyText={replyText}
             onToggleReply={() => setActiveReplyUri(activeReplyUri === post.uri ? null : post.uri)}
-            replyText={replyText}
             onReplyTextChange={setReplyText}
             onSendReply={() => {
               setReplyText("");
