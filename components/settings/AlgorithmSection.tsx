@@ -23,6 +23,7 @@ export default function AlgorithmSection(){
   const choose=(id:string)=>{
     setSelected(id);
     window.localStorage.setItem("kelo-algorithm-level",id);
+    window.dispatchEvent(new Event("kelo-algorithm-changed"));
   };
 
   return <div className="space-y-5">
