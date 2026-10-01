@@ -107,14 +107,10 @@ function ThreadReply({
 
   return (
     <div className="relative">
-      <div className="relative pl-5">
+      <div className="relative">
         <span
           aria-hidden="true"
-          className="absolute bottom-0 left-2 top-0 w-px bg-kelo-border"
-        />
-        <span
-          aria-hidden="true"
-          className="absolute left-2 top-0 h-5 w-3 rounded-bl-xl border-b border-l border-kelo-border"
+          className="absolute -left-4 top-7 h-px w-4 bg-kelo-border"
         />
 
         <PostCard
@@ -136,21 +132,41 @@ function ThreadReply({
       </div>
 
       {hasChildren && (
-        <div className="ml-5">
-          {node.replies.map((child) => (
-            <ThreadReply
-              key={child.post.uri}
-              node={child}
-              myDid={myDid}
-              activeReplyUri={activeReplyUri}
-              replyText={replyText}
-              setActiveReplyUri={setActiveReplyUri}
-              setReplyText={setReplyText}
-              onReplySent={onReplySent}
-              onBookmark={onBookmark}
-              onDelete={onDelete}
-            />
-          ))}
+        <div className="relative ml-4 border-l border-kelo-border pl-4">
+          {node.replies.map((child, index) => {
+            const isLast = index === node.replies.length - 1;
+
+            return (
+              <div
+                key={child.post.uri}
+                className={`relative ${isLast ? "pb-0" : "pb-1"}`}
+              >
+                <span
+                  aria-hidden="true"
+                  className="absolute -left-4 top-7 h-px w-4 bg-kelo-border"
+                />
+
+                {isLast && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute -left-5 top-0 bottom-0 w-1 bg-white"
+                  />
+                )}
+
+                <ThreadReply
+                  node={child}
+                  myDid={myDid}
+                  activeReplyUri={activeReplyUri}
+                  replyText={replyText}
+                  setActiveReplyUri={setActiveReplyUri}
+                  setReplyText={setReplyText}
+                  onReplySent={onReplySent}
+                  onBookmark={onBookmark}
+                  onDelete={onDelete}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
