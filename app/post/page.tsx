@@ -21,9 +21,9 @@ import { getPostThread } from "@/lib/atproto/post-thread";
 import { deleteOwnPost } from "@/lib/atproto/posts";
 import { getStoredSession } from "@/services/auth.service";
 
-interface FlattenedThreadPost {
+interface ThreadReplyNode {
   post: any;
-  depth: number;
+  replies: ThreadReplyNode[];
 }
 
 interface ViewPostThreadNode {
@@ -69,36 +69,92 @@ function isViewPostThread(
  *
  * Les réponses supprimées, bloquées ou indisponibles sont ignorées.
  */
-function flattenReplies(
-  replies: any[] = [],
-  depth = 0
-): FlattenedThreadPost[] {
-  const result: FlattenedThreadPost[] = [];
+function buildReplyTree(replies: any[] = []): ThreadReplyNode[] {
+  return replies.flatMap((reply) => {
+    if (!isViewPostThread(reply)) return [];
 
-  for (const reply of replies) {
-    if (!isViewPostThread(reply)) {
-      continue;
-    }
-
-    result.push({
+    return [{
       post: flattenPost(reply.post),
-      depth,
-    });
+      replies: Array.isArray(reply.replies)
+        ? buildReplyTree(reply.replies)
+        : [],
+    }];
+  });
+}
 
-    if (
-      Array.isArray(reply.replies) &&
-      reply.replies.length > 0
-    ) {
-      result.push(
-        ...flattenReplies(
-          reply.replies,
-          depth + 1
-        )
-      );
-    }
-  }
+function ThreadReply({
+  node,
+  myDid,
+  activeReplyUri,
+  replyText,
+  setActiveReplyUri,
+  setReplyText,
+  onReplySent,
+  onBookmark,
+  onDelete,
+}: {
+  node: ThreadReplyNode;
+  myDid: string | null;
+  activeReplyUri: string | null;
+  replyText: string;
+  setActiveReplyUri: (uri: string | null) => void;
+  setReplyText: (text: string) => void;
+  onReplySent: () => void;
+  onBookmark: (post: any) => void;
+  onDelete: (uri: string) => void;
+}) {
+  const hasChildren = node.replies.length > 0;
 
-  return result;
+  return (
+    <div className="relative">
+      <div className="relative pl-5">
+        <span
+          aria-hidden="true"
+          className="absolute bottom-0 left-2 top-0 w-px bg-kelo-border"
+        />
+        <span
+          aria-hidden="true"
+          className="absolute left-2 top-0 h-5 w-3 rounded-bl-xl border-b border-l border-kelo-border"
+        />
+
+        <PostCard
+          post={node.post}
+          isMine={!!myDid && node.post.author?.did === myDid}
+          isBookmarked={false}
+          replyOpen={activeReplyUri === node.post.uri}
+          replyText={replyText}
+          onToggleReply={() =>
+            setActiveReplyUri(
+              activeReplyUri === node.post.uri ? null : node.post.uri
+            )
+          }
+          onReplyTextChange={setReplyText}
+          onSendReply={onReplySent}
+          onBookmark={() => onBookmark(node.post)}
+          onDelete={() => onDelete(node.post.uri)}
+        />
+      </div>
+
+      {hasChildren && (
+        <div className="ml-5">
+          {node.replies.map((child) => (
+            <ThreadReply
+              key={child.post.uri}
+              node={child}
+              myDid={myDid}
+              activeReplyUri={activeReplyUri}
+              replyText={replyText}
+              setActiveReplyUri={setActiveReplyUri}
+              setReplyText={setReplyText}
+              onReplySent={onReplySent}
+              onBookmark={onBookmark}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function PostThreadContent() {
@@ -115,7 +171,8 @@ function PostThreadContent() {
     useState<any>(null);
 
   const [threadReplies, setThreadReplies] =
-    useState<FlattenedThreadPost[]>([]);
+    useState<ThreadReplyNode[]>([]);
+  const [threadRefresh, setThreadRefresh] = useState(0);
 
   const [loading, setLoading] = useState(true);
 
@@ -193,9 +250,7 @@ function PostThreadContent() {
           ? thread.replies
           : [];
 
-        setThreadReplies(
-          flattenReplies(replies, 0)
-        );
+        setThreadReplies(buildReplyTree(replies));
       } catch (error) {
         if (cancelled) {
           return;
@@ -221,10 +276,12 @@ function PostThreadContent() {
     return () => {
       cancelled = true;
     };
-  }, [checked, uri]);
+  }, [checked, uri, threadRefresh]);
 
   const replyCountLabel = useMemo(() => {
-    const count = threadReplies.length;
+    const countReplies = (nodes: ThreadReplyNode[]): number =>
+      nodes.reduce((total, node) => total + 1 + countReplies(node.replies), 0);
+    const count = countReplies(threadReplies);
 
     if (count === 0) {
       return "Aucune réponse";
@@ -279,6 +336,7 @@ function PostThreadContent() {
   const handleReplySubmit = () => {
     setReplyText("");
     setActiveReplyUri(null);
+    setThreadRefresh((value) => value + 1);
   };
 
   if (!checked) {
@@ -385,78 +443,20 @@ function PostThreadContent() {
 
               {threadReplies.length > 0 ? (
                 <div className="divide-y divide-kelo-border">
-                  {threadReplies.map(
-                    ({ post, depth }) => {
-                      const cappedDepth = Math.min(
-                        depth,
-                        4
-                      );
-
-                      return (
-                        <div
-                          key={post.uri}
-                          className="relative"
-                          style={{
-                            paddingLeft:
-                              cappedDepth > 0
-                                ? `${Math.min(cappedDepth * 18, 72)}px`
-                                : undefined,
-                          }}
-                        >
-                          {depth > 0 && (
-                            <>
-                              <span
-                                aria-hidden="true"
-                                className="absolute bottom-0 top-0 w-px bg-kelo-border"
-                                style={{
-                                  left: Math.max(cappedDepth * 18 - 9, 9),
-                                }}
-                              />
-                              <span
-                                aria-hidden="true"
-                                className="absolute left-0 top-0 h-7 rounded-bl-2xl border-b border-l border-kelo-border"
-                                style={{
-                                  width: Math.max(cappedDepth * 18 - 9, 18),
-                                }}
-                              />
-                            </>
-                          )}
-
-                          <PostCard
-                            post={post}
-                            isMine={
-                              !!myDid &&
-                              post.author?.did === myDid
-                            }
-                            isBookmarked={isBookmarked(
-                              post.uri
-                            )}
-                            replyOpen={
-                              activeReplyUri === post.uri
-                            }
-                            replyText={replyText}
-                            onToggleReply={() =>
-                              setActiveReplyUri(
-                                activeReplyUri === post.uri
-                                  ? null
-                                  : post.uri
-                              )
-                            }
-                            onReplyTextChange={
-                              setReplyText
-                            }
-                            onSendReply={handleReplySubmit}
-                            onBookmark={() =>
-                              toggleBookmark(post)
-                            }
-                            onDelete={() =>
-                              handleDelete(post.uri)
-                            }
-                          />
-                        </div>
-                      );
-                    }
-                  )}
+                  {threadReplies.map((node) => (
+                    <ThreadReply
+                      key={node.post.uri}
+                      node={node}
+                      myDid={myDid}
+                      activeReplyUri={activeReplyUri}
+                      replyText={replyText}
+                      setActiveReplyUri={setActiveReplyUri}
+                      setReplyText={setReplyText}
+                      onReplySent={handleReplySubmit}
+                      onBookmark={toggleBookmark}
+                      onDelete={handleDelete}
+                    />
+                  ))}
                 </div>
               ) : (
                 <div className="px-6 py-12 text-center">
