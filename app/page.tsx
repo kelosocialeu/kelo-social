@@ -75,28 +75,70 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <section className={`relative overflow-hidden border-b transition-colors duration-300 ${dark ? "border-white/10 bg-gradient-to-b from-[#11112B] via-[#15133A] to-[#09091A]" : "border-[#E7E8F5] bg-gradient-to-br from-[#EEF4FF] via-[#F8F5FF] to-[#FFF1FA]"}`}>
-        <div className="pointer-events-none absolute -left-20 top-10 h-44 w-44 rounded-full bg-[#2563FF]/15 blur-3xl animate-[float_7s_ease-in-out_infinite]" />
-        <div className="pointer-events-none absolute -right-16 bottom-0 h-52 w-52 rounded-full bg-[#8B5CFF]/15 blur-3xl animate-[float_9s_ease-in-out_infinite_reverse]" />
-        <div className="pointer-events-none absolute left-[8%] bottom-8 h-28 w-28 rounded-full bg-[#22D3EE]/10 blur-3xl animate-[float_8s_ease-in-out_infinite_reverse]" />
-        <div className="pointer-events-none absolute right-[8%] top-10 h-32 w-32 rounded-full bg-[#EC4899]/10 blur-3xl animate-[float_6s_ease-in-out_infinite]" />
-        <div className="pointer-events-none absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#6D5DFB]/10 animate-[spinSlow_18s_linear_infinite]" />
-        <div className="pointer-events-none absolute left-[18%] top-1/4 h-3 w-3 rounded-full bg-[#2563FF]/50 shadow-[0_0_22px_#2563FF] animate-[orbit_6s_ease-in-out_infinite]" />
-        <div className="pointer-events-none absolute right-[20%] top-1/3 h-2 w-2 rounded-full bg-[#8B5CFF]/60 shadow-[0_0_18px_#8B5CFF] animate-[orbit_5s_ease-in-out_infinite_reverse]" />
-        <div className="pointer-events-none absolute right-[34%] bottom-1/4 h-2 w-2 rounded-full bg-[#F59E0B]/60 shadow-[0_0_16px_#F59E0B] animate-[orbit_7s_ease-in-out_infinite]" />
-        <div className="relative mx-auto max-w-4xl px-4 py-16 text-center sm:py-24">
-          <div className="mx-auto mb-6 h-1 w-20 rounded-full bg-gradient-to-r from-[#22D3EE] via-[#6D5DFB] to-[#EC4899] animate-[pulseLine_2.5s_ease-in-out_infinite]" />
-          <p className="animate-[fadeIn_0.5s_ease-out] text-sm font-semibold text-[#6D5DFB]">{t("landing.beta", "Kelo Social · Version bêta")}</p>
-          <h1 className="mx-auto mt-3 max-w-3xl text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl">
-            {t("landing.hero.title", "Le réseau social qui vous permet de")}
-            <span className="block bg-gradient-to-r from-[#2563FF] via-[#6D5DFB] to-[#8B5CFF] bg-clip-text text-transparent animate-[softGlow_4s_ease-in-out_infinite]">{t("landing.hero.emphasis", "reprendre le contrôle de votre expérience.")}</span>
-          </h1>
-          <p className={`mx-auto mt-4 max-w-2xl text-base leading-7 ${dark ? "text-gray-300" : "text-gray-600"}`}>{t("landing.hero.description", "Une expérience sociale moderne construite avec l’AT Protocol, avec des choix d’algorithme et une architecture ouverte.")}</p>
-          <div className="mx-auto mt-6 flex max-w-md flex-col gap-2 sm:max-w-none sm:flex-row sm:justify-center">
-            <Link href="/signup" className="group inline-flex min-h-11 items-center justify-center rounded-xl bg-gradient-to-r from-[#2563FF] via-[#6D5DFB] to-[#8B5CFF] px-5 font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">{t("landing.hero.join", "Rejoindre Kelo Social")} <span className="ml-2 transition-transform duration-200 group-hover:translate-x-1">→</span></Link>
-            <Link href="/login" className={`inline-flex min-h-11 items-center justify-center rounded-lg border px-5 font-bold transition-all hover:-translate-y-0.5 ${dark ? "border-gray-700 bg-gray-950 text-gray-100 hover:bg-gray-800" : "border-gray-300 bg-white text-gray-800 hover:bg-gray-50"}`}>{t("landing.hero.existing", "J’ai déjà un compte")}</Link>
+      <section className={`relative overflow-hidden border-b transition-colors duration-300 ${dark ? "border-white/10 bg-[#070714]" : "border-[#E5E7F7] bg-[#F7F8FF]"}`}>
+        <div className="absolute inset-0 pointer-events-none">
+          <div className={`absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl ${dark ? "bg-[#6D5DFB]/10" : "bg-[#6D5DFB]/12"}`} />
+          <div className="absolute -left-24 top-20 h-72 w-72 rounded-full bg-[#2563FF]/15 blur-3xl animate-[float_8s_ease-in-out_infinite]" />
+          <div className="absolute -right-24 bottom-0 h-80 w-80 rounded-full bg-[#EC4899]/15 blur-3xl animate-[float_10s_ease-in-out_infinite_reverse]" />
+          <div className="absolute left-[12%] top-[24%] h-2 w-2 rounded-full bg-[#22D3EE] shadow-[0_0_24px_#22D3EE] animate-[orbit_5s_ease-in-out_infinite]" />
+          <div className="absolute right-[16%] top-[30%] h-2.5 w-2.5 rounded-full bg-[#EC4899] shadow-[0_0_24px_#EC4899] animate-[orbit_6s_ease-in-out_infinite_reverse]" />
+          <div className="absolute bottom-[20%] left-[20%] h-2 w-2 rounded-full bg-[#F59E0B] shadow-[0_0_20px_#F59E0B] animate-[orbit_7s_ease-in-out_infinite]" />
+        </div>
+
+        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 sm:px-8 sm:py-24 lg:grid-cols-[1.05fr_.95fr] lg:gap-8">
+          <div className="relative z-10 text-center lg:text-left">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#8B5CFF]/20 bg-white/70 px-3 py-1.5 text-xs font-bold text-[#6D5DFB] shadow-sm backdrop-blur dark:bg-white/5">
+              <span className="h-2 w-2 rounded-full bg-gradient-to-r from-[#2563FF] to-[#EC4899] animate-pulse" />
+              {t("landing.beta", "Kelo Social · Version bêta")}
+            </div>
+
+            <h1 className="max-w-3xl text-4xl font-black leading-[0.98] tracking-[-0.04em] sm:text-6xl lg:text-[5.25rem]">
+              {t("landing.hero.title", "Le réseau social qui vous permet de")}
+              <span className="mt-2 block bg-gradient-to-r from-[#2563FF] via-[#6D5DFB] to-[#EC4899] bg-clip-text pb-2 text-transparent">{t("landing.hero.emphasis", "reprendre le contrôle de votre expérience.")}</span>
+            </h1>
+
+            <p className={`mx-auto mt-6 max-w-xl text-base leading-7 lg:mx-0 ${dark ? "text-gray-300" : "text-gray-600"}`}>
+              {t("landing.hero.description", "Une expérience sociale moderne construite avec l’AT Protocol, avec des choix d’algorithme et une architecture ouverte.")}
+            </p>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
+              <Link href="/signup" className="group inline-flex min-h-12 items-center justify-center rounded-2xl bg-gradient-to-r from-[#2563FF] via-[#6D5DFB] to-[#8B5CFF] px-6 font-bold text-white shadow-[0_12px_35px_rgba(109,93,251,.25)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(109,93,251,.35)]">
+                {t("landing.hero.join", "Rejoindre Kelo Social")} <span className="ml-2 transition-transform group-hover:translate-x-1">→</span>
+              </Link>
+              <Link href="/login" className={`inline-flex min-h-12 items-center justify-center rounded-2xl border px-6 font-bold backdrop-blur transition-all duration-300 hover:-translate-y-1 ${dark ? "border-white/15 bg-white/5 text-white hover:bg-white/10" : "border-[#D9DCF0] bg-white/80 text-gray-800 hover:bg-white"}`}>
+                {t("landing.hero.existing", "J’ai déjà un compte")}
+              </Link>
+            </div>
+
+            <div className={`mt-6 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs font-medium lg:justify-start ${dark ? "text-gray-400" : "text-gray-500"}`}>
+              <span>✓ {t("landing.hero.atproto", "Basé sur AT Protocol")}</span>
+              <span>✓ {t("landing.hero.pds", "Architecture ouverte")}</span>
+              <span>✓ {t("landing.hero.verify", "Kelo ID")}</span>
+            </div>
           </div>
-          <p className={`mt-5 text-xs ${dark ? "text-gray-400" : "text-gray-500"}`}>✓ {t("landing.hero.atproto", "Basé sur AT Protocol")} · ✓ {t("landing.hero.pds", "Architecture ouverte")} · ✓ {t("landing.hero.verify", "Vérification avec Kelo ID")}</p>
+
+          <div className="relative mx-auto h-[360px] w-full max-w-[470px] sm:h-[430px]" aria-hidden="true">
+            <div className="absolute inset-0 rounded-[3rem] bg-gradient-to-br from-[#2563FF]/10 via-[#8B5CFF]/10 to-[#EC4899]/10 blur-2xl" />
+            <div className={`absolute inset-[8%] rounded-[2.5rem] border backdrop-blur-xl shadow-2xl ${dark ? "border-white/10 bg-[#101022]/80 shadow-black/30" : "border-white/80 bg-white/70 shadow-[#6D5DFB]/10"}`}>
+              <div className="absolute left-1/2 top-1/2 flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[2rem] bg-gradient-to-br from-[#2563FF] via-[#6D5DFB] to-[#EC4899] p-[3px] shadow-[0_0_55px_rgba(109,93,251,.35)] animate-[softGlow_4s_ease-in-out_infinite]">
+                <div className="flex h-full w-full items-center justify-center rounded-[1.85rem] bg-white/95 p-3">
+                  <img src={LOGO} alt="" width={110} height={36} className="h-auto w-full object-contain" />
+                </div>
+              </div>
+
+              <div className="absolute left-[12%] top-[17%] flex h-14 w-14 items-center justify-center rounded-2xl border border-[#22D3EE]/30 bg-[#22D3EE]/10 text-xl shadow-lg animate-[float_4.5s_ease-in-out_infinite]">✦</div>
+              <div className="absolute right-[12%] top-[20%] flex h-14 w-14 items-center justify-center rounded-2xl border border-[#EC4899]/30 bg-[#EC4899]/10 text-xl shadow-lg animate-[float_5.5s_ease-in-out_infinite_reverse]">♡</div>
+              <div className="absolute bottom-[17%] left-[15%] flex h-14 w-14 items-center justify-center rounded-2xl border border-[#F59E0B]/30 bg-[#F59E0B]/10 text-xl shadow-lg animate-[float_6s_ease-in-out_infinite_reverse]">◎</div>
+              <div className="absolute bottom-[14%] right-[15%] flex h-14 w-14 items-center justify-center rounded-2xl border border-[#8B5CFF]/30 bg-[#8B5CFF]/10 text-xl shadow-lg animate-[float_5s_ease-in-out_infinite]">⌁</div>
+
+              <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" fill="none">
+                <path d="M27 28 L50 50 L73 30 M50 50 L30 72 M50 50 L72 74" stroke="url(#keloLine)" strokeWidth="0.65" strokeDasharray="2 2" opacity=".55" />
+                <defs><linearGradient id="keloLine" x1="20" y1="20" x2="80" y2="80"><stop stopColor="#22D3EE"/><stop offset=".5" stopColor="#6D5DFB"/><stop offset="1" stopColor="#EC4899"/></linearGradient></defs>
+              </svg>
+
+              <div className={`absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full border px-3 py-1.5 text-[10px] font-bold tracking-wide ${dark ? "border-white/10 bg-black/20 text-gray-300" : "border-[#E5E7F7] bg-white/80 text-gray-500"}`}>AT PROTOCOL · KELO ID · KELO SOCIAL</div>
+            </div>
+          </div>
         </div>
       </section>
 
