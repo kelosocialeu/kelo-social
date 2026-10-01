@@ -59,15 +59,11 @@ export default function LandingPage() {
             <button
               type="button"
               onClick={toggleTheme}
-              aria-label={dark ? "Activer le mode clair" : "Activer le mode sombre"}
-              className={`group relative inline-flex h-9 w-16 items-center rounded-full border p-1 transition-all duration-300 ${dark ? "border-violet-500/40 bg-gray-800" : "border-violet-200 bg-violet-50"}`}
+              aria-label={dark ? "Passer au mode clair" : "Passer au mode sombre"}
+              className={`inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-bold transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${dark ? "border-white/10 bg-white/5 text-white hover:bg-white/10" : "border-[#DDE0F2] bg-white text-gray-700 hover:bg-[#F5F3FF]"}`}
             >
-              <span className={`absolute inset-y-1 left-1 flex w-7 items-center justify-center rounded-full bg-white text-xs shadow-sm transition-transform duration-300 ${dark ? "translate-x-7" : "translate-x-0"}`}>
-                {dark ? "☀" : "☾"}
-              </span>
-              <span className={`ml-auto mr-1 text-[10px] font-bold ${dark ? "text-violet-300" : "text-violet-600"}`}>
-                {dark ? "CLAIR" : "SOMBRE"}
-              </span>
+              <span className="text-sm">{dark ? "☀" : "☾"}</span>
+              <span>{dark ? "Clair" : "Sombre"}</span>
             </button>
             <Link href="/login" className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${dark ? "text-gray-200 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"}`}>{t("auth.login.submit", "Se connecter")}</Link>
             <Link href="/signup" className="rounded-xl bg-gradient-to-r from-[#2563FF] via-[#6D5DFB] to-[#8B5CFF] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">{t("auth.login.createAccount", "Créer un compte")}</Link>
@@ -138,6 +134,34 @@ export default function LandingPage() {
 
               <div className={`absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full border px-3 py-1.5 text-[10px] font-bold tracking-wide ${dark ? "border-white/10 bg-black/20 text-gray-300" : "border-[#E5E7F7] bg-white/80 text-gray-500"}`}>AT PROTOCOL · KELO ID · KELO SOCIAL</div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={`relative overflow-hidden border-y px-4 py-20 sm:py-28 ${dark ? "border-white/10 bg-[#0A0A19]" : "border-[#E8EAF5] bg-[#F8F9FF]"}`}>
+        <div className="mx-auto max-w-6xl">
+          <div className="max-w-2xl">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#6D5DFB]">Contrôle de l’algorithme</p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Vous choisissez votre expérience.</h2>
+            <p className={`mt-4 text-base leading-7 ${dark ? "text-gray-300" : "text-gray-600"}`}>
+              Kelo Social vous permet de choisir le niveau d’intervention de l’algorithme dans votre fil. Les détails de chaque niveau peuvent être définis précisément dans vos paramètres.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              ["Très peu", "Une expérience avec très peu d’intervention algorithmique.", "from-[#22D3EE] to-[#2563FF]"],
+              ["Moyen", "Un équilibre entre contenu choisi et recommandations.", "from-[#2563FF] to-[#6D5DFB]"],
+              ["Addictif moyen", "Davantage de recommandations personnalisées.", "from-[#6D5DFB] to-[#EC4899]"],
+              ["Addictif", "Une expérience fortement orientée par les recommandations.", "from-[#EC4899] to-[#F59E0B]"],
+            ].map(([title, description, gradient], index) => (
+              <article key={title} className={`group relative overflow-hidden rounded-[1.75rem] border p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${dark ? "border-white/10 bg-white/[0.04]" : "border-[#E3E5F2] bg-white"}`}>
+                <div className={`mb-5 h-1.5 w-14 rounded-full bg-gradient-to-r ${gradient} transition-all duration-300 group-hover:w-20`} />
+                <div className={`mb-3 text-xs font-black uppercase tracking-widest ${dark ? "text-gray-500" : "text-gray-400"}`}>Niveau {index + 1}</div>
+                <h3 className="text-xl font-black">{title}</h3>
+                <p className={`mt-2 text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{description}</p>
+              </article>
+            ))}
           </div>
         </div>
       </section>
