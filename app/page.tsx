@@ -40,7 +40,7 @@ export default function LandingPage() {
   }
 
   const features = [
-    [t("landing.cards.algorithm.title", "Votre algorithme"), t("landing.cards.algorithm.text", "Choisissez le niveau d’algorithme qui vous convient depuis les paramètres.")],
+    [t("landing.cards.algorithm.title", "Votre algorithme"), t("landing.cards.algorithm.text", "Choisissez le niveau d’algorithme qui vous convient dans les paramètres.")],
     [t("landing.cards.identity.title", "Kelo ID"), t("landing.cards.identity.text", "Une identité vérifiable pour mieux distinguer les différents types de comptes.")],
     [t("landing.cards.federation.title", "AT Protocol"), t("landing.cards.federation.text", "Une technologie ouverte qui permet à différents services sociaux de communiquer entre eux.")],
   ];
@@ -142,47 +142,89 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-6xl px-4 py-14 sm:py-20 animate-[fadeUp_0.6s_ease-out_both]">
-        <div className="mx-auto max-w-xl text-center">
-          <p className="text-sm font-semibold text-[#6D5DFB]">{t("landing.why.eyebrow", "Pourquoi Kelo Social ?")}</p>
-          <h2 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">{t("landing.why.title", "Une expérience simple et claire.")}</h2>
-          <p className={`mt-3 text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{t("landing.why.description", "Kelo Social est un réseau social simple où vous gardez davantage de contrôle sur votre expérience.")}</p>
-        </div>
-        <div className="relative mt-7 grid gap-3 md:grid-cols-3">
-          <div className="pointer-events-none absolute left-[16%] right-[16%] top-1/2 hidden h-px bg-gradient-to-r from-[#2563FF]/20 via-[#6D5DFB]/40 to-[#8B5CFF]/20 md:block" />
-          {features.map(([title, description], index) => (
-            <article key={title} className={`group relative z-10 overflow-hidden rounded-3xl border p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${dark ? "border-gray-800 bg-gray-900/90" : "border-[#E2E4F5] bg-white shadow-sm"}`} style={{ animation: `fadeUp 0.45s ease-out ${index * 80}ms both` }}>
-              <div className="mb-5 h-1.5 w-10 rounded-full bg-gradient-to-r from-[#2563FF] via-[#8B5CFF] to-[#EC4899] transition-all duration-300 group-hover:w-12" />
-              <h3 className="text-base font-bold">{title}</h3>
-              <p className={`mt-2 text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{description}</p>
-            </article>
-          ))}
+      <section className="relative overflow-hidden px-4 py-20 sm:py-28">
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-12 grid items-end gap-5 lg:grid-cols-[1fr_auto]">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#6D5DFB]">{t("landing.why.eyebrow", "Pourquoi Kelo Social ?")}</p>
+              <h2 className="mt-3 max-w-2xl text-3xl font-black tracking-tight sm:text-5xl">{t("landing.why.title", "Une expérience sociale qui vous ressemble.")}</h2>
+            </div>
+            <p className={`max-w-md text-sm leading-6 lg:text-right ${dark ? "text-gray-400" : "text-gray-600"}`}>{t("landing.why.description", "Kelo Social vous donne les outils pour personnaliser votre expérience sociale et garder davantage de contrôle.")}</p>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-3">
+            {features.map(([title, description], index) => (
+              <article key={title} className={`group relative min-h-56 overflow-hidden rounded-[2rem] border p-7 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl ${dark ? "border-white/10 bg-white/[0.04]" : "border-[#E4E6F5] bg-white shadow-[0_15px_50px_rgba(38,42,90,.07)]"}`} style={{ animation: `fadeUp 0.5s ease-out ${index * 100}ms both` }}>
+                <div className={`absolute -right-10 -top-10 h-32 w-32 rounded-full blur-3xl transition-transform duration-500 group-hover:scale-150 ${index === 0 ? "bg-[#2563FF]/20" : index === 1 ? "bg-[#EC4899]/20" : "bg-[#8B5CFF]/20"}`} />
+                <div className="relative">
+                  <div className="mb-7 flex items-center justify-between">
+                    <span className={`flex h-11 w-11 items-center justify-center rounded-2xl text-lg font-black text-white shadow-lg ${index === 0 ? "bg-gradient-to-br from-[#2563FF] to-[#22D3EE]" : index === 1 ? "bg-gradient-to-br from-[#EC4899] to-[#F59E0B]" : "bg-gradient-to-br from-[#6D5DFB] to-[#8B5CFF]"}`}>
+                      {index === 0 ? "✦" : index === 1 ? "✓" : "∞"}
+                    </span>
+                    <span className={`text-4xl font-black transition-transform duration-500 group-hover:scale-110 ${dark ? "text-white/10" : "text-[#6D5DFB]/10"}`}>0{index + 1}</span>
+                  </div>
+                  <h3 className="text-xl font-black">{title}</h3>
+                  <p className={`mt-3 text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{description}</p>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
-            <section className={`relative overflow-hidden border-y transition-colors duration-300 ${dark ? "border-white/10 bg-gradient-to-r from-[#16163A] via-[#21174A] to-[#35152F]" : "border-[#E7E8F5] bg-gradient-to-r from-[#EEF4FF] via-[#F5F0FF] to-[#FFF0F7]"}`}>
-        <div className="mx-auto max-w-3xl px-4 py-9 text-center">
-          <p className="text-sm font-semibold text-[#6D5DFB]">{t("landing.about.eyebrow", "Kelo Social")}</p>
-          <h2 className="mt-1 text-2xl font-extrabold tracking-tight">{t("landing.about.title", "Un réseau social pensé pour vous.")}</h2>
-          <p className={`mx-auto mt-3 max-w-2xl text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>
-            {t("landing.about.description", "Kelo Social vous permet de publier, discuter et découvrir du contenu dans une interface claire et agréable. Vous pouvez choisir votre expérience algorithmique et utiliser Kelo ID pour vérifier votre identité.")}
-          </p>
+      <section className={`relative overflow-hidden px-4 py-20 sm:py-24 ${dark ? "bg-[#0D0D22]" : "bg-white"}`}>
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#8B5CFF]/40 to-transparent" />
+        <div className="absolute -left-24 top-10 h-64 w-64 rounded-full bg-[#2563FF]/10 blur-3xl" />
+        <div className="absolute -right-24 bottom-0 h-64 w-64 rounded-full bg-[#EC4899]/10 blur-3xl" />
+        <div className="relative mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[.85fr_1.15fr]">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#6D5DFB]">{t("landing.about.eyebrow", "Kelo Social")}</p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">{t("landing.about.title", "Un réseau social pensé pour vous.")}</h2>
+          </div>
+          <div className={`rounded-[2rem] border p-7 sm:p-9 ${dark ? "border-white/10 bg-white/[0.04]" : "border-[#E6E8F5] bg-[#F8F9FF]"}`}>
+            <div className="mb-5 h-1.5 w-20 rounded-full bg-gradient-to-r from-[#2563FF] via-[#6D5DFB] to-[#EC4899]" />
+            <p className={`text-base leading-8 ${dark ? "text-gray-300" : "text-gray-600"}`}>
+              {t("landing.about.description", "Publiez, échangez et découvrez du contenu dans un espace pensé pour être simple, vivant et personnalisable. Choisissez votre expérience algorithmique et utilisez Kelo ID lorsque vous souhaitez vérifier votre identité.")}
+            </p>
+          </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-4xl px-4 py-14 text-center animate-[fadeUp_0.7s_ease-out_both]">
-        <p className="text-sm font-semibold text-[#6D5DFB]">{t("landing.atproto.eyebrow", "Technologie")}</p>
-        <h2 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">{t("landing.atproto.title", "AT Protocol, c’est quoi ?")}</h2>
-        <p className={`mx-auto mt-2 max-w-2xl text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>
-          {t("landing.atproto.description", "Une technologie ouverte qui permet à différents services sociaux de communiquer entre eux et rend votre identité plus portable.")}
-        </p>
+      <section className="relative overflow-hidden px-4 py-20 sm:py-28">
+        <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#8B5CFF]/20 bg-gradient-to-br from-[#2563FF] via-[#6D5DFB] to-[#EC4899] p-[1px] shadow-[0_25px_80px_rgba(109,93,251,.18)]">
+          <div className={`relative overflow-hidden rounded-[2.45rem] px-6 py-12 sm:px-12 sm:py-16 ${dark ? "bg-[#0C0C1D]" : "bg-white"}`}>
+            <div className="absolute right-[-80px] top-[-100px] h-64 w-64 rounded-full bg-[#8B5CFF]/10 blur-3xl" />
+            <div className="relative grid items-center gap-10 lg:grid-cols-[1fr_.8fr]">
+              <div>
+                <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#6D5DFB]">{t("landing.atproto.eyebrow", "Technologie")}</p>
+                <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">{t("landing.atproto.title", "AT Protocol, c’est quoi ?")}</h2>
+                <p className={`mt-5 max-w-2xl text-base leading-7 ${dark ? "text-gray-300" : "text-gray-600"}`}>
+                  {t("landing.atproto.description", "AT Protocol est une technologie ouverte qui permet à différents services sociaux de communiquer entre eux. Votre identité et vos données sont ainsi pensées pour être plus portables entre les services compatibles.")}
+                </p>
+              </div>
+              <div className="relative mx-auto h-48 w-48">
+                <div className="absolute inset-0 rounded-full border border-[#22D3EE]/30 animate-[spinSlow_12s_linear_infinite]" />
+                <div className="absolute inset-6 rounded-full border border-[#EC4899]/30 animate-[spinSlow_9s_linear_infinite_reverse]" />
+                <div className="absolute inset-12 flex items-center justify-center rounded-[1.75rem] bg-gradient-to-br from-[#2563FF] via-[#6D5DFB] to-[#EC4899] p-1 shadow-[0_0_45px_rgba(109,93,251,.3)]">
+                  <div className="flex h-full w-full items-center justify-center rounded-[1.5rem] bg-white p-4"><img src={LOGO} alt="" width={120} height={40} className="w-full object-contain" /></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={`overflow-hidden border-y py-5 ${dark ? "border-white/10 bg-white/[0.03]" : "border-[#E8EAF5] bg-white"}`}>
+        <div className={`flex min-w-max animate-[marquee_22s_linear_infinite] gap-10 text-xs font-bold uppercase tracking-[0.2em] ${dark ? "text-gray-500" : "text-gray-400"}`}>
+          <span>KELO SOCIAL</span><span>✦</span><span>KELO ID</span><span>✦</span><span>AT PROTOCOL</span><span>✦</span><span>RÉSEAU SOCIAL OUVERT</span><span>✦</span><span>KELO SOCIAL</span><span>✦</span><span>KELO ID</span><span>✦</span><span>AT PROTOCOL</span>
+        </div>
       </section>
 
       <footer className={`border-t transition-colors duration-300 ${dark ? "border-gray-800" : "border-gray-100"}`}>
         <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-6">
           <div>
             <img src={LOGO} alt="Kelo Social" width={125} height={30} className="h-7 w-auto rounded-lg" loading="lazy" />
-            <p className={`mt-1 text-xs ${dark ? "text-gray-400" : "text-gray-500"}`}>{t("landing.footer.tagline", "Une expérience sociale construite autour d’AT Protocol.")}</p>
+            <p className={`mt-1 text-xs ${dark ? "text-gray-400" : "text-gray-500"}`}>{t("landing.footer.tagline", "Un réseau social ouvert, coloré et construit autour d’AT Protocol.")}</p>
           </div>
           <nav className={`flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold ${dark ? "text-gray-400" : "text-gray-500"}`}>
             <Link href="/legal-notice">Mentions légales</Link>
@@ -204,7 +246,7 @@ export default function LandingPage() {
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes float { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(0, -10px, 0); } }
-        @keyframes softGlow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.08); } }
+        @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-35%); } }\n        @keyframes softGlow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.08); } }
         @media (prefers-reduced-motion: reduce) {
           *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
         }
