@@ -150,16 +150,20 @@ export default function LandingPage() {
 
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              ["Très peu", "Une expérience avec très peu d’intervention algorithmique.", "from-[#22D3EE] to-[#2563FF]"],
-              ["Moyen", "Un équilibre entre contenu choisi et recommandations.", "from-[#2563FF] to-[#6D5DFB]"],
-              ["Addictif moyen", "Davantage de recommandations personnalisées.", "from-[#6D5DFB] to-[#EC4899]"],
-              ["Addictif", "Une expérience fortement orientée par les recommandations.", "from-[#EC4899] to-[#F59E0B]"],
-            ].map(([title, description, gradient], index) => (
+              ["Très peu", "Environ 30 min/jour", "Recommandations légères", "L’algorithme privilégie la langue et les intérêts de la personne, tout en mélangeant volontairement quelques contenus moins susceptibles de l’intéresser. L’objectif est de proposer une découverte mesurée, puis de laisser progressivement l’utilisateur décrocher.", "from-[#22D3EE] to-[#2563FF]"],
+              ["Moyen", "Environ 1 h/jour", "Recommandations équilibrées", "Le principe reste similaire, avec davantage de personnalisation et de continuité dans les recommandations. L’algorithme cherche à maintenir l’attention autour d’une durée d’environ une heure avant de réduire progressivement son intensité.", "from-[#2563FF] to-[#6D5DFB]"],
+              ["Addictif moyen", "Environ 2 h/jour", "Recommandations renforcées", "La personnalisation devient beaucoup plus soutenue. Le système cherche à prolonger nettement la session, avec davantage de contenus susceptibles de retenir l’attention, autour d’une cible d’environ deux heures.", "from-[#6D5DFB] to-[#EC4899]"],
+              ["Addictif", "Sans limite de durée", "Engagement maximal", "Le niveau le plus intense vise à maximiser la durée passée sur Kelo Social en adaptant continuellement les recommandations aux signaux d’engagement. Il est conçu pour une utilisation sans objectif de durée maximale.", "from-[#EC4899] to-[#F59E0B]"],
+            ].map(([title, duration, label, description, gradient], index) => (
               <article key={title} className={`group relative overflow-hidden rounded-[1.75rem] border p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${dark ? "border-white/10 bg-white/[0.04]" : "border-[#E3E5F2] bg-white"}`}>
                 <div className={`mb-5 h-1.5 w-14 rounded-full bg-gradient-to-r ${gradient} transition-all duration-300 group-hover:w-20`} />
-                <div className={`mb-3 text-xs font-black uppercase tracking-widest ${dark ? "text-gray-500" : "text-gray-400"}`}>Niveau {index + 1}</div>
-                <h3 className="text-xl font-black">{title}</h3>
-                <p className={`mt-2 text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{description}</p>
+                <div className="flex items-center justify-between gap-3">
+                  <div className={`text-xs font-black uppercase tracking-widest ${dark ? "text-gray-500" : "text-gray-400"}`}>Niveau {index + 1}</div>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${dark ? "bg-white/10 text-gray-200" : "bg-[#F1F0FF] text-[#6D5DFB]"}`}>{duration}</span>
+                </div>
+                <h3 className="mt-4 text-xl font-black">{title}</h3>
+                <p className={`mt-1 text-xs font-bold uppercase tracking-wide ${dark ? "text-gray-400" : "text-[#6D5DFB]"}`}>{label}</p>
+                <p className={`mt-3 text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{description}</p>
               </article>
             ))}
           </div>
