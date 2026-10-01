@@ -1,9 +1,9 @@
 "use client";
 
-import { Bell, ChevronRight, Eye, FileText, Globe2, Languages, MessageCircleMore, Palette, Shield, UserRound } from "lucide-react";
+import { Bell, BrainCircuit, ChevronRight, Eye, FileText, Globe2, Languages, MessageCircleMore, Palette, Shield, UserRound } from "lucide-react";
 import { useTranslation } from "@/components/providers/TranslationProvider";
 
-export type SettingsSection = "account" | "identity" | "moderation" | "appearance" | "notifications" | "language" | "privacy" | "messaging" | "legal";
+export type SettingsSection = "account" | "identity" | "moderation" | "appearance" | "notifications" | "algorithm" | "language" | "privacy" | "messaging" | "legal";
 interface SettingsNavProps { active: SettingsSection; onChange: (section: SettingsSection) => void; }
 type SettingsItem = { key: SettingsSection; labelKey: string; fallback: string; descriptionKey: string; descriptionFallback: string; icon: React.ComponentType<{ className?: string }>; };
 
@@ -16,6 +16,7 @@ const GROUPS: Array<{ titleKey: string; titleFallback: string; items: SettingsIt
   { titleKey:"settings.group.preferences",titleFallback:"Préférences",items:[
     {key:"appearance",labelKey:"settings.display",fallback:"Affichage",descriptionKey:"settings.display.description",descriptionFallback:"Thème, couleurs, texte et animations",icon:Palette},
     {key:"language",labelKey:"settings.languageContent",fallback:"Langues et centres d’intérêt",descriptionKey:"settings.languageContent.description",descriptionFallback:"Langues, fil et sujets préférés",icon:Languages},
+    {key:"algorithm",labelKey:"settings.algorithm",fallback:"Algorithme",descriptionKey:"settings.algorithm.description",descriptionFallback:"Contrôlez la personnalisation de votre fil",icon:BrainCircuit},
     {key:"notifications",labelKey:"settings.notifications",fallback:"Notifications et flux",descriptionKey:"settings.notifications.description",descriptionFallback:"Notifications et contenu affiché",icon:Bell},
     {key:"messaging",labelKey:"settings.messaging",fallback:"Messagerie",descriptionKey:"settings.messaging.description",descriptionFallback:"Messages privés et invitations",icon:MessageCircleMore},
   ]},
