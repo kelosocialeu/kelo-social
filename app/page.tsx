@@ -59,9 +59,14 @@ export default function LandingPage() {
               type="button"
               onClick={toggleTheme}
               aria-label={dark ? "Activer le mode clair" : "Activer le mode sombre"}
-              className={`rounded-lg px-3 py-2 text-lg transition-colors ${dark ? "text-gray-200 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"}`}
+              className={`group relative inline-flex h-9 w-16 items-center rounded-full border p-1 transition-all duration-300 ${dark ? "border-violet-500/40 bg-gray-800" : "border-violet-200 bg-violet-50"}`}
             >
-              {dark ? "☀️" : "🌙"}
+              <span className={`absolute inset-y-1 left-1 flex w-7 items-center justify-center rounded-full bg-white text-xs shadow-sm transition-transform duration-300 ${dark ? "translate-x-7" : "translate-x-0"}`}>
+                {dark ? "☀" : "☾"}
+              </span>
+              <span className={`ml-auto mr-1 text-[10px] font-bold ${dark ? "text-violet-300" : "text-violet-600"}`}>
+                {dark ? "CLAIR" : "SOMBRE"}
+              </span>
             </button>
             <Link href="/login" className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${dark ? "text-gray-200 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"}`}>{t("auth.login.submit", "Se connecter")}</Link>
             <Link href="/signup" className="rounded-lg bg-gray-950 px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-violet-700 hover:-translate-y-0.5">{t("auth.login.createAccount", "Créer un compte")}</Link>
@@ -69,16 +74,18 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <section className={`border-b transition-colors duration-300 ${dark ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-gray-50"}`}>
-        <div className="mx-auto max-w-3xl px-4 py-12 text-center sm:py-16">
+      <section className={`relative overflow-hidden border-b transition-colors duration-300 ${dark ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-gray-50"}`}>
+        <div className="pointer-events-none absolute -left-24 top-8 h-48 w-48 rounded-full bg-blue-500/10 blur-3xl animate-[float_7s_ease-in-out_infinite]" />
+        <div className="pointer-events-none absolute -right-24 bottom-0 h-56 w-56 rounded-full bg-violet-500/10 blur-3xl animate-[float_9s_ease-in-out_infinite_reverse]" />
+        <div className="relative mx-auto max-w-3xl px-4 py-12 text-center sm:py-16">
           <p className="animate-[fadeIn_0.5s_ease-out] text-sm font-semibold text-violet-500">{t("landing.beta", "Kelo Social · Version bêta")}</p>
           <h1 className="mx-auto mt-3 max-w-2xl text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl">
             {t("landing.hero.title", "Le réseau social qui vous laisse")}
-            <span className="block text-violet-500">{t("landing.hero.emphasis", "reprendre le contrôle.")}</span>
+            <span className="block bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent animate-[softGlow_4s_ease-in-out_infinite]">{t("landing.hero.emphasis", "reprendre le contrôle.")}</span>
           </h1>
           <p className={`mx-auto mt-4 max-w-xl text-base leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{t("landing.hero.description", "Une expérience sociale moderne construite sur AT Protocol, avec des choix d’algorithme et une architecture ouverte.")}</p>
           <div className="mx-auto mt-6 flex max-w-md flex-col gap-2 sm:max-w-none sm:flex-row sm:justify-center">
-            <Link href="/signup" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-violet-700 px-5 font-bold text-white transition-all hover:-translate-y-0.5 hover:bg-violet-800">{t("landing.hero.join", "Rejoindre Kelo Social")}</Link>
+            <Link href="/signup" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-5 font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">{t("landing.hero.join", "Rejoindre Kelo Social")}</Link>
             <Link href="/login" className={`inline-flex min-h-11 items-center justify-center rounded-lg border px-5 font-bold transition-all hover:-translate-y-0.5 ${dark ? "border-gray-700 bg-gray-950 text-gray-100 hover:bg-gray-800" : "border-gray-300 bg-white text-gray-800 hover:bg-gray-50"}`}>{t("landing.hero.existing", "J’ai déjà un compte")}</Link>
           </div>
           <p className={`mt-5 text-xs ${dark ? "text-gray-400" : "text-gray-500"}`}>✓ {t("landing.hero.atproto", "Basé sur AT Protocol")} · ✓ {t("landing.hero.pds", "Architecture ouverte")} · ✓ {t("landing.hero.verify", "Vérification avec Kelo ID")}</p>
@@ -93,7 +100,8 @@ export default function LandingPage() {
         </div>
         <div className="mt-7 grid gap-3 md:grid-cols-3">
           {features.map(([title, description], index) => (
-            <article key={title} className={`rounded-2xl border p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md ${dark ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`} style={{ animation: `fadeUp 0.45s ease-out ${index * 80}ms both` }}>
+            <article key={title} className={`group rounded-2xl border p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${dark ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`} style={{ animation: `fadeUp 0.45s ease-out ${index * 80}ms both` }}>
+              <div className="mb-4 h-1 w-8 rounded-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all duration-300 group-hover:w-12" />
               <h3 className="text-base font-bold">{title}</h3>
               <p className={`mt-2 text-sm leading-6 ${dark ? "text-gray-300" : "text-gray-600"}`}>{description}</p>
             </article>
@@ -141,6 +149,8 @@ export default function LandingPage() {
       <style jsx global>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes float { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(0, -10px, 0); } }
+        @keyframes softGlow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.08); } }
         @media (prefers-reduced-motion: reduce) {
           *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
         }
