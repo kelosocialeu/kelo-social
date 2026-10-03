@@ -79,21 +79,45 @@ function clientIp(request: NextRequest) {
 
 function isAllowedOrigin(request: NextRequest) {
   const origin = request.headers.get("origin");
-  if (!origin) return true; // native clients/server-side calls may omit Origin
+  if (!origin || origin === "null") return true;
   try {
     const url = new URL(origin);
-    return url.protocol === "https:" && (url.hostname === "kelosocial.eu" || url.hostname === "www.kelosocial.eu");
+    const hostname = url.hostname.toLowerCase();
+    return (
+      (url.protocol === "https:" &&
+        (hostname === "kelosocial.eu" || hostname === "www.kelosocial.eu")) ||
+      (url.protocol === "http:" && (hostname === "localhost" || hostname === "127.0.0.1"))
+    );
   } catch {
     return false;
   }
 }
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "https://kelosocial.eu",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Vary": "Origin",
-};
+function corsOrigin(request: NextRequest) {
+  const origin = request.headers.get("origin");
+  if (!origin || origin === "null") return "https://kelosocial.eu";
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname.toLowerCase();
+    if (
+      (url.protocol === "https:" &&
+        (hostname === "kelosocial.eu" || hostname === "www.kelosocial.eu")) ||
+      (url.protocol === "http:" && (hostname === "localhost" || hostname === "127.0.0.1"))
+    ) {
+      return origin;
+    }
+  } catch {}
+  return "https://kelosocial.eu";
+}
+
+function getCorsHeaders(request: NextRequest) {
+  return {
+    "Access-Control-Allow-Origin": corsOrigin(request),
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Vary": "Origin",
+  };
+}
 
 function isRateLimited(request: NextRequest) {
   const key = clientIp(request);
@@ -248,11 +272,11 @@ export async function GET() {
 }
 
 export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
 export async function POST(request: NextRequest) {
-  const corsHeaders = CORS_HEADERS;
+  const corsHeaders = getCorsHeaders(request);
   try {
     if (!isAllowedOrigin(request)) {
       return NextResponse.json({ error: "Origine non autorisée" }, { status: 403, headers: corsHeaders });
