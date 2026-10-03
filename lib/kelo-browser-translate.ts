@@ -61,11 +61,17 @@ function writeCache(text: string, target: string, value: string) {
 }
 
 async function translateOnServer(text: string, target: string): Promise<TranslationResult> {
-  const response = await fetch("/api/translate", {
+  const endpoint =
+    typeof window !== "undefined"
+      ? new URL("/api/translate", window.location.origin).toString()
+      : "/api/translate";
+
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ text, target: targetLanguage(target) }),
     cache: "no-store",
+    signal: AbortSignal.timeout(15000),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || typeof data.translation !== "string" || !data.translation.trim()) {
