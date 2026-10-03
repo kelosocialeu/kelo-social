@@ -102,14 +102,18 @@ export async function rankKeloFeed(items: FeedItem[], cursor?: string) {
     );
     const ageHours = Math.max(0, (Date.now() - new Date(record.createdAt || Date.now()).getTime()) / 3600000);
     const freshness = 1 / (1 + ageHours);
+    const recentBoost = ageHours <= 12 ? (13 - ageHours) * (1.5 + weights.freshness * 0.35) : 0;
     const exploration = ((index * 17 + text.length * 13) % 100) / 100;
+    const refreshJitter = !cursor ? (((index * 31 + text.length * 7 + Math.floor(Date.now() / 60000)) % 1000) / 1000) * 4 : 0;
 
     let score =
       interestMatches * weights.interest +
       languageMatch * weights.language +
       engagement * weights.engagement +
       freshness * weights.freshness +
-      exploration * weights.exploration;
+      recentBoost +
+      exploration * weights.exploration +
+      refreshJitter;
 
     // Les niveaux restent pilotés par l'utilisateur. Après la durée indicative,
     // on augmente progressivement la diversité au lieu de chercher à prolonger
