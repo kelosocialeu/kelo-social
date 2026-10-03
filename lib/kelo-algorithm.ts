@@ -89,6 +89,7 @@ export async function rankKeloFeed(items: FeedItem[], cursor?: string) {
   const level = getLevel();
   const weights = LEVELS[level];
   const sessionMinutes = getSessionMinutes();
+  const refreshSeed = !cursor ? Math.floor(Math.random() * 1_000_000) : 0;
 
   const ranked = items.map((item, index) => {
     const record = item.post?.record || {};
@@ -104,7 +105,7 @@ export async function rankKeloFeed(items: FeedItem[], cursor?: string) {
     const freshness = 1 / (1 + ageHours);
     const recentBoost = ageHours <= 12 ? (13 - ageHours) * (1.5 + weights.freshness * 0.35) : 0;
     const exploration = ((index * 17 + text.length * 13) % 100) / 100;
-    const refreshJitter = !cursor ? (((index * 31 + text.length * 7 + Math.floor(Date.now() / 60000)) % 1000) / 1000) * 4 : 0;
+    const refreshJitter = refreshSeed ? (((index * 31 + text.length * 7 + refreshSeed) % 1000) / 1000) * 4 : 0;
 
     let score =
       interestMatches * weights.interest +
