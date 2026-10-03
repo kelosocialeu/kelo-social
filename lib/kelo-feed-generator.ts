@@ -54,7 +54,6 @@ function scorePost(post: any, index: number, level: Level, acceptLanguage: strin
   const freshness = 1 / (1 + ageHours);
   const exploration = ((index * 17 + text.length * 13) % 100) / 100;
   const language = languageScore(record.langs, acceptLanguage);
-  const ageHours = Math.max(0, (Date.now() - createdAt) / 3600000);
   const recentBoost = ageHours <= 12 ? (13 - ageHours) * (1.5 + weights.freshness * 0.35) : 0;
   const refreshJitter = refreshSeed > 0 ? (((index * 31 + text.length * 7 + refreshSeed) % 1000) / 1000) * 4 : 0;
 
