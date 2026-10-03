@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Flag, Languages, MoreHorizontal, Heart } from "lucide-react";
 import { addConversationReaction, removeConversationReaction } from "@/lib/atproto/chat";
 import { getKeloContentPreferences, resolvedInterfaceLanguage } from "@/lib/kelo-language-preferences";
@@ -12,6 +12,8 @@ export default function MessageActionMenu({
   myDid,
   onMessageUpdated,
   onReport,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   convoId: string;
   message: any;
@@ -19,40 +21,16 @@ export default function MessageActionMenu({
   onMessageUpdated?: (message: any) => void;
   onReport?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (value: boolean | ((current: boolean) => boolean)) => {
+    const next = typeof value === "function" ? value(open) : value;
+    if (controlledOpen === undefined) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   const [working, setWorking] = useState(false);
   const [translated, setTranslated] = useState("");
   const [translationLoading, setTranslationLoading] = useState(false);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressTriggered = useRef(false);
-
-  const reactions = Array.isArray(message?.reactions) ? message.reactions : [];
-  const myLike = reactions.find(
-    (reaction: any) => reaction?.value === "❤️" && reaction?.sender?.did === myDid
-  );
-
-  const clearLongPress = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  };
-
-  useEffect(() => clearLongPress, []);
-
-  const startLongPress = () => {
-    longPressTriggered.current = false;
-    clearLongPress();
-    longPressTimer.current = setTimeout(() => {
-      longPressTriggered.current = true;
-      setOpen(true);
-    }, 500);
-  };
-
-  const endLongPress = () => {
-    clearLongPress();
-  };
-
   const toggleLike = async () => {
     if (working || !message?.id) return;
     setWorking(true);
@@ -87,24 +65,10 @@ export default function MessageActionMenu({
   return (
     <div
       className="relative flex shrink-0 items-center"
-      onPointerDown={startLongPress}
-      onPointerUp={endLongPress}
-      onPointerCancel={endLongPress}
-      onPointerLeave={endLongPress}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        setOpen(true);
-      }}
     >
       <button
         type="button"
-        onClick={() => {
-          if (longPressTriggered.current) {
-            longPressTriggered.current = false;
-            return;
-          }
-          setOpen((value) => !value);
-        }}
+        onClick={() => setOpen((value) => !value)}
         className="hidden h-8 w-8 items-center justify-center rounded-full text-kelo-muted transition hover:bg-kelo-background hover:text-kelo-primary [@media(hover:hover)]:flex"
         aria-label="Options du message"
         aria-expanded={open}
