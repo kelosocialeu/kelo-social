@@ -210,6 +210,7 @@ export default function ConversationPage() {
                       />
                     </div>
                   </div>
+                </div>
             })}
             {!loading && !error && messages.length === 0 && <div className="flex min-h-[50vh] items-center justify-center px-6"><div className="max-w-sm text-center"><div className="text-4xl" aria-hidden="true">💬</div><h2 className="mt-4 text-lg font-bold text-kelo-text">Commencez la discussion</h2><p className="mt-2 text-sm text-kelo-muted">Envoyez votre premier message.</p></div></div>}
             <div ref={bottomRef} />
