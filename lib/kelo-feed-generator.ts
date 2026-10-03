@@ -40,7 +40,7 @@ function languageScore(langs: unknown, acceptLanguage: string) {
   return langs.some((lang) => wanted.includes(String(lang).toLowerCase().split("-")[0])) ? 1 : 0;
 }
 
-function scorePost(post: any, index: number, level: Level, acceptLanguage: string) {
+function scorePost(post: any, index: number, level: Level, acceptLanguage: string, refreshSeed = 0) {
   const weights = WEIGHTS[level];
   const record = post.record || {};
   const text = String(record.text || "");
@@ -54,12 +54,17 @@ function scorePost(post: any, index: number, level: Level, acceptLanguage: strin
   const freshness = 1 / (1 + ageHours);
   const exploration = ((index * 17 + text.length * 13) % 100) / 100;
   const language = languageScore(record.langs, acceptLanguage);
+  const ageHours = Math.max(0, (Date.now() - createdAt) / 3600000);
+  const recentBoost = ageHours <= 12 ? (13 - ageHours) * (1.5 + weights.freshness * 0.35) : 0;
+  const refreshJitter = refreshSeed > 0 ? (((index * 31 + text.length * 7 + refreshSeed) % 1000) / 1000) * 4 : 0;
 
   return (
     language * 8 +
     engagement * weights.engagement +
     freshness * weights.freshness +
-    exploration * weights.exploration
+    recentBoost +
+    exploration * weights.exploration +
+    refreshJitter
   );
 }
 
@@ -73,8 +78,11 @@ export async function getKeloFeedSkeleton(feedUri: string, limit: number, cursor
   });
 
   const posts = response.data.feed.filter((item: any) => !item?.post?.record?.reply);
+  // Chaque première page peut varier légèrement afin qu'un rechargement propose
+  // de nouvelles publications. La pagination reste déterministe via le curseur.
+  const refreshSeed = cursor ? 0 : Math.floor(Math.random() * 1_000_000);
   const ranked = posts
-    .map((item: any, index: number) => ({ uri: item.post.uri, score: scorePost(item.post, index, level, acceptLanguage) }))
+    .map((item: any, index: number) => ({ uri: item.post.uri, score: scorePost(item.post, index, level, acceptLanguage, refreshSeed) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 
