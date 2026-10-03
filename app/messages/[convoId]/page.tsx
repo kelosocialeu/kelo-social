@@ -237,20 +237,21 @@ export default function ConversationPage() {
                                 .map((reaction: any) => String(reaction.value))
                             )
                           ).map((value) => {
-                            const count = message.reactions.filter((reaction: any) => String(reaction?.value) === value).length;
+                            const reactionValue = String(value);
+                            const count = message.reactions.filter((reaction: any) => String(reaction?.value) === reactionValue).length;
                             const mine = message.reactions.some(
                               (reaction: any) =>
-                                String(reaction?.value) === value && reaction?.sender?.did === myDid
+                                String(reaction?.value) === reactionValue && reaction?.sender?.did === myDid
                             );
                             return (
                               <button
-                                key={value}
+                                key={reactionValue}
                                 type="button"
-                                onClick={() => void toggleMessageReaction(message, value)}
+                                onClick={() => void toggleMessageReaction(message, reactionValue)}
                                 className={`inline-flex min-h-7 items-center gap-1 rounded-full border px-2.5 py-1 text-sm shadow-sm transition hover:scale-[1.02] ${mine ? "border-kelo-primary bg-kelo-primary/10" : "border-kelo-border bg-white"}`}
                                 title={mine ? "Retirer ma réaction" : "Réagir"}
                               >
-                                <span>{value}</span>
+                                <span>{reactionValue}</span>
                                 {count > 1 && <span className="text-xs font-bold text-kelo-muted">{count}</span>}
                               </button>
                             );
