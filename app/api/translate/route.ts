@@ -271,7 +271,7 @@ export async function GET() {
   return NextResponse.json({ ok: true, service: "kelo-translate", configuredEndpoint: Boolean(process.env.KELO_TRANSLATE_URL) });
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
