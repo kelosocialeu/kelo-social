@@ -15,7 +15,7 @@ import VerificationRequiredDialog from "@/components/verification/VerificationRe
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useIdentityVerification } from "@/hooks/useIdentityVerification";
 import { useVisibleInterval } from "@/hooks/useVisibleInterval";
-import { getConversation, getConversationMessages, sendConversationMessage, markConversationRead } from "@/lib/atproto/chat";
+import { addConversationReaction, getConversation, getConversationMessages, removeConversationReaction, sendConversationMessage, markConversationRead } from "@/lib/atproto/chat";
 import { getStoredSession } from "@/services/auth.service";
 
 const MESSAGE_REFRESH_MS = 5_000;
@@ -150,6 +150,23 @@ export default function ConversationPage() {
     }, 500);
   };
 
+  const toggleMessageReaction = async (message: any, value: string) => {
+    if (!message?.id || !value || !myDid) return;
+    const reactions = Array.isArray(message.reactions) ? message.reactions : [];
+    const mine = reactions.find(
+      (reaction: any) =>
+        reaction?.value === value && reaction?.sender?.did === myDid
+    );
+    try {
+      const updated = mine
+        ? await removeConversationReaction(convoId, message.id, value)
+        : await addConversationReaction(convoId, message.id, value);
+      updateMessage(updated);
+    } catch (reactionError) {
+      console.error("Impossible de synchroniser la réaction AT Protocol :", reactionError);
+    }
+  };
+
   const updateMessage = (updatedMessage: any) => {
     if (!updatedMessage?.id) return;
     setMessages((previous) => previous.map((message) =>
@@ -187,11 +204,12 @@ export default function ConversationPage() {
                       setActiveMessageId(String(message.id || index));
                     }}
                   >
-                    <div className={`flex items-center gap-1 ${isMine ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[82%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm sm:max-w-[72%] lg:max-w-[60%] ${isMine ? "rounded-br-md bg-kelo-gradient text-white" : "rounded-bl-md bg-kelo-background text-kelo-text"}`}>
-                        {message.text}
-                      </div>
-                      <MessageActionMenu
+                    <div className={`flex flex-col gap-1 ${isMine ? "items-end" : "items-start"}`}>
+                      <div className={`flex items-center gap-1 ${isMine ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[82%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm sm:max-w-[72%] lg:max-w-[60%] ${isMine ? "rounded-br-md bg-kelo-gradient text-white" : "rounded-bl-md bg-kelo-background text-kelo-text"}`}>
+                          {message.text}
+                        </div>
+                        <MessageActionMenu
                         convoId={convoId}
                         message={message}
                         myDid={myDid}
@@ -209,6 +227,36 @@ export default function ConversationPage() {
                           })
                         }
                       />
+                      </div>
+                      {Array.isArray(message.reactions) && message.reactions.length > 0 && (
+                        <div className={`flex max-w-full flex-wrap gap-1.5 ${isMine ? "justify-end" : "justify-start"}`} aria-label="Réactions">
+                          {Array.from(
+                            new Set(
+                              message.reactions
+                                .filter((reaction: any) => reaction?.value)
+                                .map((reaction: any) => String(reaction.value))
+                            )
+                          ).map((value) => {
+                            const count = message.reactions.filter((reaction: any) => String(reaction?.value) === value).length;
+                            const mine = message.reactions.some(
+                              (reaction: any) =>
+                                String(reaction?.value) === value && reaction?.sender?.did === myDid
+                            );
+                            return (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => void toggleMessageReaction(message, value)}
+                                className={`inline-flex min-h-7 items-center gap-1 rounded-full border px-2.5 py-1 text-sm shadow-sm transition hover:scale-[1.02] ${mine ? "border-kelo-primary bg-kelo-primary/10" : "border-kelo-border bg-white"}`}
+                                title={mine ? "Retirer ma réaction" : "Réagir"}
+                              >
+                                <span>{value}</span>
+                                {count > 1 && <span className="text-xs font-bold text-kelo-muted">{count}</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
