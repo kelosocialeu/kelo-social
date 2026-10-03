@@ -5,6 +5,7 @@ import { Flag, Languages, MoreHorizontal, Heart } from "lucide-react";
 import { addConversationReaction, removeConversationReaction } from "@/lib/atproto/chat";
 import { getKeloContentPreferences, resolvedInterfaceLanguage } from "@/lib/kelo-language-preferences";
 import { translateKeloText } from "@/lib/kelo-browser-translate";
+import KeloEmojiPicker from "@/components/ui/KeloEmojiPicker";
 
 export default function MessageActionMenu({
   convoId,
@@ -35,19 +36,27 @@ export default function MessageActionMenu({
   const [working, setWorking] = useState(false);
   const [translated, setTranslated] = useState("");
   const [translationLoading, setTranslationLoading] = useState(false);
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const reactions = Array.isArray(message?.reactions) ? message.reactions : [];
   const myLike = reactions.find(
     (reaction: any) =>
       reaction?.value === "❤️" && reaction?.sender?.did === myDid
   );
-  const toggleLike = async () => {
-    if (working || !message?.id) return;
+  const toggleReaction = async (emoji: string) => {
+    if (working || !message?.id || !emoji.trim()) return;
+    const value = emoji.trim();
+    const currentReactions = Array.isArray(message?.reactions) ? message.reactions : [];
+    const mine = currentReactions.find(
+      (reaction: any) =>
+        reaction?.value === value && reaction?.sender?.did === myDid
+    );
     setWorking(true);
     try {
-      const updated = myLike
-        ? await removeConversationReaction(convoId, message.id, "❤️")
-        : await addConversationReaction(convoId, message.id, "❤️");
+      const updated = mine
+        ? await removeConversationReaction(convoId, message.id, value)
+        : await addConversationReaction(convoId, message.id, value);
       onMessageUpdated?.(updated);
+      setReactionPickerOpen(false);
       setOpen(false);
     } finally {
       setWorking(false);
@@ -101,12 +110,12 @@ export default function MessageActionMenu({
           </button>
           <button
             type="button"
-            onClick={toggleLike}
+            onClick={() => setReactionPickerOpen((value) => !value)}
             disabled={working}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-kelo-text hover:bg-kelo-background disabled:opacity-50"
           >
             <Heart className={`h-4 w-4 ${myLike ? "fill-current text-red-500" : "text-kelo-primary"}`} />
-            {myLike ? "Retirer la réaction" : "Réagir"}
+            Réagir
           </button>
           <button
             type="button"
@@ -119,6 +128,12 @@ export default function MessageActionMenu({
             <Flag className="h-4 w-4 text-kelo-danger" />
             Signaler
           </button>
+        </div>
+      )}
+
+      {reactionPickerOpen && (
+        <div className={`absolute top-full z-[60] mt-2 ${align === "left" ? "right-0" : "left-0"}`}>
+          <KeloEmojiPicker onSelect={(emoji) => void toggleReaction(emoji)} />
         </div>
       )}
 
