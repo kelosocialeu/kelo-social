@@ -16,10 +16,12 @@ const REASONS = [
 export default function MessageReportDialog({
   open,
   memberDid,
+  messageText,
   onClose,
 }: {
   open: boolean;
   memberDid?: string;
+  messageText?: string;
   onClose: () => void;
 }) {
   const [reason, setReason] = useState<string>(REASONS[0][0]);
@@ -34,7 +36,9 @@ export default function MessageReportDialog({
     setSending(true);
     setError("");
     try {
-      await reportConversationMember(memberDid, reason, description);
+      const messageContext = messageText?.trim() ? `Message signalé :\n${messageText.trim().slice(0, 1500)}` : "";
+      const fullDescription = [messageContext, description.trim()].filter(Boolean).join("\n\n");
+      await reportConversationMember(memberDid, reason, fullDescription);
       onClose();
       setDescription("");
       alert("Signalement envoyé.");
@@ -57,7 +61,7 @@ export default function MessageReportDialog({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <p className="mt-2 text-sm text-kelo-muted">Le signalement sera transmis au système de modération Kelo Social.</p>
+        <p className="mt-2 text-sm text-kelo-muted">Le signalement sera transmis au système de modération Kelo Social avec le message concerné.</p>
         <label className="mt-4 block text-sm font-bold text-kelo-text">
           Motif
           <select value={reason} onChange={(event) => setReason(event.target.value)} className="mt-1 w-full rounded-xl border border-kelo-border bg-white px-3 py-2.5 text-sm">
