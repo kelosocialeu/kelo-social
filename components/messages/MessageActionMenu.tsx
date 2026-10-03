@@ -14,6 +14,7 @@ export default function MessageActionMenu({
   onReport,
   open: controlledOpen,
   onOpenChange,
+  align = "right",
 }: {
   convoId: string;
   message: any;
@@ -22,6 +23,7 @@ export default function MessageActionMenu({
   onReport?: () => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  align?: "left" | "right";
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
@@ -85,7 +87,7 @@ export default function MessageActionMenu({
 
       {open && (
         <div
-          className="absolute z-50 top-full mt-2 w-44 overflow-hidden rounded-2xl border border-kelo-border bg-white p-1.5 shadow-xl"
+          className={`absolute z-50 top-full mt-2 w-44 max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-kelo-border bg-white p-1.5 shadow-xl ${align === "left" ? "right-0" : "left-0"}`}
           onPointerDown={(event) => event.stopPropagation()}
         >
           <button
@@ -121,7 +123,7 @@ export default function MessageActionMenu({
       )}
 
       {translated && (
-        <div className="absolute right-0 top-full z-40 mt-2 w-64 max-w-[80vw] rounded-2xl border border-kelo-border bg-white p-3 text-sm leading-relaxed text-kelo-text shadow-xl">
+        <div className={`absolute top-full z-40 mt-2 w-64 max-w-[calc(100vw-32px)] rounded-2xl ${align === "left" ? "right-0" : "left-0"}` border border-kelo-border bg-white p-3 text-sm leading-relaxed text-kelo-text shadow-xl">
           <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-kelo-muted">
             Traduction
           </div>
