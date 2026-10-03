@@ -13,7 +13,8 @@ let cachedAt = 0;
 let pendingFetch: Promise<unknown[]> | null = null;
 
 async function fetchCertificationRecords(): Promise<unknown[]> {
-  const agent = new AtpAgent({ service: PDS_URL });
+  try {
+    const agent = new AtpAgent({ service: PDS_URL });
     const records: unknown[] = [];
     let cursor: string | undefined;
     do {
