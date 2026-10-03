@@ -231,12 +231,12 @@ export default function ConversationPage() {
                       {Array.isArray(message.reactions) && message.reactions.length > 0 && (
                         <div className={`flex max-w-full flex-wrap gap-1.5 ${isMine ? "justify-end" : "justify-start"}`} aria-label="Réactions">
                           {Array.from(
-                            new Set(
+                            new Set<string>(
                               message.reactions
-                                .filter((reaction: any) => reaction?.value)
+                                .filter((reaction: any) => Boolean(reaction?.value))
                                 .map((reaction: any) => String(reaction.value))
                             )
-                          ).map((value) => {
+                          ).map((value: string) => {
                             const reactionValue = String(value);
                             const count = message.reactions.filter((reaction: any) => String(reaction?.value) === reactionValue).length;
                             const mine = message.reactions.some(
