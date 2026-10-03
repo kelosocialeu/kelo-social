@@ -62,7 +62,7 @@ export default function VerificationBadge({ actor, size = 16 }: VerificationBadg
       } catch (error) { console.warn("Certification temporairement indisponible, conservation du dernier état connu.", error); }
     }
     void load(); return () => { cancelled = true; };
-  }, [actor, did, cacheKey]);
+  }, [did, cacheKey]);
 
   useEffect(() => { setIssuers([]); setIssuerError(false); }, [did]);
   const badgeType = useMemo<VerificationBadgeType>(() => {
