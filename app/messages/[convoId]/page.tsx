@@ -195,6 +195,7 @@ export default function ConversationPage() {
                         convoId={convoId}
                         message={message}
                         myDid={myDid}
+                        align={isMine ? "left" : "right"}
                         open={activeMessageId === String(message.id || index)}
                         onOpenChange={(open) =>
                           setActiveMessageId(open ? String(message.id || index) : null)
