@@ -123,7 +123,7 @@ export default function MessageActionMenu({
       )}
 
       {translated && (
-        <div className={`absolute top-full z-40 mt-2 w-64 max-w-[calc(100vw-32px)] rounded-2xl ${align === "left" ? "right-0" : "left-0"}` border border-kelo-border bg-white p-3 text-sm leading-relaxed text-kelo-text shadow-xl">
+        <div className={`absolute top-full z-40 mt-2 w-64 max-w-[calc(100vw-32px)] rounded-2xl border border-kelo-border bg-white p-3 text-sm leading-relaxed text-kelo-text shadow-xl ${align === "left" ? "right-0" : "left-0"}`}>
           <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-kelo-muted">
             Traduction
           </div>
