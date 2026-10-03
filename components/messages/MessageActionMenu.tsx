@@ -20,6 +20,8 @@ export default function MessageActionMenu({
   myDid?: string | null;
   onMessageUpdated?: (message: any) => void;
   onReport?: () => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
@@ -31,6 +33,11 @@ export default function MessageActionMenu({
   const [working, setWorking] = useState(false);
   const [translated, setTranslated] = useState("");
   const [translationLoading, setTranslationLoading] = useState(false);
+  const reactions = Array.isArray(message?.reactions) ? message.reactions : [];
+  const myLike = reactions.find(
+    (reaction: any) =>
+      reaction?.value === "❤️" && reaction?.sender?.did === myDid
+  );
   const toggleLike = async () => {
     if (working || !message?.id) return;
     setWorking(true);
