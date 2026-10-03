@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Flag, Laugh } from "lucide-react";
+import { Laugh } from "lucide-react";
 
 import Sidebar from "@/components/layout/Sidebar";
 import Avatar from "@/components/feed/Avatar";
 import AccountBadges from "@/components/ui/AccountBadges";
 import KeloEmojiPicker from "@/components/ui/KeloEmojiPicker";
-import MessageReactions from "@/components/messages/MessageReactions";
-import MessageTranslation from "@/components/messages/MessageTranslation";
+import MessageActionMenu from "@/components/messages/MessageActionMenu";
 import MessageReportDialog from "@/components/messages/MessageReportDialog";
 import VerificationRequiredDialog from "@/components/verification/VerificationRequiredDialog";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
@@ -42,11 +41,13 @@ export default function ConversationPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
-  const [reportMemberDid, setReportMemberDid] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<{ memberDid: string; messageText: string } | null>(null);
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const { checked: verificationChecked, verified, dialogOpen, requireVerification, closeDialog } = useIdentityVerification();
   const bottomRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const hasLoadedRef = useRef(false);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadConversation = useCallback(async (silent = false) => {
     if (!checked || !convoId) return;
@@ -133,6 +134,22 @@ export default function ConversationPage() {
   };
   const handleLogout = () => { localStorage.clear(); window.location.href = "/login"; };
 
+  const clearMessageLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const startMessageLongPress = (messageId: string, pointerType: string) => {
+    clearMessageLongPress();
+    if (pointerType !== "touch") return;
+    longPressTimerRef.current = setTimeout(() => {
+      setActiveMessageId(messageId);
+      longPressTimerRef.current = null;
+    }, 500);
+  };
+
   const updateMessage = (updatedMessage: any) => {
     if (!updatedMessage?.id) return;
     setMessages((previous) => previous.map((message) =>
@@ -159,13 +176,40 @@ export default function ConversationPage() {
               const isMine = message.sender?.did === myDid;
               const senderHandle = message.sender?.handle || otherUser?.handle;
               const senderAvatar = message.sender?.avatar || otherUser?.avatar;
-              return <div key={message.id || index} className={`mb-4 flex items-end gap-2 ${isMine ? "justify-end" : "justify-start"}`}>{!isMine && senderHandle && <Link href={`/profile/${senderHandle}`} className="flex-shrink-0 transition-opacity hover:opacity-80"><Avatar src={senderAvatar} fallback={senderHandle[0]?.toUpperCase() || "U"} size="sm" /></Link>}<div className="relative min-w-0 max-w-[82%]">
-                    <div className={`flex items-start gap-1 ${isMine ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[82%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm sm:max-w-[72%] lg:max-w-[60%] ${isMine ? "rounded-br-md bg-kelo-gradient text-white" : "rounded-bl-md bg-kelo-background text-kelo-text"}`}>{message.text}</div>
+              return <div key={message.id || index} className={`mb-4 flex items-end gap-2 ${isMine ? "justify-end" : "justify-start"}`}>{!isMine && senderHandle && <Link href={`/profile/${senderHandle}`} className="flex-shrink-0 transition-opacity hover:opacity-80"><Avatar src={senderAvatar} fallback={senderHandle[0]?.toUpperCase() || "U"} size="sm" /></Link>}<div
+                    className="relative min-w-0 max-w-[82%]"
+                    onPointerDown={(event) => startMessageLongPress(String(message.id || index), event.pointerType)}
+                    onPointerUp={clearMessageLongPress}
+                    onPointerCancel={clearMessageLongPress}
+                    onPointerLeave={clearMessageLongPress}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      setActiveMessageId(String(message.id || index));
+                    }}
+                  >
+                    <div className={`flex items-center gap-1 ${isMine ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[82%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm sm:max-w-[72%] lg:max-w-[60%] ${isMine ? "rounded-br-md bg-kelo-gradient text-white" : "rounded-bl-md bg-kelo-background text-kelo-text"}`}>
+                        {message.text}
+                      </div>
+                      <MessageActionMenu
+                        convoId={convoId}
+                        message={message}
+                        myDid={myDid}
+                        open={activeMessageId === String(message.id || index)}
+                        onOpenChange={(open) =>
+                          setActiveMessageId(open ? String(message.id || index) : null)
+                        }
+                        onMessageUpdated={updateMessage}
+                        onReport={() =>
+                          message.sender?.did &&
+                          setReportTarget({
+                            memberDid: message.sender.did,
+                            messageText: message.text || "",
+                          })
+                        }
+                      />
                     </div>
-                    <MessageReactions convoId={convoId} message={message} myDid={myDid} onMessageUpdated={updateMessage} />
-                    <MessageTranslation text={message.text || ""} />
-                  </div></div>;
+                  </div>
             })}
             {!loading && !error && messages.length === 0 && <div className="flex min-h-[50vh] items-center justify-center px-6"><div className="max-w-sm text-center"><div className="text-4xl" aria-hidden="true">💬</div><h2 className="mt-4 text-lg font-bold text-kelo-text">Commencez la discussion</h2><p className="mt-2 text-sm text-kelo-muted">Envoyez votre premier message.</p></div></div>}
             <div ref={bottomRef} />
@@ -184,7 +228,7 @@ export default function ConversationPage() {
           </form>
         </section>
       </main>
-      <MessageReportDialog open={!!reportMemberDid} memberDid={reportMemberDid || undefined} onClose={() => setReportMemberDid(null)} />
+      <MessageReportDialog open={!!reportTarget} memberDid={reportTarget?.memberDid} messageText={reportTarget?.messageText} onClose={() => setReportTarget(null)} />
       <VerificationRequiredDialog open={dialogOpen} onClose={closeDialog} />
     </div>
   );
