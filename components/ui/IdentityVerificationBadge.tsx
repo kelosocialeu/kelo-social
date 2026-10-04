@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 import {
-  getIdentityVerification,
+  clearIdentityVerificationCache,\n  getIdentityVerification,
   IdentityVerificationRecord,
   IdentityVerificationType,
   IDENTITY_VERIFICATION_LABELS,
