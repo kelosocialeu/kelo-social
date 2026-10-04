@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bot, ExternalLink, Globe2, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { Bot, Check, ExternalLink, Globe2, RefreshCw, ShieldCheck, Sparkles, X } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import Badge from "@/components/ui/Badge";
 import { useAdminRole } from "@/hooks/useAdminRole";
@@ -15,18 +15,31 @@ type Candidate = {
   sources: { label: string; url: string; result: "positive" | "neutral" | "negative" }[];
 };
 
-const categories = [
-  ["all", "Tous profils"], ["influencer", "Créateurs / influenceurs"], ["media", "Médias / journalistes"],
-  ["enterprise", "Entreprises"], ["association", "Associations / ONG"], ["institution", "Institutions"],
-  ["university", "Universités"], ["political", "Partis / personnalités politiques"],
-];
-
 export default function TrustDiscoveryPage() {
   const { checked, isAdmin, handle } = useAdminRole();
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [error, setError] = useState("");
+
+  async function decideCandidate(candidate: Candidate, decision: "certify" | "trusted-verifier" | "reject") {
+    try {
+      const session = getStoredSession();
+      if (!session) throw new Error("Session introuvable. Reconnectez-vous.");
+      const status = decision === "reject" ? "none" : decision;
+      const response = await fetch("/api/admin/certify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session, targetDid: candidate.did, targetHandle: candidate.handle, status }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Action impossible.");
+      setCandidates(current => current.filter(item => item.did !== candidate.did));
+      setLastUpdate(new Date());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Action impossible.");
+    }
+  }
 
   async function loadSuggestions() {
     try {
@@ -38,7 +51,11 @@ export default function TrustDiscoveryPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Chargement impossible.");
-      setCandidates(data.candidates || []);
+      const eligible = (data.candidates || []).filter((candidate: Candidate) =>
+        candidate.confidence === "high" &&
+        candidate.score >= (candidate.recommendation === "trusted-certifier" ? 85 : 70)
+      );
+      setCandidates(eligible);
       setLastUpdate(new Date());
       setError("");
     } catch (e) {
@@ -92,9 +109,19 @@ export default function TrustDiscoveryPage() {
                     <div className="mb-3 rounded-2xl border border-kelo-border bg-kelo-background p-3"><p className="text-sm font-extrabold">{candidate.recommendationTitle}</p><p className="mt-1 text-sm text-kelo-muted">{candidate.recommendationSummary}</p></div><div className="flex flex-wrap items-center gap-2"><h2 className="font-extrabold">{candidate.displayName}</h2><span className="text-sm text-kelo-muted">@{candidate.handle}</span><span className="rounded-full bg-kelo-background px-2.5 py-1 text-xs font-extrabold">{candidate.score}/100</span><span className="rounded-full px-2.5 py-1 text-xs font-extrabold">{candidate.confidence === "high" ? "Confiance élevée" : candidate.confidence === "medium" ? "À examiner" : "Faible confiance"}</span></div>
                     {candidate.description && <p className="mt-2 text-sm text-kelo-muted">{candidate.description}</p>}
                     <div className="mt-3 flex flex-wrap gap-2">{candidate.reasons.map(reason => <span key={reason} className="rounded-full bg-kelo-background px-3 py-1.5 text-xs font-semibold">{reason}</span>)}</div>
+                    <div className="mt-4 rounded-2xl border border-kelo-border bg-kelo-background p-4">
+                      <p className="text-sm font-extrabold">Pourquoi le robot recommande ce compte</p>
+                      <p className="mt-1 text-sm leading-6 text-kelo-muted">{candidate.recommendationSummary}</p>
+                    </div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       {candidate.sources.map(source => <a key={source.label + source.url} href={source.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full border border-kelo-border px-3 py-1.5 text-xs font-bold"><Globe2 className="h-3.5 w-3.5" />{source.label}<ExternalLink className="h-3 w-3" /></a>)}
-                      <a href={"https://bsky.app/profile/" + candidate.handle} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-kelo-background px-3 py-1.5 text-xs font-bold"><ShieldCheck className="h-3.5 w-3.5" />Ouvrir le profil</a>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2 border-t border-kelo-border pt-4">
+                      <button onClick={() => void decideCandidate(candidate, "reject")} className="inline-flex items-center gap-2 rounded-full border border-kelo-border bg-white px-4 py-2 text-xs font-extrabold text-kelo-muted"><X className="h-4 w-4" />Refuser</button>
+                      <button onClick={() => { window.location.href = "/profile/" + encodeURIComponent(candidate.handle); }} className="inline-flex items-center gap-2 rounded-full border border-kelo-border bg-white px-4 py-2 text-xs font-extrabold"><ShieldCheck className="h-4 w-4" />Aller vers le profil</button>
+                      <button onClick={() => void decideCandidate(candidate, candidate.recommendation === "trusted-certifier" ? "trusted-verifier" : "certify")} className="inline-flex items-center gap-2 rounded-full bg-kelo-gradient px-4 py-2 text-xs font-extrabold text-white">
+                        <Check className="h-4 w-4" />{candidate.recommendation === "trusted-certifier" ? "Accorder la certification pour certificateur de confiance" : "Accorder la certification"}
+                      </button>
                     </div>
                   </div>
                 </div>
