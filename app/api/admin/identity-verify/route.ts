@@ -9,7 +9,7 @@ import {
 } from "@/lib/atproto/identity-verifications";
 
 function isVerificationType(value: unknown): value is IdentityVerificationType {
-  return ["human", "enterprise", "media", "university", "association", "institution", "ai"].includes(String(value));
+  return ["human", "enterprise", "media", "university", "association", "institution", "political-party", "ai"].includes(String(value));
 }
 
 function isVerificationSource(value: unknown): value is IdentityVerificationSource {
