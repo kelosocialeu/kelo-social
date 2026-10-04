@@ -4,6 +4,8 @@ import { AtpAgent } from "@atproto/api";
 const APPVIEW = "https://public.api.bsky.app/xrpc";
 const PDS_URL = process.env.KELO_ADMIN_PDS_URL?.trim() || "https://pds.kelosocial.eu";
 
+type Source = { label: string; url: string; result: "positive" | "neutral" | "negative" };
+
 type Candidate = {
   did: string;
   handle: string;
@@ -14,7 +16,7 @@ type Candidate = {
   score: number;
   confidence: "high" | "medium" | "low";
   reasons: string[];
-  sources: { label: string; url: string; result: "positive" | "neutral" | "negative" }[];
+  sources: Source[];
   officialWebsite?: string;
   recommendation: "certification" | "trusted-certifier";
   recommendationTitle: string;
@@ -59,8 +61,9 @@ function sameName(a: string, b: string) {
   return !!x && !!y && (x === y || x.includes(y) || y.includes(x));
 }
 
-async function inspectWebsite(url: string, handle: string, displayName: string): Promise<{ sources: Candidate["sources"]; officialWebsite?: string; score: number }> {
-  const sources: Candidate["sources"] = [];
+async function inspectWebsite(url: string, handle: string, displayName: string): Promise<{ sources: Source[]; officialWebsite?: string; score: number }> {
+  const sources: Source[] = [];
+  const addSource = (label: string, sourceUrl: string, result: Source["result"]) => sources.push({ label, url: sourceUrl, result });
   try {
     const parsed = new URL(url);
     if (!["http:", "https:"].includes(parsed.protocol)) return { sources, officialWebsite: undefined, score: 0 };
@@ -70,7 +73,7 @@ async function inspectWebsite(url: string, handle: string, displayName: string):
       cache: "no-store",
       signal: AbortSignal.timeout(8000),
     });
-    if (!response.ok) return { sources: [{ label: "Site officiel", url: parsed.toString(), result: "negative" }], officialWebsite: parsed.toString(), score: 0 };
+    if (!response.ok) return { sources: [{ label: "Site officiel", url: parsed.toString(), result: "negative" } satisfies Source], officialWebsite: parsed.toString(), score: 0 };
     const html = (await response.text()).slice(0, 1_000_000);
     const lower = html.toLowerCase();
     const handleVariants = [handle.toLowerCase(), "@" + handle.toLowerCase()];
@@ -79,17 +82,17 @@ async function inspectWebsite(url: string, handle: string, displayName: string):
     let score = 0;
     if (linkedBack) {
       score += 25;
-      sources.push({ label: "Site officiel : lien vers le compte", url: parsed.toString(), result: "positive" });
+      addSource("Site officiel : lien vers le compte", parsed.toString(), "positive");
     } else {
-      sources.push({ label: "Site officiel", url: parsed.toString(), result: "neutral" });
+      addSource("Site officiel", parsed.toString(), "neutral");
     }
     if (nameMatch) {
       score += 10;
-      sources.push({ label: "Concordance du nom", url: parsed.toString(), result: "positive" });
+      addSource("Concordance du nom", parsed.toString(), "positive");
     }
     return { sources, officialWebsite: response.url || parsed.toString(), score };
   } catch {
-    return { sources: [{ label: "Site externe inaccessible", url, result: "neutral" }], officialWebsite: url, score: 0 };
+    return { sources: [{ label: "Site externe inaccessible", url, result: "neutral" } satisfies Source], officialWebsite: url, score: 0 };
   }
 }
 
@@ -154,7 +157,7 @@ export async function POST(request: NextRequest) {
 
       let score = 0;
       const reasons: string[] = [];
-      const sources: Candidate["sources"] = [
+      const sources: Source[] = [
         { label: "Profil AT Protocol public", url: "https://bsky.app/profile/" + actor.handle, result: "positive" }
       ];
 
