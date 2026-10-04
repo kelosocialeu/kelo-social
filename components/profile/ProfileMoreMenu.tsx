@@ -223,7 +223,7 @@ export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted, displ
             <div className="mt-4 grid grid-cols-2 gap-2">
               {[
                 ["human","Humain"],["enterprise","Entreprise"],["media","Média"],["university","Université"],
-                ["association","Association"],["institution","Institution"],["ai","IA"]
+                ["association","Association"],["institution","Institution"],["political-party","Parti politique"],["ai","IA"]
               ].map(([value,label]) => (
                 <button key={value} type="button" onClick={() => setVerifyType(value as typeof verifyType)} className={`rounded-xl border px-3 py-2.5 text-sm font-bold ${verifyType === value ? "border-kelo-primary bg-kelo-background text-kelo-primary" : "border-kelo-border text-kelo-text"}`}>
                   {label}
