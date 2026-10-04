@@ -11,6 +11,7 @@ type Candidate = {
   did: string; handle: string; displayName: string; description?: string; avatar?: string;
   score: number; confidence: "high" | "medium" | "low";
   reasons: string[]; officialWebsite?: string;
+  recommendation: "certification" | "trusted-certifier"; recommendationTitle: string; recommendationSummary: string;
   sources: { label: string; url: string; result: "positive" | "neutral" | "negative" }[];
 };
 
@@ -61,7 +62,7 @@ export default function TrustDiscoveryPage() {
         </header>
         <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
           <section className="rounded-3xl border border-kelo-border bg-kelo-background p-5">
-            <div className="flex items-start gap-3"><Sparkles className="mt-0.5 h-5 w-5 text-kelo-primary" /><div><p className="font-extrabold">Présélection, pas certification automatique</p><p className="mt-1 text-sm text-kelo-muted">Le robot recoupe les informations publiques et propose uniquement des candidats. Le rond de certification reste attribué par l’Admin ou un certificateur de confiance.</p></div></div>
+            <div className="flex items-start gap-3"><Sparkles className="mt-0.5 h-5 w-5 text-kelo-primary" /><div><p className="font-extrabold">Présélection, pas certification automatique</p><p className="mt-1 text-sm text-kelo-muted">Le robot ne certifie jamais. Il recoupe les informations publiques et formule une suggestion argumentée : certification d’un compte, ou certificateur de confiance pour une très grande entité authentifiable.</p></div></div>
             <div className="mt-5 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
               <select value={category} onChange={e => setCategory(e.target.value)} className="rounded-2xl border border-kelo-border bg-white px-4 py-3 text-sm font-bold">{categories.map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select>
               <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Recherche libre (ex. Fondation, journaliste…)" className="rounded-2xl border border-kelo-border bg-white px-4 py-3 text-sm" />
@@ -77,7 +78,7 @@ export default function TrustDiscoveryPage() {
                 <div className="flex flex-wrap items-start gap-4">
                   {candidate.avatar ? <img src={candidate.avatar} alt="" className="h-14 w-14 rounded-full object-cover" /> : <div className="h-14 w-14 rounded-full bg-kelo-background" />}
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><h2 className="font-extrabold">{candidate.displayName}</h2><span className="text-sm text-kelo-muted">@{candidate.handle}</span><span className="rounded-full bg-kelo-background px-2.5 py-1 text-xs font-extrabold">{candidate.score}/100</span><span className="rounded-full px-2.5 py-1 text-xs font-extrabold">{candidate.confidence === "high" ? "Confiance élevée" : candidate.confidence === "medium" ? "À examiner" : "Faible confiance"}</span></div>
+                    <div className="mb-3 rounded-2xl border border-kelo-border bg-kelo-background p-3"><p className="text-sm font-extrabold">{candidate.recommendationTitle}</p><p className="mt-1 text-sm text-kelo-muted">{candidate.recommendationSummary}</p></div><div className="flex flex-wrap items-center gap-2"><h2 className="font-extrabold">{candidate.displayName}</h2><span className="text-sm text-kelo-muted">@{candidate.handle}</span><span className="rounded-full bg-kelo-background px-2.5 py-1 text-xs font-extrabold">{candidate.score}/100</span><span className="rounded-full px-2.5 py-1 text-xs font-extrabold">{candidate.confidence === "high" ? "Confiance élevée" : candidate.confidence === "medium" ? "À examiner" : "Faible confiance"}</span></div>
                     {candidate.description && <p className="mt-2 text-sm text-kelo-muted">{candidate.description}</p>}
                     <div className="mt-3 flex flex-wrap gap-2">{candidate.reasons.map(reason => <span key={reason} className="rounded-full bg-kelo-background px-3 py-1.5 text-xs font-semibold">{reason}</span>)}</div>
                     <div className="mt-4 flex flex-wrap gap-2">
