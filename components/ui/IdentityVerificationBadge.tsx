@@ -7,6 +7,7 @@ import {
   HeartHandshake,
   Landmark,
   Newspaper,
+  Flag,
   UserRound,
   X,
 } from "lucide-react";
@@ -37,6 +38,7 @@ const TYPE_ICONS: Record<Exclude<IdentityVerificationType, "ai">, typeof UserRou
   university: GraduationCap,
   association: HeartHandshake,
   institution: Landmark,
+  "political-party": Flag,
 };
 
 const TYPE_STYLES: Record<
@@ -75,6 +77,11 @@ const TYPE_STYLES: Record<
   institution: {
     border: "from-blue-500 via-indigo-500 to-violet-500",
     iconBackground: "from-blue-600 via-indigo-600 to-violet-600",
+    iconText: "text-white",
+  },
+  "political-party": {
+    border: "from-red-500 via-fuchsia-500 to-violet-500",
+    iconBackground: "from-red-600 via-fuchsia-600 to-violet-600",
     iconText: "text-white",
   },
   ai: {
