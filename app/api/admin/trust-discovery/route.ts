@@ -93,6 +93,16 @@ async function searchActors(query: string) {
   return Array.isArray(data?.actors) ? data.actors : [];
 }
 
+async function getProfile(actor: string) {
+  try {
+    const url = new URL(APPVIEW + "/app.bsky.actor.getProfile");
+    url.searchParams.set("actor", actor);
+    return await json(url.toString());
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -122,10 +132,15 @@ export async function POST(request: NextRequest) {
 
     const results: Candidate[] = [];
     for (const actor of Array.from(actorsByDid.values()).slice(0, 60)) {
-      const displayName = String(actor.displayName || actor.handle);
-      const description = String(actor.description || "");
+      const profile = await getProfile(actor.did);
+      const displayName = String(profile?.displayName || actor.displayName || actor.handle);
+      const description = String(profile?.description || actor.description || "");
       const text = [displayName, description, actor.handle].join(" ");
-      const links = urlsFromText(text);
+      const profileWebsite = typeof profile?.website === "string" ? profile.website.trim() : "";
+      const links = Array.from(new Set([
+        ...(profileWebsite ? [profileWebsite] : []),
+        ...urlsFromText(text),
+      ]));
       const profileLinks = Array.isArray(actor.viewer?.associated?.chat) ? [] : [];
       const externalLinks = links.length ? links : [];
 
