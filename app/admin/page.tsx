@@ -9,6 +9,7 @@ import {
   HeartHandshake,
   Landmark,
   Newspaper,
+  Flag,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -61,6 +62,7 @@ const IDENTITY_TYPE_ICONS: Record<IdentityVerificationType, typeof UserRoundChec
   university: GraduationCap,
   association: HeartHandshake,
   institution: Landmark,
+  "political-party": Flag,
   ai: Bot,
 };
 
@@ -798,6 +800,7 @@ export default function AdminPage() {
                       <option value="university">Université vérifiée</option>
                       <option value="association">Association vérifiée</option>
                       <option value="institution">Institution vérifiée</option>
+                      <option value="political-party">Parti politique vérifié</option>
                       <option value="ai">IA autorisée</option>
                     </Select>
 
