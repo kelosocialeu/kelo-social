@@ -1,6 +1,7 @@
 // Trust discovery source typing is intentionally explicit to keep production builds strict.
 import { NextRequest, NextResponse } from "next/server";
 import { AtpAgent } from "@atproto/api";
+import { decideTrustDiscoverySuggestion, getTrustDiscoverySuggestions } from "@/lib/atproto/trust-discovery-worker";
 
 const APPVIEW = "https://public.api.bsky.app/xrpc";
 const PDS_URL = process.env.KELO_ADMIN_PDS_URL?.trim() || process.env.CERTIFICATION_REPO_PDS_URL?.trim() || process.env.KELO_PDS_URL?.trim() || "https://pds.kelosocial.eu";
@@ -124,27 +125,23 @@ export async function POST(request: NextRequest) {
     await assertAdmin(body?.session);
 
     if (body?.mode === "list") {
-      if (!ADMIN_PASSWORD) throw new Error("Configuration du dépôt administrateur incomplète.");
-      const repoAgent = new AtpAgent({ service: PDS_URL });
-      await repoAgent.login({ identifier: ADMIN_IDENTIFIER, password: ADMIN_PASSWORD });
-      const repoDid = repoAgent.session?.did;
-      if (!repoDid) throw new Error("Dépôt administrateur indisponible.");
-      const records = await repoAgent.api.com.atproto.repo.listRecords({
-        repo: repoDid,
-        collection: "eu.kelosocial.trustdiscovery",
-        limit: 100,
-      });
-      const candidates = records.data.records
-        .filter(item => !item.uri.endsWith("/state"))
-        .map(item => item.value)
-        .filter(value => value && typeof value === "object")
-        .filter((value) => {
-          const candidate = value as Candidate;
-          return candidate.confidence === "high" &&
-            candidate.score >= (candidate.recommendation === "trusted-certifier" ? 85 : 70);
-        }) as Candidate[];
-      candidates.sort((a, b) => String(b.discoveredAt || "").localeCompare(String(a.discoveredAt || "")));
-      return NextResponse.json({ success: true, candidates });
+      const candidates = getTrustDiscoverySuggestions() as Candidate[];
+      return NextResponse.json({
+        success: true,
+        candidates,
+        storage: "memory",
+      }, { headers: { "Cache-Control": "no-store" } });
+    }
+
+    if (body?.mode === "decision") {
+      const did = String(body?.did || "").trim();
+      const decision = String(body?.decision || "");
+      if (!did) return NextResponse.json({ error: "DID manquant." }, { status: 400 });
+      if (!["rejected", "certified", "trusted-certifier"].includes(decision)) {
+        return NextResponse.json({ error: "Décision invalide." }, { status: 400 });
+      }
+      decideTrustDiscoverySuggestion(did, decision as "rejected" | "certified" | "trusted-certifier");
+      return NextResponse.json({ success: true, did, decision });
     }
 
     const category = String(body?.category || "all");
