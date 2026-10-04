@@ -16,6 +16,9 @@ type Candidate = {
   reasons: string[];
   sources: { label: string; url: string; result: "positive" | "neutral" | "negative" }[];
   officialWebsite?: string;
+  recommendation: "certification" | "trusted-certifier";
+  recommendationTitle: string;
+  recommendationSummary: string;
 };
 
 function norm(v: string) { return v.trim().replace(/^@/, "").toLowerCase(); }
@@ -43,6 +46,11 @@ function urlsFromText(text: string): string[] {
 
 function hostOf(url: string) {
   try { return new URL(url).hostname.toLowerCase().replace(/^www\./, ""); } catch { return ""; }
+}
+
+function baseDomain(handle: string) {
+  const parts = norm(handle).split(".");
+  return parts.length >= 2 ? parts.slice(-2).join(".") : "";
 }
 
 function sameName(a: string, b: string) {
@@ -173,12 +181,31 @@ export async function POST(request: NextRequest) {
       }
 
       let officialWebsite: string | undefined;
+      let websiteDomain = "";
       for (const link of externalLinks.slice(0, 2)) {
         const checked = await inspectWebsite(link, actor.handle, displayName);
         score += checked.score;
         sources.push(...checked.sources);
         officialWebsite ||= checked.officialWebsite;
+        websiteDomain ||= hostOf(checked.officialWebsite || link);
       }
+
+      const customDomain = actor.handle.includes(".") && !actor.handle.endsWith(".bsky.social");
+      const domainMatchesHandle = customDomain && !!websiteDomain && (websiteDomain === baseDomain(actor.handle) || websiteDomain.endsWith("." + baseDomain(actor.handle)));
+      if (domainMatchesHandle) {
+        score += 15;
+        reasons.push("Le domaine du compte correspond au domaine du site public associé.");
+        sources.push({ label: "Concordance du domaine", url: officialWebsite || "https://bsky.app/profile/" + actor.handle, result: "positive" });
+      }
+
+      const organizationWords = /\b(group|groupe|corporation|corp|company|entreprise|foundation|fondation|university|université|government|gouvernement|institution|association|ngo|ong|media|média|news)\b/i;
+      const looksLikeLargeEntity = organizationWords.test([displayName, description, websiteDomain].join(" "));
+      const hasStrongIdentityEvidence = actor.verification?.verifiedStatus === "valid" && !!officialWebsite && (sources.some(source => source.label.includes("lien vers le compte") && source.result === "positive") || domainMatchesHandle);
+      const recommendation: Candidate["recommendation"] = score >= 85 && hasStrongIdentityEvidence && looksLikeLargeEntity ? "trusted-certifier" : "certification";
+      const recommendationTitle = recommendation === "trusted-certifier" ? "Suggestion : certificateur de confiance" : "Suggestion : certification";
+      const recommendationSummary = recommendation === "trusted-certifier"
+        ? "Entité majeure identifiée comme fortement authentifiable pour être proposée comme certificateur de confiance. Après validation humaine et accord de l’entité, elle pourrait certifier ses filiales, équipes ou entités rattachées."
+        : "Compte ou entité identifié comme candidat à une certification Kelo Social. La décision et l’attribution restent entièrement humaines.";
 
       if (score < 35) continue;
       const confidence: Candidate["confidence"] = score >= 70 ? "high" : score >= 50 ? "medium" : "low";
@@ -194,6 +221,9 @@ export async function POST(request: NextRequest) {
         reasons,
         sources,
         officialWebsite,
+        recommendation,
+        recommendationTitle,
+        recommendationSummary,
       });
     }
 
@@ -202,7 +232,7 @@ export async function POST(request: NextRequest) {
       success: true,
       scannedQueries: queries,
       candidates: results.slice(0, 30),
-      disclaimer: "Présélection automatique uniquement : aucune certification n'est attribuée automatiquement.",
+      disclaimer: "Le robot ne certifie jamais et ne nomme jamais automatiquement un certificateur de confiance. Il formule uniquement des suggestions argumentées à partir de sources publiques ; toute décision reste humaine.",
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("[admin/trust-discovery]", error);
