@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { MoreHorizontal, Ban, Flag, EyeOff, Link2, BadgeCheck } from "lucide-react";
 import Avatar from "@/components/feed/Avatar";
 import Badge from "@/components/ui/Badge";
-import { isTrustedVerifier } from "@/lib/atproto/certifications";
+import { clearCertificationCache, isTrustedVerifier } from "@/lib/atproto/certifications";
+import { clearIdentityVerificationCache } from "@/lib/atproto/identity-verifications";
 import { getStoredSession } from "@/services/auth.service";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import ReportDialog from "@/components/feed/ReportDialog";
@@ -69,6 +70,7 @@ export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted, displ
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.error || "Impossible d’attribuer la certification.");
+      clearCertificationCache(did);
       setCertifyOpen(false);
       setOpen(false);
       window.dispatchEvent(new CustomEvent("kelo:certification-changed", { detail: { did, handle } }));
@@ -90,6 +92,7 @@ export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted, displ
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.error || "Impossible d’attribuer la vérification.");
+      clearIdentityVerificationCache(did);
       setVerifyOpen(false);
       setOpen(false);
       window.dispatchEvent(new CustomEvent("kelo:identity-verification-changed", { detail: { did, handle } }));
