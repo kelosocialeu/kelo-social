@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { AtpAgent } from "@atproto/api";
 
 import { CERTIFICATION_SUPPRESSION_COLLECTION } from "@/lib/atproto/certification-suppressions";
+import { followCertifiedProfile } from "@/lib/atproto/admin-follows";
 
 const CERTIFICATION_COLLECTION = "eu.kelosocial.certification";
 
@@ -252,7 +253,15 @@ export async function POST(request: Request) {
     const issuedAt = existingOwnRecord?.issuedAt || new Date().toISOString();
     const response = await certificationRepo.agent.api.com.atproto.repo.putRecord({ repo: certificationRepo.repoDid, collection: CERTIFICATION_COLLECTION, rkey: recordKey, record: { $type: CERTIFICATION_COLLECTION, subjectDid, subjectHandle: targetHandle, status, issuedAt, issuerDid: requester.did, issuerHandle: requester.handle }, validate: false });
 
-    return NextResponse.json({ success: true, action: existingOwnRecord ? "updated" : "certified", uri: response.data.uri, cid: response.data.cid, subjectDid, subjectHandle: targetHandle, status, issuedAt, issuerDid: requester.did, issuerHandle: requester.handle });
+    // Une certification attribuée par l’Admin implique automatiquement un suivi
+    // depuis le même compte Admin. Les certifications déjà existantes sont
+    // rattrapées par la synchronisation de la page d’administration.
+    let followAction: "followed" | "already-following" | "skipped" = "skipped";
+    if (requesterIsAdmin && status === "certified") {
+      followAction = await followCertifiedProfile(certificationRepo.agent, certificationRepo.repoDid, subjectDid);
+    }
+
+    return NextResponse.json({ success: true, action: existingOwnRecord ? "updated" : "certified", uri: response.data.uri, cid: response.data.cid, subjectDid, subjectHandle: targetHandle, status, issuedAt, issuerDid: requester.did, issuerHandle: requester.handle, followAction });
   } catch (error) {
     console.error("[admin/certify] Erreur", error);
     return NextResponse.json({ error: publicErrorMessage(error) }, { status: 500 });
