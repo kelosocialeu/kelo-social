@@ -63,8 +63,6 @@ export default function Sidebar({ handle, onLogout }: SidebarProps) {
 
           {isAdmin && <>
             <Link href="/admin" className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${pathname === "/admin" ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><ShieldCheck className="h-5 w-5"/>{t("nav.admin", "Panneau Admin")}</Link>
-            <Link href="/admin/journal" className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/admin/journal") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><Newspaper className="h-5 w-5"/>{t("nav.journalMedia", "Médias du Journal")}</Link>
-            <Link href="/admin/certifiers" className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/admin/certifiers") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><BadgeCheck className="h-5 w-5"/>{t("nav.certifiers", "Gérer les certificateurs")}</Link>
           </>}
 
           {!isAdmin && (isTrustedVerifier || canCertify) && <Link href="/verifier" className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 ${isRouteActive(pathname, "/verifier") ? "bg-kelo-gradient text-white" : "text-kelo-secondary hover:bg-kelo-background"}`}><BadgeCheck className="h-5 w-5"/>{t("nav.verifier", "Panneau certificateur")}</Link>}
