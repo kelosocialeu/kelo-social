@@ -120,7 +120,9 @@ export default function IdentityVerificationBadge({
   useEffect(() => {
     const handleChanged = (event: Event) => {
       const detail = (event as CustomEvent<{ did?: string }>).detail;
-      if (!detail?.did || detail.did.trim().toLowerCase() !== actor?.did?.trim().toLowerCase()) return;
+      const matchesDid = Boolean(detail?.did && actor?.did && detail.did.trim().toLowerCase() === actor.did.trim().toLowerCase());
+      const matchesHandle = Boolean(detail?.handle && actor?.handle && detail.handle.trim().replace(/^@/, "").toLowerCase() === actor.handle.trim().replace(/^@/, "").toLowerCase());
+      if (!matchesDid && !matchesHandle) return;
       clearIdentityVerificationCache(detail.did);
       setRecord(null);
       void getIdentityVerification(detail.did).then(setRecord).catch(() => setRecord(null));
