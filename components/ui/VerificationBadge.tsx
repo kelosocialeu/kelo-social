@@ -46,6 +46,20 @@ export default function VerificationBadge({ actor, size = 16 }: VerificationBadg
   const [issuerError, setIssuerError] = useState(false);
 
   useEffect(() => {
+    const handleChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ did?: string }>).detail;
+      if (!detail?.did || normalizeDid(detail.did) !== cacheKey) return;
+      clearCertificationCache(detail.did);
+      setKeloCertifications([]);
+      void listCertifications(true).then((records) => {
+        setKeloCertifications(records.filter((record) => normalizeDid(record.subjectDid) === cacheKey));
+      }).catch(() => {});
+    };
+    window.addEventListener("kelo:certification-changed", handleChanged);
+    return () => window.removeEventListener("kelo:certification-changed", handleChanged);
+  }, [cacheKey]);
+
+  useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
