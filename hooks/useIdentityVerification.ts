@@ -45,6 +45,7 @@ const SUPPORTED_TYPES: IdentityVerificationType[] = [
   "university",
   "association",
   "institution",
+  "political-party",
 ];
 
 function storageKey(did: string) {
