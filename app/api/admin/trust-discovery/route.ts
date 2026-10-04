@@ -4,10 +4,6 @@ import { AtpAgent } from "@atproto/api";
 import { decideTrustDiscoverySuggestion, getTrustDiscoverySuggestions } from "@/lib/atproto/trust-discovery-worker";
 
 const APPVIEW = "https://public.api.bsky.app/xrpc";
-const PDS_URL = process.env.KELO_ADMIN_PDS_URL?.trim() || process.env.CERTIFICATION_REPO_PDS_URL?.trim() || process.env.KELO_PDS_URL?.trim() || "https://pds.kelosocial.eu";
-const ADMIN_IDENTIFIER = process.env.KELO_ADMIN_ATPROTO_IDENTIFIER?.trim() || process.env.CERTIFICATION_REPO_IDENTIFIER?.trim() || "kelosocial.eu";
-const ADMIN_PASSWORD = process.env.KELO_ADMIN_ATPROTO_PASSWORD?.trim() || process.env.CERTIFICATION_REPO_APP_PASSWORD?.trim() || "";
-
 type Source = { label: string; url: string; result: "positive" | "neutral" | "negative" };
 
 type Candidate = {
