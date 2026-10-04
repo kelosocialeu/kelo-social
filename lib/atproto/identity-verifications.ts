@@ -12,7 +12,8 @@ export type IdentityVerificationType =
   | "university"
   | "association"
   | "institution"
-  | "ai";
+  | "ai"
+  | "political-party";
 
 export type IdentityVerificationSource = "kelo-id" | "kelo-verify";
 export type IdentityVerificationAssignmentMode = "automatic" | "manual";
@@ -49,7 +50,7 @@ function normalizeHandle(value: string): string {
 }
 
 function isIdentityVerificationType(value: unknown): value is IdentityVerificationType {
-  return ["human", "enterprise", "media", "university", "association", "institution", "ai"].includes(String(value));
+  return ["human", "enterprise", "media", "university", "association", "institution", "political-party", "ai"].includes(String(value));
 }
 
 function isIdentityVerificationSource(value: unknown): value is IdentityVerificationSource {
@@ -193,6 +194,7 @@ export const IDENTITY_VERIFICATION_LABELS: Record<IdentityVerificationType, stri
   association: "Association vérifiée",
   institution: "Institution vérifiée",
   ai: "IA autorisée",
+  "political-party": "Parti politique vérifié",
 };
 
 export const IDENTITY_VERIFICATION_SOURCE_LABELS: Record<IdentityVerificationSource, string> = {
