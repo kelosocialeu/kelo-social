@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MoreHorizontal, Ban, Flag, EyeOff, Link2 } from "lucide-react";
+import { MoreHorizontal, Ban, Flag, EyeOff, Link2, BadgeCheck } from "lucide-react";
+import Avatar from "@/components/feed/Avatar";
+import Badge from "@/components/ui/Badge";
+import { isTrustedVerifier } from "@/lib/atproto/certifications";
+import { getStoredSession } from "@/services/auth.service";
 import ReportDialog from "@/components/feed/ReportDialog";
 import {
   blockActor,
@@ -17,18 +21,26 @@ interface ProfileMoreMenuProps {
   handle: string;
   onBlocked?: () => void;
   onMuted?: () => void;
+  displayName?: string;
+  avatar?: string;
 }
 
-export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted }: ProfileMoreMenuProps) {
+export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted, displayName, avatar }: ProfileMoreMenuProps) {
   const [open, setOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [copiedFeedback, setCopiedFeedback] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [blocking, setBlocking] = useState(false);
+  const [isTrusted, setIsTrusted] = useState(false);
+  const [certifyOpen, setCertifyOpen] = useState(false);
+  const [certifying, setCertifying] = useState(false);
+  const session = getStoredSession();
+  const isOwnProfile = Boolean(session?.did && session.did.toLowerCase() === did.toLowerCase());
 
   useEffect(() => {
     let cancelled = false;
+    if (session?.did) isTrustedVerifier(session.did).then((value) => { if (!cancelled) setIsTrusted(value); }).catch(() => {});
     isActorBlocked(did)
       .then((value) => { if (!cancelled) setBlocked(value); })
       .catch(() => {});
@@ -36,6 +48,31 @@ export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted }: Pro
   }, [did]);
 
   const profileUrl = typeof window !== "undefined" ? `${window.location.origin}/profile/${handle}` : "";
+
+  const handleCertification = async () => {
+    if (certifying) return;
+    if (!session) {
+      alert("Session introuvable. Reconnectez-vous.");
+      return;
+    }
+    setCertifying(true);
+    try {
+      const response = await fetch("/api/admin/certify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session, targetHandle: handle, targetDid: did, status: "certified" }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || "Impossible d’attribuer la certification.");
+      setCertifyOpen(false);
+      setOpen(false);
+      window.dispatchEvent(new CustomEvent("kelo:certification-changed", { detail: { did, handle } }));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Impossible d’attribuer la certification.");
+    } finally {
+      setCertifying(false);
+    }
+  };
 
   const handleCopyLink = async () => {
     try {
@@ -114,6 +151,11 @@ export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted }: Pro
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-full z-20 mt-2 w-60 overflow-hidden rounded-2xl border border-kelo-border bg-white shadow-kelo">
+            {isTrusted && !isOwnProfile && (
+              <button onClick={() => { setOpen(false); setCertifyOpen(true); }} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-kelo-primary transition-colors hover:bg-kelo-background">
+                <BadgeCheck className="h-4 w-4" /> Attribuer une certification
+              </button>
+            )}
             <button onClick={handleCopyLink} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-kelo-text transition-colors hover:bg-kelo-background">
               <Link2 className="h-4 w-4" /> Copier le lien vers le compte
             </button>
@@ -136,6 +178,27 @@ export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted }: Pro
               <Ban className="h-4 w-4" />
               {blocking ? (blocked ? "Déblocage..." : "Blocage...") : (blocked ? "Débloquer cet utilisateur" : "Bloquer cet utilisateur")}
             </button>
+          </div>
+        </>
+      )}
+
+      {certifyOpen && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={() => !certifying && setCertifyOpen(false)} />
+          <div className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-kelo-border bg-white p-6 shadow-kelo">
+            <div className="flex flex-col items-center text-center">
+              <Avatar src={avatar} fallback={(handle[0] || "K").toUpperCase()} size="lg" gradient />
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <h3 className="text-lg font-extrabold text-kelo-text">{displayName || handle}</h3>
+                <Badge status="certified" size={26} />
+              </div>
+              <p className="mt-1 text-sm font-semibold text-kelo-muted">@{handle}</p>
+              <p className="mt-4 text-sm leading-6 text-kelo-muted">Voulez-vous bien attribuer une <strong className="text-kelo-text">certification</strong> à ce compte ? Le badge rond de certification apparaîtra sur son profil.</p>
+              <div className="mt-5 flex w-full gap-3">
+                <button type="button" onClick={() => setCertifyOpen(false)} disabled={certifying} className="flex-1 rounded-full bg-kelo-background px-4 py-2.5 text-sm font-bold text-kelo-text disabled:opacity-50">Annuler</button>
+                <button type="button" onClick={handleCertification} disabled={certifying} className="flex-1 rounded-full bg-kelo-gradient px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{certifying ? "Certification..." : "Certifier le compte"}</button>
+              </div>
+            </div>
           </div>
         </>
       )}
