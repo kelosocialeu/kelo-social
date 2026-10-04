@@ -38,7 +38,7 @@ export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted, displ
   const [certifyOpen, setCertifyOpen] = useState(false);
   const [certifying, setCertifying] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
-  const [verifyType, setVerifyType] = useState<"human"|"enterprise"|"media"|"university"|"association"|"institution"|"ai">("human");
+  const [verifyType, setVerifyType] = useState<"human"|"enterprise"|"media"|"university"|"association"|"institution"|"political-party"|"ai">("human");
   const [verifying, setVerifying] = useState(false);
   const { isAdmin } = useIsAdmin();
   const session = getStoredSession();
