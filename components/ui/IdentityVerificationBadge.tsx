@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 
 import {
-  clearIdentityVerificationCache,\n  getIdentityVerification,
+  clearIdentityVerificationCache,
+  getIdentityVerification,
   IdentityVerificationRecord,
   IdentityVerificationType,
   IDENTITY_VERIFICATION_LABELS,
@@ -115,6 +116,18 @@ export default function IdentityVerificationBadge({
   const [record, setRecord] = useState<IdentityVerificationRecord | null>(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const handleChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ did?: string }>).detail;
+      if (!detail?.did || detail.did.trim().toLowerCase() !== actor?.did?.trim().toLowerCase()) return;
+      clearIdentityVerificationCache(detail.did);
+      setRecord(null);
+      void getIdentityVerification(detail.did).then(setRecord).catch(() => setRecord(null));
+    };
+    window.addEventListener("kelo:identity-verification-changed", handleChanged);
+    return () => window.removeEventListener("kelo:identity-verification-changed", handleChanged);
+  }, [actor?.did]);
 
   useEffect(() => {
     let cancelled = false;
