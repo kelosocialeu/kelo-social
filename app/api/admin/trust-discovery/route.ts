@@ -59,7 +59,7 @@ function sameName(a: string, b: string) {
   return !!x && !!y && (x === y || x.includes(y) || y.includes(x));
 }
 
-async function inspectWebsite(url: string, handle: string, displayName: string) {
+async function inspectWebsite(url: string, handle: string, displayName: string): Promise<{ sources: Candidate["sources"]; officialWebsite?: string; score: number }> {
   const sources: Candidate["sources"] = [];
   try {
     const parsed = new URL(url);
