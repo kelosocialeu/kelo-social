@@ -24,6 +24,7 @@ type Candidate = {
   recommendation: "certification" | "trusted-certifier";
   recommendationTitle: string;
   recommendationSummary: string;
+  discoveredAt?: string;
 };
 
 function norm(v: string) { return v.trim().replace(/^@/, "").toLowerCase(); }
