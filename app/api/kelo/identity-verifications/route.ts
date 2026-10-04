@@ -4,7 +4,7 @@ import { AtpAgent } from "@atproto/api";
 const COLLECTION = "eu.kelosocial.identityverification";
 const PDS_URL = process.env.KELO_ADMIN_PDS_URL?.trim() || "https://eurosky.social";
 const REPO = process.env.NEXT_PUBLIC_KELO_ADMIN_DID?.trim() || process.env.KELO_ADMIN_ATPROTO_IDENTIFIER?.trim() || "kelosocial.eu";
-const TYPES = ["human","enterprise","media","university","association","institution","ai"] as const;
+const TYPES = ["human","enterprise","media","university","association","institution","political-party","ai"] as const;
 type VerificationType = typeof TYPES[number];
 
 function norm(v:string){return v.trim().replace(/^@/,"").toLowerCase();}
