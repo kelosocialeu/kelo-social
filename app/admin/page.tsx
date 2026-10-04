@@ -439,6 +439,9 @@ export default function AdminPage() {
 
         <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
           <div className="grid gap-4 sm:grid-cols-2">
+            <button type="button" onClick={() => router.push("/admin/trust-discovery")} className="rounded-3xl border border-kelo-border bg-white p-5 text-left transition hover:bg-kelo-background/50">
+              <div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-kelo-gradient text-white"><Bot className="h-5 w-5" /></div><div><h2 className="font-extrabold text-kelo-text">Robot de découverte</h2><p className="text-xs text-kelo-muted">Repérer des comptes susceptibles d’être certifiés grâce aux sources publiques</p></div></div>
+            </button>
             <button type="button" onClick={() => router.push("/admin/journal")} className="rounded-3xl border border-kelo-border bg-white p-5 text-left transition hover:bg-kelo-background/50">
               <div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-kelo-gradient text-white"><Newspaper className="h-5 w-5" /></div><div><h2 className="font-extrabold text-kelo-text">Journal</h2><p className="text-xs text-kelo-muted">Ajouter, modifier, retirer et fermer les médias du Journal</p></div></div>
             </button>
