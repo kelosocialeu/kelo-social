@@ -315,6 +315,7 @@ export default function AdminPage() {
           : `${updatedCount} compte${updatedCount > 1 ? "s" : ""} mis à jour. Échecs : ${failures.join(" · ")}`
       );
 
+      window.dispatchEvent(new CustomEvent("kelo:certification-changed", { detail: { dids: selectedAccounts.map((account) => account.did) } }));
       await refreshCertifications();
     } catch (submitError) {
       setError(
@@ -366,6 +367,7 @@ export default function AdminPage() {
           : "La vérification d’identité a été attribuée."
       );
 
+      window.dispatchEvent(new CustomEvent("kelo:identity-verification-changed", { detail: { handle: cleanTargetHandle } }));
       await refreshIdentityVerifications();
     } catch (submitError) {
       setError(
