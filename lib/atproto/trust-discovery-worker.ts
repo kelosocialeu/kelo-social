@@ -1,6 +1,4 @@
 import { AtpAgent } from "@atproto/api";
-import { createHash } from "crypto";
-
 const COLLECTION = "eu.kelosocial.trustdiscovery";
 const CERTIFICATION_COLLECTION = "eu.kelosocial.certification";
 const STATE_RKEY = "state";
@@ -71,9 +69,6 @@ function sameName(a: string, b: string) {
   const clean = (v: string) => v.toLowerCase().replace(/[^a-z0-9À-ÿ]+/g, " ").trim();
   const x = clean(a), y = clean(b);
   return !!x && !!y && (x === y || x.includes(y) || y.includes(x));
-}
-function rkey(did: string) {
-  return createHash("sha256").update(did).digest("hex").slice(0, 48);
 }
 function interesting(text: string) {
   return /journalist|journaliste|media|média|news|founder|fondateur|ceo|company|entreprise|group|groupe|corporation|association|ngo|ong|university|université|professor|institution|government|gouvernement|minister|ministre|politician|politique|creator|créateur|influencer|influenceur|artist|artiste|samsung|microsoft|google|apple|meta|amazon/i.test(text);
