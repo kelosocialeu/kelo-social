@@ -6,6 +6,7 @@ import Avatar from "@/components/feed/Avatar";
 import Badge from "@/components/ui/Badge";
 import { isTrustedVerifier } from "@/lib/atproto/certifications";
 import { getStoredSession } from "@/services/auth.service";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import ReportDialog from "@/components/feed/ReportDialog";
 import {
   blockActor,
@@ -35,6 +36,10 @@ export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted, displ
   const [isTrusted, setIsTrusted] = useState(false);
   const [certifyOpen, setCertifyOpen] = useState(false);
   const [certifying, setCertifying] = useState(false);
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  const [verifyType, setVerifyType] = useState<"human"|"enterprise"|"media"|"university"|"association"|"institution"|"ai">("human");
+  const [verifying, setVerifying] = useState(false);
+  const { isAdmin } = useIsAdmin();
   const session = getStoredSession();
   const isOwnProfile = Boolean(session?.did && session.did.toLowerCase() === did.toLowerCase());
 
@@ -72,6 +77,25 @@ export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted, displ
     } finally {
       setCertifying(false);
     }
+  };
+
+  const handleVerification = async () => {
+    if (verifying || !session) return;
+    setVerifying(true);
+    try {
+      const response = await fetch("/api/kelo/identity-verifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session, targetDid: did, targetHandle: handle, verificationType: verifyType }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || "Impossible d’attribuer la vérification.");
+      setVerifyOpen(false);
+      setOpen(false);
+      window.dispatchEvent(new CustomEvent("kelo:identity-verification-changed", { detail: { did, handle } }));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Impossible d’attribuer la vérification.");
+    } finally { setVerifying(false); }
   };
 
   const handleCopyLink = async () => {
@@ -151,6 +175,11 @@ export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted, displ
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-full z-20 mt-2 w-60 overflow-hidden rounded-2xl border border-kelo-border bg-white shadow-kelo">
+            {isAdmin && !isOwnProfile && (
+              <button onClick={() => { setOpen(false); setVerifyOpen(true); }} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-kelo-primary transition-colors hover:bg-kelo-background">
+                <BadgeCheck className="h-4 w-4" /> Ajouter une vérification
+              </button>
+            )}
             {isTrusted && !isOwnProfile && (
               <button onClick={() => { setOpen(false); setCertifyOpen(true); }} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-kelo-primary transition-colors hover:bg-kelo-background">
                 <BadgeCheck className="h-4 w-4" /> Attribuer une certification
@@ -178,6 +207,30 @@ export default function ProfileMoreMenu({ did, handle, onBlocked, onMuted, displ
               <Ban className="h-4 w-4" />
               {blocking ? (blocked ? "Déblocage..." : "Blocage...") : (blocked ? "Débloquer cet utilisateur" : "Bloquer cet utilisateur")}
             </button>
+          </div>
+        </>
+      )}
+
+      {verifyOpen && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={() => !verifying && setVerifyOpen(false)} />
+          <div className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-kelo-border bg-white p-6 shadow-kelo">
+            <h3 className="text-lg font-extrabold text-kelo-text">Ajouter une vérification</h3>
+            <p className="mt-1 text-sm text-kelo-muted">Cette action est réservée à l’administrateur Kelo Social.</p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              {[
+                ["human","Humain"],["enterprise","Entreprise"],["media","Média"],["university","Université"],
+                ["association","Association"],["institution","Institution"],["ai","IA"]
+              ].map(([value,label]) => (
+                <button key={value} type="button" onClick={() => setVerifyType(value as typeof verifyType)} className={`rounded-xl border px-3 py-2.5 text-sm font-bold ${verifyType === value ? "border-kelo-primary bg-kelo-background text-kelo-primary" : "border-kelo-border text-kelo-text"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-5 flex gap-3">
+              <button type="button" onClick={() => setVerifyOpen(false)} disabled={verifying} className="flex-1 rounded-full bg-kelo-background py-2.5 text-sm font-bold">Annuler</button>
+              <button type="button" onClick={handleVerification} disabled={verifying} className="flex-1 rounded-full bg-kelo-gradient py-2.5 text-sm font-bold text-white">{verifying ? "Vérification..." : "Vérifier le compte"}</button>
+            </div>
           </div>
         </>
       )}
