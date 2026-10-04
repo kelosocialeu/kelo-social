@@ -185,6 +185,9 @@ export default function BatchCertificationManager({
           current.filter((actor) => failedHandles.has(`@${normalizeHandle(actor.handle)}`))
         );
       }
+      for (const actor of selected) {
+        if (actor.did?.startsWith("did:")) window.dispatchEvent(new CustomEvent("kelo:certification-changed", { detail: { did: actor.did, handle: actor.handle } }));
+      }
       await onUpdated?.();
     }
 
