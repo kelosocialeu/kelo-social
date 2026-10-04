@@ -205,9 +205,9 @@ async function consume() {
   if (running || !PASSWORD) return;
   running = true;
   try {
-    const { agent, did } = await login();
-    const certified = await getCertifiedDids(agent, did);
-    const cursor = await readState(agent, did);
+    const { agent, did: adminDid } = await login();
+    const certified = await getCertifiedDids(agent, adminDid);
+    const cursor = await readState(agent, adminDid);
     const params = new URLSearchParams();
     params.append("wantedCollections", "app.bsky.actor.profile");
     params.append("wantedCollections", "app.bsky.graph.verification");
@@ -224,13 +224,13 @@ async function consume() {
           if (payload.kind !== "commit") return;
           const nextCursor = Number(payload.time_us || 0);
           if (nextCursor > lastCursor) lastCursor = nextCursor;
-          const did = String(payload.did || "");
-          if (!did || payload.commit?.operation === "delete") return;
+          const eventDid = String(payload.did || "");
+          if (!eventDid || payload.commit?.operation === "delete") return;
           processed++;
           if (processed > 50) { ws.close(); return; }
-          if (!certified.has(did)) {
-            const suggestion = await inspect(did, certified);
-            if (suggestion) await saveSuggestion(agent, did, suggestion);
+          if (!certified.has(eventDid)) {
+            const suggestion = await inspect(eventDid, certified);
+            if (suggestion) await saveSuggestion(agent, adminDid, suggestion);
           }
         } catch (error) {
           console.error("[trust-discovery-worker] event error", error);
@@ -240,7 +240,7 @@ async function consume() {
       ws.onerror = () => resolve();
     });
     clearTimeout(closeTimer);
-    if (lastCursor > cursor) await writeState(agent, did, lastCursor);
+    if (lastCursor > cursor) await writeState(agent, adminDid, lastCursor);
   } catch (error) {
     console.error("[trust-discovery-worker]", error);
   } finally {
