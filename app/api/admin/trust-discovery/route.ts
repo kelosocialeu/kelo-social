@@ -1,3 +1,4 @@
+// Trust discovery source typing is intentionally explicit to keep production builds strict.
 import { NextRequest, NextResponse } from "next/server";
 import { AtpAgent } from "@atproto/api";
 
