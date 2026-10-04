@@ -26,14 +26,32 @@ export default function TrustDiscoveryPage() {
     try {
       const session = getStoredSession();
       if (!session) throw new Error("Session introuvable. Reconnectez-vous.");
-      const status = decision === "reject" ? "none" : decision;
-      const response = await fetch("/api/admin/certify", {
+
+      if (decision !== "reject") {
+        const status = decision === "trusted-verifier" ? "trusted-verifier" : "certified";
+        const response = await fetch("/api/admin/certify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session, targetDid: candidate.did, targetHandle: candidate.handle, status }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Certification impossible.");
+      }
+
+      const memoryDecision = decision === "reject"
+        ? "rejected"
+        : decision === "trusted-verifier"
+          ? "trusted-certifier"
+          : "certified";
+
+      const decisionResponse = await fetch("/api/admin/trust-discovery", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session, targetDid: candidate.did, targetHandle: candidate.handle, status }),
+        body: JSON.stringify({ session, mode: "decision", did: candidate.did, decision: memoryDecision }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Action impossible.");
+      const decisionData = await decisionResponse.json();
+      if (!decisionResponse.ok) throw new Error(decisionData.error || "Impossible de mémoriser la décision.");
+
       setCandidates(current => current.filter(item => item.did !== candidate.did));
       setLastUpdate(new Date());
     } catch (e) {
