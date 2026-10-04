@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { AtpAgent } from "@atproto/api";
 
 const APPVIEW = "https://public.api.bsky.app/xrpc";
-const PDS_URL = process.env.KELO_ADMIN_PDS_URL?.trim() || "https://pds.kelosocial.eu";
+const PDS_URL = process.env.KELO_ADMIN_PDS_URL?.trim() || process.env.CERTIFICATION_REPO_PDS_URL?.trim() || process.env.KELO_PDS_URL?.trim() || "https://pds.kelosocial.eu";
+const ADMIN_IDENTIFIER = process.env.KELO_ADMIN_ATPROTO_IDENTIFIER?.trim() || process.env.CERTIFICATION_REPO_IDENTIFIER?.trim() || "kelosocial.eu";
+const ADMIN_PASSWORD = process.env.KELO_ADMIN_ATPROTO_PASSWORD?.trim() || process.env.CERTIFICATION_REPO_APP_PASSWORD?.trim() || "";
 
 type Source = { label: string; url: string; result: "positive" | "neutral" | "negative" };
 
@@ -119,6 +121,25 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     await assertAdmin(body?.session);
+
+    if (body?.mode === "list") {
+      if (!ADMIN_PASSWORD) throw new Error("Configuration du dépôt administrateur incomplète.");
+      const repoAgent = new AtpAgent({ service: PDS_URL });
+      await repoAgent.login({ identifier: ADMIN_IDENTIFIER, password: ADMIN_PASSWORD });
+      const repoDid = repoAgent.session?.did;
+      if (!repoDid) throw new Error("Dépôt administrateur indisponible.");
+      const records = await repoAgent.api.com.atproto.repo.listRecords({
+        repo: repoDid,
+        collection: "eu.kelosocial.trustdiscovery",
+        limit: 100,
+      });
+      const candidates = records.data.records
+        .filter(item => !item.uri.endsWith("/state"))
+        .map(item => item.value)
+        .filter(value => value && typeof value === "object") as Candidate[];
+      candidates.sort((a, b) => String(b.discoveredAt || "").localeCompare(String(a.discoveredAt || "")));
+      return NextResponse.json({ success: true, candidates });
+    }
 
     const category = String(body?.category || "all");
     const customQuery = String(body?.query || "").trim().slice(0, 80);
