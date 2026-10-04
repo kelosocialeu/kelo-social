@@ -16,6 +16,7 @@ import {
 } from "@/lib/atproto/verification";
 import { CertificationRecord, listCertifications } from "@/lib/atproto/certifications";
 import { isCertificationSuppressed } from "@/lib/atproto/certification-suppressions";
+import { clearCertificationCache } from "@/lib/atproto/certifications";
 
 interface VerificationBadgeProps { actor: any; size?: number; }
 interface IssuerProfile {
