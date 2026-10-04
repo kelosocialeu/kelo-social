@@ -290,7 +290,7 @@ export default function PostCard({
                 className="flex min-w-0 flex-wrap items-center gap-2 hover:underline"
               >
                 <span className="max-w-full truncate font-bold text-kelo-primary">
-                  {post.author?.displayName || "Utilisateur"}
+                  {post.author?.displayName || (post.author?.handle ? `@${post.author.handle.replace(/^@/, "")}` : "Utilisateur")}
                 </span>
               </Link>
               <span onClick={(event) => event.stopPropagation()}>
