@@ -169,6 +169,7 @@ async function inspect(did: string, certified: Set<string>): Promise<Suggestion 
           } else {
             sources.push({ label: "Site public associé", url: res.url || u.toString(), result: "neutral" });
           }
+          // Extract the HTML title without a regular expression (Render/Next parser-safe).
           const titleStart = html.indexOf("<title");
           const titleOpenEnd = titleStart >= 0 ? html.indexOf(">", titleStart) : -1;
           const titleClose = titleOpenEnd >= 0 ? html.indexOf("</title>", titleOpenEnd) : -1;
