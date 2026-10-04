@@ -118,6 +118,19 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!checked || !targetHandle) return;
 
+    const handleCertificationChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ did?: string; handle?: string }>).detail;
+      if (!detail?.did || detail.did.toLowerCase() !== profile?.did?.toLowerCase()) return;
+      void getActorProfile(targetHandle).then(setProfile).catch(() => {});
+    };
+
+    window.addEventListener("kelo:certification-changed", handleCertificationChanged);
+    return () => window.removeEventListener("kelo:certification-changed", handleCertificationChanged);
+  }, [checked, targetHandle, profile?.did]);
+
+  useEffect(() => {
+    if (!checked || !targetHandle) return;
+
     async function loadProfileData() {
       setLoadingProfile(true);
       setLoadError(null);
