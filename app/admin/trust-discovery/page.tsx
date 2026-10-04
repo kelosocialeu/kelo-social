@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bot, ExternalLink, Globe2, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import Badge from "@/components/ui/Badge";
@@ -23,28 +23,37 @@ const categories = [
 
 export default function TrustDiscoveryPage() {
   const { checked, isAdmin, handle } = useAdminRole();
-  const [category, setCategory] = useState("all");
-  const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [error, setError] = useState("");
 
-  async function scan() {
-    setLoading(true); setError("");
+  async function loadSuggestions() {
     try {
       const session = getStoredSession();
       if (!session) throw new Error("Session introuvable. Reconnectez-vous.");
       const response = await fetch("/api/admin/trust-discovery", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session, category, query }),
+        body: JSON.stringify({ session, mode: "list" }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Analyse impossible.");
+      if (!response.ok) throw new Error(data.error || "Chargement impossible.");
       setCandidates(data.candidates || []);
+      setLastUpdate(new Date());
+      setError("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Analyse impossible.");
-    } finally { setLoading(false); }
+      setError(e instanceof Error ? e.message : "Chargement impossible.");
+    } finally {
+      setLoading(false);
+    }
   }
+
+  useEffect(() => {
+    if (!checked || !isAdmin) return;
+    void loadSuggestions();
+    const timer = window.setInterval(() => void loadSuggestions(), 30000);
+    return () => window.clearInterval(timer);
+  }, [checked, isAdmin]);
 
   if (!checked || !isAdmin) return <div className="flex min-h-screen items-center justify-center bg-kelo-background text-sm text-kelo-muted">Vérification des droits…</div>;
 
@@ -62,11 +71,13 @@ export default function TrustDiscoveryPage() {
         </header>
         <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
           <section className="rounded-3xl border border-kelo-border bg-kelo-background p-5">
-            <div className="flex items-start gap-3"><Sparkles className="mt-0.5 h-5 w-5 text-kelo-primary" /><div><p className="font-extrabold">Présélection, pas certification automatique</p><p className="mt-1 text-sm text-kelo-muted">Le robot ne certifie jamais. Il recoupe les informations publiques et formule une suggestion argumentée : certification d’un compte, ou certificateur de confiance pour une très grande entité authentifiable.</p></div></div>
-            <div className="mt-5 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-              <select value={category} onChange={e => setCategory(e.target.value)} className="rounded-2xl border border-kelo-border bg-white px-4 py-3 text-sm font-bold">{categories.map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select>
-              <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Recherche libre (ex. Fondation, journaliste…)" className="rounded-2xl border border-kelo-border bg-white px-4 py-3 text-sm" />
-              <button onClick={scan} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-full bg-kelo-gradient px-5 py-3 text-sm font-extrabold text-white disabled:opacity-50"><RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />{loading ? "Analyse…" : "Lancer le robot"}</button>
+            <div className="flex items-start gap-3"><Sparkles className="mt-0.5 h-5 w-5 text-kelo-primary" /><div><p className="font-extrabold">Veille AT Protocol autonome</p><p className="mt-1 text-sm text-kelo-muted">Le robot tourne automatiquement sur le serveur et surveille le flux AT Protocol en continu. Il vérifie d’abord si le DID est déjà certifié par Kelo Social : dans ce cas, il l’ignore. Sinon, il recoupe les signaux AT Protocol et les sources publiques sur Internet.</p></div></div>
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-xs font-semibold text-kelo-muted">
+              <span className="rounded-full bg-white px-3 py-1.5">Surveillance automatique</span>
+              <span className="rounded-full bg-white px-3 py-1.5">Certifications Kelo ignorées</span>
+              <span className="rounded-full bg-white px-3 py-1.5">Aucune certification automatique</span>
+              {lastUpdate && <span>Dernière actualisation : {lastUpdate.toLocaleTimeString("fr-BE")}</span>}
+              <button onClick={() => void loadSuggestions()} className="ml-auto inline-flex items-center gap-2 rounded-full border border-kelo-border bg-white px-4 py-2 font-extrabold"><RefreshCw className="h-4 w-4" />Actualiser</button>
             </div>
           </section>
 
@@ -89,7 +100,7 @@ export default function TrustDiscoveryPage() {
                 </div>
               </article>
             ))}
-            {!loading && candidates.length === 0 && <div className="rounded-3xl border border-dashed border-kelo-border p-10 text-center text-sm text-kelo-muted">Lancez une analyse pour rechercher des candidats.</div>}
+            {!loading && candidates.length === 0 && <div className="rounded-3xl border border-dashed border-kelo-border p-10 text-center text-sm text-kelo-muted">Le robot n’a pas encore produit de suggestion. Il continue sa veille automatiquement.</div>}
           </section>
         </div>
       </main>
