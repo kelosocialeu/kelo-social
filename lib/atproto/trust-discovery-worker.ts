@@ -41,6 +41,27 @@ type Suggestion = {
 let started = false;
 let running = false;
 
+type Decision = "rejected" | "certified" | "trusted-certifier";
+const suggestions = new Map<string, Suggestion>();
+const decisions = new Map<string, Decision>();
+
+export function getTrustDiscoverySuggestions(): Suggestion[] {
+  return Array.from(suggestions.values())
+    .filter((suggestion) => !decisions.has(suggestion.did))
+    .filter((suggestion) => suggestion.confidence === "high")
+    .filter((suggestion) => suggestion.score >= (suggestion.recommendation === "trusted-certifier" ? 85 : 70))
+    .sort((a, b) => b.discoveredAt.localeCompare(a.discoveredAt));
+}
+
+export function decideTrustDiscoverySuggestion(did: string, decision: Decision) {
+  decisions.set(did, decision);
+  suggestions.delete(did);
+}
+
+export function clearTrustDiscoverySuggestion(did: string) {
+  suggestions.delete(did);
+}
+
 function norm(v: string) { return v.trim().toLowerCase(); }
 function baseDomain(handle: string) {
   const p = norm(handle).split(".");
@@ -100,16 +121,6 @@ async function writeState(agent: AtpAgent, repoDid: string, cursor: number) {
     rkey: STATE_RKEY,
     validate: false,
     record: { "$type": COLLECTION, cursor, updatedAt: new Date().toISOString() },
-  });
-}
-
-async function saveSuggestion(agent: AtpAgent, repoDid: string, suggestion: Suggestion) {
-  await agent.api.com.atproto.repo.putRecord({
-    repo: repoDid,
-    collection: COLLECTION,
-    rkey: rkey(suggestion.did),
-    validate: false,
-    record: { "$type": COLLECTION, ...suggestion },
   });
 }
 
@@ -234,9 +245,11 @@ async function consume() {
           if (!eventDid || payload.commit?.operation === "delete") return;
           processed++;
           if (processed > 50) { ws.close(); return; }
-          if (!certified.has(eventDid)) {
+          if (!certified.has(eventDid) && !decisions.has(eventDid)) {
             const suggestion = await inspect(eventDid, certified);
-            if (suggestion) await saveSuggestion(agent, adminDid, suggestion);
+            if (suggestion && !decisions.has(eventDid)) {
+              suggestions.set(eventDid, suggestion);
+            }
           }
         } catch (error) {
           console.error("[trust-discovery-worker] event error", error);
