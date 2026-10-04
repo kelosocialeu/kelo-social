@@ -315,7 +315,7 @@ export default function AdminPage() {
           : `${updatedCount} compte${updatedCount > 1 ? "s" : ""} mis à jour. Échecs : ${failures.join(" · ")}`
       );
 
-      window.dispatchEvent(new CustomEvent("kelo:certification-changed", { detail: { dids: selectedAccounts.map((account) => account.did) } }));
+      selectedAccounts.forEach((account) => window.dispatchEvent(new CustomEvent("kelo:certification-changed", { detail: { did: account.did, handle: account.handle } })));
       await refreshCertifications();
     } catch (submitError) {
       setError(
