@@ -85,6 +85,19 @@ async function getCentralRepo() {
   return { agent, repoDid: agent.session.did };
 }
 
+// La lecture du Journal est publique : elle ne doit pas dépendre du mot de passe
+// du compte administrateur. Cela évite que /journal et /admin/journal cassent
+// simultanément si le secret d'écriture est absent ou temporairement invalide.
+async function getCentralRepoForRead() {
+  const agent = new AtpAgent({ service: REPO_PDS_URL });
+  const response = await agent.api.com.atproto.identity.resolveHandle({
+    handle: REPO_IDENTIFIER,
+  });
+  const repoDid = response.data.did;
+  if (!repoDid) throw new Error("Dépôt central introuvable.");
+  return { agent, repoDid };
+}
+
 async function listMedia(agent: AtpAgent, repoDid: string): Promise<JournalMedia[]> {
   const items: JournalMedia[] = [];
   let cursor: string | undefined;
@@ -120,7 +133,7 @@ async function listMedia(agent: AtpAgent, repoDid: string): Promise<JournalMedia
 
 export async function GET() {
   try {
-    const { agent, repoDid } = await getCentralRepo();
+    const { agent, repoDid } = await getCentralRepoForRead();
     return NextResponse.json({ media: await listMedia(agent, repoDid) });
   } catch (error) {
     console.error("[journal/media GET]", error);
