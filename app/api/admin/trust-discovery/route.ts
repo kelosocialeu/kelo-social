@@ -137,7 +137,12 @@ export async function POST(request: NextRequest) {
       const candidates = records.data.records
         .filter(item => !item.uri.endsWith("/state"))
         .map(item => item.value)
-        .filter(value => value && typeof value === "object") as Candidate[];
+        .filter(value => value && typeof value === "object")
+        .filter((value) => {
+          const candidate = value as Candidate;
+          return candidate.confidence === "high" &&
+            candidate.score >= (candidate.recommendation === "trusted-certifier" ? 85 : 70);
+        }) as Candidate[];
       candidates.sort((a, b) => String(b.discoveredAt || "").localeCompare(String(a.discoveredAt || "")));
       return NextResponse.json({ success: true, candidates });
     }
