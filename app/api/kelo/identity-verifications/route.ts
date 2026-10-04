@@ -28,6 +28,22 @@ async function assertAdmin(session:any){
   if(!ok) throw new Error("Accès réservé à l’administrateur Kelo Social.");
   return {did,handle};
 }
+export async function GET() {
+  try {
+    const agent = new AtpAgent({ service: PDS_URL });
+    const records: unknown[] = [];
+    let cursor: string | undefined;
+    do {
+      const response = await agent.api.com.atproto.repo.listRecords({ repo: REPO, collection: COLLECTION, limit: 100, cursor });
+      records.push(...response.data.records.map((item) => item.value));
+      cursor = response.data.cursor;
+    } while (cursor);
+    return NextResponse.json({ records, meta: { count: records.length, repo: REPO, fetchedAt: new Date().toISOString() } }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? `Impossible de charger les vérifications d’identité : ${error.message}` : "Impossible de charger les vérifications d’identité.", records: [] }, { status: 502, headers: { "Cache-Control": "no-store" } });
+  }
+}
+
 export async function POST(request:Request){
  try{
   const body=await request.json();
