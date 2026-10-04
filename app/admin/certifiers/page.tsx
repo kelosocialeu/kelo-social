@@ -114,6 +114,8 @@ export default function CertifiersAdminPage() {
       throw new Error(data.error || "Impossible de modifier la certification.");
     }
 
+    if (data?.subjectDid) window.dispatchEvent(new CustomEvent("kelo:certification-changed", { detail: { did: data.subjectDid, handle: targetHandle } }));
+    else window.dispatchEvent(new CustomEvent("kelo:certification-changed", { detail: { handle: targetHandle } }));
     return data;
   }
 
