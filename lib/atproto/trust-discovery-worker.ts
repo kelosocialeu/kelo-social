@@ -169,8 +169,12 @@ async function inspect(did: string, certified: Set<string>): Promise<Suggestion 
           } else {
             sources.push({ label: "Site public associé", url: res.url || u.toString(), result: "neutral" });
           }
-          const titleMatch = html.match(/<title[^>]*>([\\s\\S]*?)<\\/title>/i);
-          const title = titleMatch?.[1] || "";
+          const titleStart = html.indexOf("<title");
+          const titleOpenEnd = titleStart >= 0 ? html.indexOf(">", titleStart) : -1;
+          const titleClose = titleOpenEnd >= 0 ? html.indexOf("</title>", titleOpenEnd) : -1;
+          const title = titleOpenEnd >= 0 && titleClose > titleOpenEnd
+            ? html.slice(titleOpenEnd + 1, titleClose)
+            : "";
           if (sameName(displayName, title)) {
             score += 10;
             reasons.push("Le nom public correspond au titre du site associé.");
