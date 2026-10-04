@@ -38,7 +38,23 @@ export default function CertifiersAdminPage() {
 
     try {
       clearCertificationCache();
-      setRecords(await listCertifications());
+      const nextRecords = await listCertifications();
+      setRecords(nextRecords);
+
+      // Rattrapage des certifications déjà attribuées par l’Admin :
+      // tous les profils concernés doivent aussi être suivis par le compte Admin.
+      const session = getStoredSession();
+      if (session) {
+        try {
+          await fetch("/api/admin/certification-follows", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session }),
+          });
+        } catch (syncError) {
+          console.warn("[certifiers] synchronisation des abonnements impossible", syncError);
+        }
+      }
     } catch (loadError) {
       console.error(loadError);
       setError("Impossible de charger les certifications.");
