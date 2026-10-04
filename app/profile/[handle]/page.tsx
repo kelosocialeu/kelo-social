@@ -521,6 +521,8 @@ export default function ProfilePage() {
                     <ProfileMoreMenu
                       did={profile.did}
                       handle={targetHandle}
+                      displayName={profile?.displayName}
+                      avatar={profile?.avatar}
                       onBlocked={handleModeration}
                       onMuted={handleModeration}
                     />
