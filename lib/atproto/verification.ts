@@ -3,10 +3,7 @@ import { createAppViewAgent } from "@/lib/atproto/appview";
 /**
  * Système de vérification natif AT Protocol / Bluesky.
  */
-export type VerificationBadgeType =
-  | "verified"
-  | "trusted-verifier"
-  | null;
+export type VerificationBadgeType = "verified" | "trusted-verifier" | null;
 
 export interface VerificationIssuer {
   issuer: string;
@@ -20,75 +17,109 @@ interface NativeVerificationCacheEntry {
   expiresAt: number;
 }
 
-const CACHE_DURATION = 5 * 60 * 1000;
+interface PendingLookup {
+  promise: Promise<any | null>;
+  resolve: (value: any | null) => void;
+}
 
-const nativeVerificationCache = new Map<
-  string,
-  NativeVerificationCacheEntry
->();
+const CACHE_DURATION = 5 * 60 * 1000;
+const MAX_BATCH_SIZE = 25;
+
+const nativeVerificationCache = new Map<string, NativeVerificationCacheEntry>();
+const pendingNativeLookups = new Map<string, PendingLookup>();
+let queuedNativeLookups = new Set<string>();
+let nativeLookupTimer: ReturnType<typeof setTimeout> | null = null;
 
 function getActorKey(actor: any): string | null {
-  const did =
-    typeof actor?.did === "string"
-      ? actor.did.trim().toLowerCase()
-      : "";
+  const did = typeof actor?.did === "string" ? actor.did.trim().toLowerCase() : "";
+  if (did) return did;
 
-  if (did) {
-    return did;
-  }
-
-  const handle =
-    typeof actor?.handle === "string"
-      ? actor.handle.trim().toLowerCase()
-      : "";
-
+  const handle = typeof actor?.handle === "string" ? actor.handle.trim().toLowerCase() : "";
   return handle || null;
 }
 
-/**
- * Retourne le badge natif déjà présent sur l’objet actor.
- *
- * La priorité est volontairement :
- * certificateur de confiance > compte certifié.
- */
-export function getVerificationBadge(
-  actor: any
-): VerificationBadgeType {
+export function getVerificationBadge(actor: any): VerificationBadgeType {
   const verification = actor?.verification;
-
-  if (!verification) {
-    return null;
-  }
-
-  if (
-    verification.trustedVerifierStatus === "valid"
-  ) {
-    return "trusted-verifier";
-  }
-
-  if (verification.verifiedStatus === "valid") {
-    return "verified";
-  }
-
+  if (!verification) return null;
+  if (verification.trustedVerifierStatus === "valid") return "trusted-verifier";
+  if (verification.verifiedStatus === "valid") return "verified";
   return null;
+}
+
+function getCachedVerification(key: string): any | null | undefined {
+  const cached = nativeVerificationCache.get(key);
+  if (!cached) return undefined;
+  if (cached.expiresAt > Date.now()) return cached.verification;
+  nativeVerificationCache.delete(key);
+  return undefined;
+}
+
+function queueNativeLookup(key: string) {
+  queuedNativeLookups.add(key);
+  if (nativeLookupTimer) return;
+
+  nativeLookupTimer = setTimeout(() => {
+    nativeLookupTimer = null;
+    void flushNativeLookups();
+  }, 0);
+}
+
+async function flushNativeLookups() {
+  const keys = Array.from(queuedNativeLookups);
+  queuedNativeLookups = new Set();
+
+  if (!keys.length) return;
+
+  try {
+    const agent = createAppViewAgent();
+
+    for (let start = 0; start < keys.length; start += MAX_BATCH_SIZE) {
+      const batch = keys.slice(start, start + MAX_BATCH_SIZE);
+      const response = await agent.api.app.bsky.actor.getProfiles({ actors: batch });
+
+      const returned = new Map<string, any | null>();
+      for (const profile of response.data.profiles || []) {
+        const profileKey = getActorKey(profile);
+        if (profileKey) returned.set(profileKey, profile.verification || null);
+      }
+
+      for (const key of batch) {
+        const verification = returned.get(key) ?? null;
+        nativeVerificationCache.set(key, {
+          verification,
+          expiresAt: Date.now() + CACHE_DURATION,
+        });
+
+        const pending = pendingNativeLookups.get(key);
+        pendingNativeLookups.delete(key);
+        pending?.resolve(verification);
+      }
+    }
+  } catch (error) {
+    console.error("Impossible de récupérer les vérifications natives :", error);
+
+    for (const key of keys) {
+      nativeVerificationCache.set(key, {
+        verification: null,
+        expiresAt: Date.now() + CACHE_DURATION,
+      });
+
+      const pending = pendingNativeLookups.get(key);
+      pendingNativeLookups.delete(key);
+      pending?.resolve(null);
+    }
+  }
 }
 
 /**
  * Récupère les données de vérification natives depuis l’AppView publique.
  *
- * Les objets actor retournés par l'AppView contiennent souvent déjà le champ
- * verification. Dans ce cas on l'utilise immédiatement, sans requête réseau
- * supplémentaire. C'est important sur les feeds/explorer/recherche où des
- * dizaines de badges sont affichés en même temps.
+ * Les profils manquants sont regroupés dans des appels getProfiles() de
+ * maximum 25 acteurs, évitant une requête réseau par badge dans le fil.
  */
-export async function getPublicNativeVerification(
-  actor: any
-): Promise<any | null> {
+export async function getPublicNativeVerification(actor: any): Promise<any | null> {
   const key = getActorKey(actor);
-
-  if (!key) {
-    return null;
-  }
+  if (!key) return null;
 
   if (actor?.verification) {
     nativeVerificationCache.set(key, {
@@ -98,65 +129,33 @@ export async function getPublicNativeVerification(
     return actor.verification;
   }
 
-  const cached =
-    nativeVerificationCache.get(key);
+  const cached = getCachedVerification(key);
+  if (cached !== undefined) return cached;
 
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.verification;
-  }
+  const pending = pendingNativeLookups.get(key);
+  if (pending) return pending.promise;
 
-  try {
-    const agent = createAppViewAgent();
+  let resolve!: (value: any | null) => void;
+  const promise = new Promise<any | null>((res) => {
+    resolve = res;
+  });
 
-    const response =
-      await agent.api.app.bsky.actor.getProfile({
-        actor: actor.did || actor.handle,
-      });
-
-    const verification =
-      response.data.verification || null;
-
-    nativeVerificationCache.set(key, {
-      verification,
-      expiresAt: Date.now() + CACHE_DURATION,
-    });
-
-    return verification;
-  } catch (error) {
-    console.error(
-      "Impossible de récupérer la vérification native :",
-      error
-    );
-
-    nativeVerificationCache.set(key, {
-      verification: null,
-      expiresAt: Date.now() + CACHE_DURATION,
-    });
-
-    return null;
-  }
+  pendingNativeLookups.set(key, { promise, resolve });
+  queueNativeLookup(key);
+  return promise;
 }
 
-export function getVerificationIssuers(
-  actor: any
-): VerificationIssuer[] {
-  return (
-    actor?.verification?.verifications || []
-  ).filter((verification: any) => verification.isValid);
+export function getVerificationIssuers(actor: any): VerificationIssuer[] {
+  return (actor?.verification?.verifications || []).filter(
+    (verification: any) => verification.isValid
+  );
 }
 
 /**
  * Récupère le profil d’un émetteur de certification.
  */
-export async function getIssuerProfile(
-  did: string
-) {
+export async function getIssuerProfile(did: string) {
   const agent = createAppViewAgent();
-
-  const response =
-    await agent.api.app.bsky.actor.getProfile({
-      actor: did,
-    });
-
+  const response = await agent.api.app.bsky.actor.getProfile({ actor: did });
   return response.data;
 }
