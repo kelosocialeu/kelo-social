@@ -99,7 +99,7 @@ export default function MobileBottomNav({ handle, hidden = false, onCreatePost }
 
 interface MobileNavLinkProps { href: string; label: string; icon: typeof Home; active: boolean; pending: boolean; onNavigate: (event: React.MouseEvent<HTMLAnchorElement>, href: string) => void; }
 function MobileNavLink({ href, label, icon: Icon, active, pending, onNavigate }: MobileNavLinkProps) {
-  return <Link href={href} prefetch onClick={(event) => onNavigate(event, href)} aria-label={label} aria-current={active ? "page" : undefined} aria-busy={pending || undefined} className={`relative z-10 flex h-11 w-11 flex-shrink-0 touch-manipulation items-center justify-center rounded-2xl transition-all duration-200 active:scale-90 ${pending ? "opacity-60" : ""}`}>
+  return <Link href={href} prefetch={false} onClick={(event) => onNavigate(event, href)} aria-label={label} aria-current={active ? "page" : undefined} aria-busy={pending || undefined} className={`relative z-10 flex h-11 w-11 flex-shrink-0 touch-manipulation items-center justify-center rounded-2xl transition-all duration-200 active:scale-90 ${pending ? "opacity-60" : ""}`}>
     {active && <span className="absolute inset-1 rounded-2xl bg-kelo-gradient shadow-[0_7px_18px_rgba(139,92,246,0.28)]"/>}
     <Icon className={`relative h-[21px] w-[21px] transition-colors ${active ? "text-white" : "text-kelo-muted"}`} strokeWidth={active ? 2.4 : 2}/>
     {active && <span className="absolute -bottom-0.5 h-1 w-1 rounded-full bg-white"/>}
