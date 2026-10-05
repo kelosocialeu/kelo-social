@@ -121,7 +121,7 @@ export default function VerificationBadge({ actor, size = 16 }: VerificationBadg
   };
 
   return <>
-    <div onClick={handleClick} className="relative inline-flex cursor-pointer items-center gap-1">
+    <div onClick={handleClick} className="relative inline-flex h-[var(--badge-size)] w-[var(--badge-size)] min-w-[var(--badge-size)] flex-shrink-0 cursor-pointer items-center justify-center gap-1" style={{ "--badge-size": `${size}px` } as React.CSSProperties}>
       {badgeType && <Badge status={badgeType === "trusted-verifier" ? "trusted-verifier" : "certified"} size={size} />}
     </div>
     {open && badgeType && <><div className="fixed inset-0 z-30 bg-black/10" onClick={() => setOpen(false)} />
