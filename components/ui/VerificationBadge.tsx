@@ -30,10 +30,14 @@ interface IssuerProfile {
 
 const badgeCache = new Map<string, { nativeActor: any; nativeBadge: VerificationBadgeType; kelo: CertificationRecord[]; suppressed: boolean }>();
 function normalizeDid(value: string) { return value.trim().toLowerCase(); }
+function normalizeHandle(value: string) { return value.trim().replace(/^@/, "").toLowerCase(); }
 
 export default function VerificationBadge({ actor, size = 16 }: VerificationBadgeProps) {
   const did = typeof actor?.did === "string" ? actor.did : "";
-  const cacheKey = normalizeDid(did);
+  const handle = typeof actor?.handle === "string" ? actor.handle : "";
+  const normalizedDid = normalizeDid(did);
+  const normalizedHandle = normalizeHandle(handle);
+  const cacheKey = normalizedDid || normalizedHandle;
   const cached = cacheKey ? badgeCache.get(cacheKey) : undefined;
   const initialNativeBadge = getVerificationBadge(actor);
   const [nativeBadge, setNativeBadge] = useState<VerificationBadgeType>(cached?.nativeBadge ?? initialNativeBadge);
@@ -65,21 +69,24 @@ export default function VerificationBadge({ actor, size = 16 }: VerificationBadg
       try {
         const [publicVerification, allKeloRecords, localSuppression] = await Promise.all([
           getPublicNativeVerification(actor),
-          did ? listCertifications() : Promise.resolve([] as CertificationRecord[]),
+          (did || handle) ? listCertifications() : Promise.resolve([] as CertificationRecord[]),
           did ? isCertificationSuppressed(did) : Promise.resolve(false),
         ]);
         if (cancelled) return;
         const enriched = publicVerification ? { ...actor, verification: publicVerification } : actor;
         const nextNative = getVerificationBadge(enriched);
-        const matching = allKeloRecords.filter((record) => normalizeDid(record.subjectDid) === normalizeDid(did));
+        const matching = allKeloRecords.filter((record) =>
+          (normalizedDid && normalizeDid(record.subjectDid) === normalizedDid) ||
+          (normalizedHandle && normalizeHandle(record.subjectHandle) === normalizedHandle)
+        );
         setNativeActor(enriched); setNativeBadge(nextNative); setKeloCertifications(matching); setSuppressed(localSuppression);
         if (cacheKey) badgeCache.set(cacheKey, { nativeActor: enriched, nativeBadge: nextNative, kelo: matching, suppressed: localSuppression });
       } catch (error) { console.warn("Certification temporairement indisponible, conservation du dernier état connu.", error); }
     }
     void load(); return () => { cancelled = true; };
-  }, [did, cacheKey]);
+  }, [did, handle, cacheKey, normalizedDid, normalizedHandle]);
 
-  useEffect(() => { setIssuers([]); setIssuerError(false); }, [did]);
+  useEffect(() => { setIssuers([]); setIssuerError(false); }, [did, handle]);
   const badgeType = useMemo<VerificationBadgeType>(() => {
     if (suppressed) return null;
     if (nativeBadge === "trusted-verifier" || keloCertifications.some((r) => r.status === "trusted-verifier")) return "trusted-verifier";
