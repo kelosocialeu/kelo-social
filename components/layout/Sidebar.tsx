@@ -55,7 +55,7 @@ export default function Sidebar({ handle, onLogout }: SidebarProps) {
         <nav className="flex flex-col gap-1 text-base font-semibold text-kelo-text">
           {NAV_ITEMS.map(({ href, key, fallback, icon: Icon }) => {
             const active = isRouteActive(pathname, href);
-            return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 transition-colors ${active ? "bg-kelo-gradient text-white" : "hover:bg-kelo-background"}`}>
+            return <Link key={href} href={href} aria-current={active ? "page" : undefined} prefetch={false} className={`flex touch-manipulation items-center gap-4 rounded-2xl p-3 transition-colors ${active ? "bg-kelo-gradient text-white" : "hover:bg-kelo-background"}`}>
               <Icon className="h-5 w-5 flex-shrink-0"/><span className="min-w-0 flex-1 truncate">{t(key, fallback)}</span>
               {href === "/notifications" && unreadNotifications > 0 && <span aria-label={t("nav.unreadNotifications", `${unreadNotifications} notification(s) non lue(s)`, { count: unreadNotifications })} className={`flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-xs font-extrabold ${active ? "bg-white text-kelo-primary" : "bg-kelo-gradient text-white"}`}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}
             </Link>;
