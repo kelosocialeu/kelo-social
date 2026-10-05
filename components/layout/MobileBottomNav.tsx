@@ -84,7 +84,7 @@ export default function MobileBottomNav({ handle, hidden = false, onCreatePost }
       )}
 
       <nav aria-label={t("nav.mobile", "Navigation mobile")} className={`fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[max(12px,env(safe-area-inset-bottom))] transition-all duration-300 ease-out md:hidden ${hidden ? "pointer-events-none translate-y-[140%] opacity-0" : "translate-y-0 opacity-100"}`}>
-        <div className="relative flex h-[68px] w-full max-w-md items-center justify-between rounded-[28px] border border-white/30 bg-white/65 px-2 shadow-[0_18px_55px_rgba(67,24,130,0.28)] backdrop-blur-2xl supports-[backdrop-filter]:bg-white/55">
+        <div className="relative flex h-[68px] w-full max-w-md items-center justify-between rounded-[28px] border border-white/30 bg-white/90 px-2 shadow-[0_12px_36px_rgba(67,24,130,0.20)] backdrop-blur-md supports-[backdrop-filter]:bg-white/80">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px]"><div className="absolute -left-8 -top-10 h-28 w-28 rounded-full bg-fuchsia-400/20 blur-2xl"/><div className="absolute -right-8 -bottom-10 h-28 w-28 rounded-full bg-sky-400/20 blur-2xl"/><div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent"/></div>
           <MobileNavLink {...navItems[0]} active={isActive(navItems[0].href)} pending={false} onNavigate={navigate} />
           <MobileNavLink {...navItems[1]} active={isActive(navItems[1].href)} pending={false} onNavigate={navigate} />
