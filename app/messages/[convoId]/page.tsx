@@ -48,6 +48,35 @@ export default function ConversationPage() {
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const hasLoadedRef = useRef(false);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const composerBarRef = useRef<HTMLFormElement>(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [composerHeight, setComposerHeight] = useState(92);
+
+  useEffect(() => {
+    const updateComposerMetrics = () => {
+      const barHeight = composerBarRef.current?.getBoundingClientRect().height;
+      if (barHeight) setComposerHeight(Math.ceil(barHeight));
+      if (typeof window === "undefined" || !window.visualViewport) return;
+      const viewport = window.visualViewport;
+      const keyboardVisible = window.innerHeight - viewport.height > 120;
+      setKeyboardOpen(keyboardVisible);
+      document.documentElement.style.setProperty(
+        "--kelo-keyboard-offset",
+        keyboardVisible ? `${Math.max(0, window.innerHeight - viewport.height)}px` : "0px"
+      );
+    };
+
+    updateComposerMetrics();
+    window.addEventListener("resize", updateComposerMetrics);
+    window.visualViewport?.addEventListener("resize", updateComposerMetrics);
+    window.visualViewport?.addEventListener("scroll", updateComposerMetrics);
+    return () => {
+      window.removeEventListener("resize", updateComposerMetrics);
+      window.visualViewport?.removeEventListener("resize", updateComposerMetrics);
+      window.visualViewport?.removeEventListener("scroll", updateComposerMetrics);
+      document.documentElement.style.removeProperty("--kelo-keyboard-offset");
+    };
+  }, []);
 
   const loadConversation = useCallback(async (silent = false) => {
     if (!checked || !convoId) return;
@@ -84,7 +113,18 @@ export default function ConversationPage() {
   }, [checked, convoId, myDid]);
 
   useVisibleInterval(() => loadConversation(true), MESSAGE_REFRESH_MS, checked && !!convoId);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: loading ? "auto" : "smooth", block: "end" }); }, [messages, loading]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: loading ? "auto" : "smooth", block: "end" });
+  }, [messages, loading]);
+
+  useEffect(() => {
+    if (!keyboardOpen) return;
+    const timer = window.setTimeout(() => {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      composerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [keyboardOpen]);
   useEffect(() => {
     const textarea = composerRef.current;
     if (!textarea) return;
@@ -111,6 +151,16 @@ export default function ConversationPage() {
       const cursor = start + emoji.length;
       textarea?.setSelectionRange(cursor, cursor);
     }, 0);
+  };
+
+  const handleComposerFocus = () => {
+    if (!verified) {
+      requireVerification();
+      return;
+    }
+    window.setTimeout(() => {
+      composerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 100);
   };
 
   const sendCurrentMessage = async () => {
@@ -179,7 +229,10 @@ export default function ConversationPage() {
   return (
     <div className="flex min-h-[100dvh] w-full overflow-x-hidden bg-kelo-background font-sans text-kelo-text">
       <Sidebar handle={handle} onLogout={handleLogout} />
-      <main className="flex min-h-[100dvh] min-w-0 flex-1 flex-col border-x border-kelo-border bg-white pb-[calc(4.5rem+env(safe-area-inset-bottom))] shadow-kelo lg:pb-0">
+      <main
+        className="flex min-h-[100dvh] min-w-0 flex-1 flex-col border-x border-kelo-border bg-white shadow-kelo"
+        style={{ "--kelo-composer-height": `${composerHeight}px` } as React.CSSProperties}
+      >
         <header className="sticky top-0 z-30 flex min-h-[70px] items-center gap-2 border-b border-kelo-border bg-white/95 px-3 py-2.5 backdrop-blur-md sm:min-h-[76px] sm:gap-3 sm:px-5 sm:py-3 lg:px-6">
           <button type="button" onClick={() => router.push("/messages")} aria-label="Retour aux discussions" className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-xl text-kelo-muted transition-colors hover:bg-kelo-background hover:text-kelo-text">
             ←
@@ -210,7 +263,10 @@ export default function ConversationPage() {
         </header>
 
         <section className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 pb-5 sm:px-5 sm:py-4 sm:pb-6 lg:px-6">
+          <div
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 pb-[calc(var(--kelo-composer-height)+5.5rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-4 sm:pb-6 lg:px-6"
+            style={{ "--kelo-composer-height": `${composerHeight}px` } as React.CSSProperties}
+          >
             {loading && messages.length === 0 && <p className="py-10 text-center text-sm text-kelo-muted">Chargement...</p>}
             {error && messages.length === 0 && <p className="py-10 text-center text-sm text-kelo-danger">{error}</p>}
 
@@ -343,7 +399,7 @@ export default function ConversationPage() {
                   readOnly={!verified}
                   placeholder={verified ? "Écrire un message..." : "Vérifiez votre compte pour répondre..."}
                   rows={1}
-                  className="max-h-40 min-h-[46px] w-full resize-none overflow-y-auto rounded-2xl border border-kelo-border bg-kelo-background px-4 py-3 pr-12 text-[15px] leading-relaxed focus:border-kelo-primary focus:outline-none focus:ring-2 focus:ring-kelo-primary/20 read-only:cursor-not-allowed read-only:opacity-60 sm:text-sm"
+                  className="max-h-32 min-h-[46px] w-full resize-none overflow-y-auto rounded-[22px] border border-kelo-border bg-kelo-background px-4 py-3 pr-12 text-[16px] leading-[1.35] focus:border-kelo-primary focus:outline-none focus:ring-2 focus:ring-kelo-primary/20 read-only:cursor-not-allowed read-only:opacity-60 sm:max-h-40 sm:text-sm"
                 />
 
                 <button
@@ -376,9 +432,10 @@ export default function ConversationPage() {
               <button
                 type="submit"
                 disabled={sending || !text.trim() || !verified}
-                className="flex h-[46px] flex-shrink-0 items-center justify-center rounded-full bg-kelo-gradient px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6"
+                aria-label="Envoyer le message"
+                className="flex h-[46px] w-[46px] flex-shrink-0 items-center justify-center rounded-full bg-kelo-gradient text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:h-[46px] sm:w-auto sm:px-6"
               >
-                {sending ? "Envoi..." : "Envoyer"}
+                {sending ? "…" : <><span className="sm:hidden">➤</span><span className="hidden sm:inline">Envoyer</span></>}
               </button>
             </div>
           </form>
