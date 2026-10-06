@@ -62,7 +62,7 @@ export default function ConversationPage() {
       setKeyboardOpen(keyboardVisible);
       document.documentElement.style.setProperty(
         "--kelo-keyboard-offset",
-        keyboardVisible ? `${Math.max(0, window.innerHeight - viewport.height)}px` : "0px"
+        keyboardVisible ? `${Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)}px` : "0px"
       );
     };
 
@@ -118,14 +118,6 @@ export default function ConversationPage() {
   }, [messages, loading]);
 
   useEffect(() => {
-    if (!keyboardOpen) return;
-    const timer = window.setTimeout(() => {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-      composerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }, 80);
-    return () => window.clearTimeout(timer);
-  }, [keyboardOpen]);
-  useEffect(() => {
     const textarea = composerRef.current;
     if (!textarea) return;
     textarea.style.height = "0px";
@@ -154,13 +146,7 @@ export default function ConversationPage() {
   };
 
   const handleComposerFocus = () => {
-    if (!verified) {
-      requireVerification();
-      return;
-    }
-    window.setTimeout(() => {
-      composerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }, 100);
+    if (!verified) requireVerification();
   };
 
   const sendCurrentMessage = async () => {
@@ -227,10 +213,10 @@ export default function ConversationPage() {
   if (!checked) return <div className="flex min-h-screen items-center justify-center bg-kelo-background font-sans text-kelo-muted">Vérification de votre session...</div>;
 
   return (
-    <div className="flex min-h-[100dvh] w-full overflow-x-hidden bg-kelo-background font-sans text-kelo-text">
+    <div className="flex h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-kelo-background font-sans text-kelo-text">
       <Sidebar handle={handle} onLogout={handleLogout} />
       <main
-        className="flex min-h-[100dvh] min-w-0 flex-1 flex-col border-x border-kelo-border bg-white shadow-kelo"
+        className="flex h-[100dvh] min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-x border-kelo-border bg-white shadow-kelo"
         style={{ "--kelo-composer-height": `${composerHeight}px` } as CSSProperties}
       >
         <header className="sticky top-0 z-30 flex min-h-[70px] items-center gap-2 border-b border-kelo-border bg-white/95 px-3 py-2.5 backdrop-blur-md sm:min-h-[76px] sm:gap-3 sm:px-5 sm:py-3 lg:px-6">
@@ -264,7 +250,7 @@ export default function ConversationPage() {
 
         <section className="flex min-h-0 flex-1 flex-col">
           <div
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 pb-[calc(var(--kelo-composer-height)+5.5rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-4 sm:pb-6 lg:px-6"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 pb-[calc(var(--kelo-composer-height)+4.5rem+var(--kelo-keyboard-offset,0px)+env(safe-area-inset-bottom))] sm:px-5 sm:py-4 sm:pb-6 lg:px-6"
             style={{ "--kelo-composer-height": `${composerHeight}px` } as CSSProperties}
           >
             {loading && messages.length === 0 && <p className="py-10 text-center text-sm text-kelo-muted">Chargement...</p>}
@@ -381,7 +367,7 @@ export default function ConversationPage() {
 
           <form
             onSubmit={handleSend}
-            className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom)+var(--kelo-keyboard-offset,0px))] z-50 border-t border-kelo-border bg-white/98 px-3 pt-2.5 pb-2 shadow-[0_-6px_20px_rgba(0,0,0,0.08)] backdrop-blur-xl sm:px-5 sm:pt-3 sm:pb-3 lg:static lg:z-auto lg:border-t lg:bg-white/95 lg:px-6 lg:py-3 lg:shadow-none"
+            className="fixed inset-x-0 bottom-[calc(4.5rem+var(--kelo-keyboard-offset,0px))] z-50 border-t border-kelo-border bg-white/98 px-3 pt-2.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-6px_20px_rgba(0,0,0,0.08)] backdrop-blur-xl sm:px-5 sm:pt-3 sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:static lg:z-auto lg:border-t lg:bg-white/95 lg:px-6 lg:py-3 lg:shadow-none"
           >
             <div className="mx-auto flex w-full max-w-4xl items-end gap-2">
               <div className="relative min-w-0 flex-1">
