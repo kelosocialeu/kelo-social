@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   PROFILE_BIO_LIMIT,
   PROFILE_DISPLAY_NAME_LIMIT,
@@ -30,6 +30,10 @@ export default function EditProfileModal({
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [mentionActors, setMentionActors] = useState<MentionActor[]>([]);
+  const [mentionRange, setMentionRange] = useState<{ start: number; end: number } | null>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const mentionAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -61,6 +65,49 @@ export default function EditProfileModal({
       if (bannerFile && bannerPreview.startsWith("blob:")) URL.revokeObjectURL(bannerPreview);
     };
   }, [bannerFile, bannerPreview]);
+
+
+  useEffect(() => {
+    const caret = descriptionRef.current?.selectionStart ?? description.length;
+    const active = getActiveMention(description, caret);
+    if (!active || !open) {
+      mentionAbortRef.current?.abort();
+      setMentionActors([]);
+      setMentionRange(null);
+      return;
+    }
+    const controller = new AbortController();
+    mentionAbortRef.current?.abort();
+    mentionAbortRef.current = controller;
+    const timer = window.setTimeout(() => {
+      void searchMentionActors(active.query, controller.signal)
+        .then((actors) => {
+          if (!controller.signal.aborted) {
+            setMentionActors(actors);
+            setMentionRange({ start: active.start, end: active.end });
+          }
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setMentionActors([]);
+        });
+    }, 120);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [description, open]);
+
+  function selectMention(actor: MentionActor) {
+    if (!mentionRange) return;
+    const result = insertMention(description, mentionRange.start, mentionRange.end, actor.handle);
+    setDescription(result.text);
+    setMentionActors([]);
+    setMentionRange(null);
+    window.setTimeout(() => {
+      descriptionRef.current?.focus();
+      descriptionRef.current?.setSelectionRange(result.caret, result.caret);
+    }, 0);
+  }
 
   if (!open) return null;
 
@@ -201,14 +248,42 @@ export default function EditProfileModal({
                 {bioCount}/{PROFILE_BIO_LIMIT}
               </span>
             </div>
-            <textarea
-              id="profile-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              rows={6}
-              className="w-full resize-none rounded-2xl border border-kelo-border px-4 py-3 outline-none transition focus:border-kelo-primary focus:ring-2 focus:ring-kelo-primary/15"
-              placeholder="Parlez de vous..."
-            />
+            <div className="relative">
+              <textarea
+                id="profile-description"
+                ref={descriptionRef}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                rows={6}
+                className="w-full resize-none rounded-2xl border border-kelo-border px-4 py-3 outline-none transition focus:border-kelo-primary focus:ring-2 focus:ring-kelo-primary/15"
+                placeholder="Parlez de vous..."
+              />
+              {mentionActors.length > 0 && mentionRange && (
+                <div className="absolute left-0 right-0 top-full z-[120] mt-2 max-h-64 overflow-y-auto rounded-2xl border border-kelo-border bg-white p-1.5 shadow-xl">
+                  {mentionActors.map((actor) => (
+                    <button
+                      key={actor.did}
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => selectMention(actor)}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-kelo-background"
+                    >
+                      {actor.avatar ? (
+                        <img src={actor.avatar} alt="" className="h-9 w-9 rounded-full object-cover" />
+                      ) : (
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-kelo-gradient text-sm font-bold text-white">
+                          {(actor.displayName || actor.handle).charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-bold text-kelo-text">{actor.displayName || actor.handle}</span>
+                        <span className="block truncate text-xs text-kelo-muted">@{actor.handle}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {error && (
