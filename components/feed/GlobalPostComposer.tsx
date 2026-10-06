@@ -179,7 +179,22 @@ export default function GlobalPostComposer() {
           <CurrentUserAvatar />
           <div className="min-w-0 flex-1">
             <div className="flex items-start gap-3">
-              <div className="relative min-w-0 flex-1">\n                <textarea ref={textareaRef} value={text} maxLength={POST_CHARACTER_LIMIT} onChange={(event) => setText(event.target.value)} placeholder={composerMode === "reel" ? "Ajouter une légende..." : "Quoi de neuf ?"} rows={6} className="min-h-36 w-full resize-none bg-transparent text-lg leading-relaxed text-kelo-text placeholder-kelo-muted focus:outline-none" />\n                {mentionActors.length > 0 && mentionRange && (\n                  <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-kelo-border bg-white p-1.5 shadow-xl">\n                    {mentionActors.map((actor) => (\n                      <button key={actor.did} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => selectMention(actor)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-kelo-background">\n                        {actor.avatar ? <img src={actor.avatar} alt="" className="h-9 w-9 rounded-full object-cover" /> : <span className="flex h-9 w-9 items-center justify-center rounded-full bg-kelo-gradient text-sm font-bold text-white">{(actor.displayName || actor.handle).charAt(0).toUpperCase()}</span>}\n                        <span className="min-w-0">\n                          <span className="block truncate text-sm font-bold text-kelo-text">{actor.displayName || actor.handle}</span>\n                          <span className="block truncate text-xs text-kelo-muted">@{actor.handle}</span>\n                        </span>\n                      </button>\n                    ))}\n                  </div>\n                )}\n              </div>
+              <div className="relative min-w-0 flex-1">
+                <textarea ref={textareaRef} value={text} maxLength={POST_CHARACTER_LIMIT} onChange={(event) => setText(event.target.value)} placeholder={composerMode === "reel" ? "Ajouter une légende..." : "Quoi de neuf ?"} rows={6} className="min-h-36 w-full resize-none bg-transparent text-lg leading-relaxed text-kelo-text placeholder-kelo-muted focus:outline-none" />
+                {mentionActors.length > 0 && mentionRange && (
+                  <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-kelo-border bg-white p-1.5 shadow-xl">
+                    {mentionActors.map((actor) => (
+                      <button key={actor.did} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => selectMention(actor)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-kelo-background">
+                        {actor.avatar ? <img src={actor.avatar} alt="" className="h-9 w-9 rounded-full object-cover" /> : <span className="flex h-9 w-9 items-center justify-center rounded-full bg-kelo-gradient text-sm font-bold text-white">{(actor.displayName || actor.handle).charAt(0).toUpperCase()}</span>}
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-bold text-kelo-text">{actor.displayName || actor.handle}</span>
+                          <span className="block truncate text-xs text-kelo-muted">@{actor.handle}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <span className={`mt-1 flex-shrink-0 text-sm font-bold ${overLimit ? "text-kelo-danger" : count >= POST_CHARACTER_LIMIT - 30 ? "text-amber-600" : "text-kelo-muted"}`}>{count}/{POST_CHARACTER_LIMIT}</span>
             </div>
             {previews.length > 0 && <div className={`mt-3 grid gap-2 overflow-hidden rounded-2xl ${previews.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>{previews.map((preview, index) => <div key={preview} className="relative overflow-hidden rounded-2xl bg-black">{files[index]?.type.startsWith("video/") ? <video src={preview} controls playsInline className="max-h-[55dvh] w-full object-contain" /> : <img src={preview} alt="Aperçu du média" className="max-h-80 w-full object-cover" />}<button type="button" onClick={() => removeFile(index)} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white" aria-label="Retirer le média"><X className="h-4 w-4" /></button></div>)}</div>}
