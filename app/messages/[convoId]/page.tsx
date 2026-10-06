@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Laugh } from "lucide-react";
@@ -231,7 +231,7 @@ export default function ConversationPage() {
       <Sidebar handle={handle} onLogout={handleLogout} />
       <main
         className="flex min-h-[100dvh] min-w-0 flex-1 flex-col border-x border-kelo-border bg-white shadow-kelo"
-        style={{ "--kelo-composer-height": `${composerHeight}px` } as React.CSSProperties}
+        style={{ "--kelo-composer-height": `${composerHeight}px` } as CSSProperties}
       >
         <header className="sticky top-0 z-30 flex min-h-[70px] items-center gap-2 border-b border-kelo-border bg-white/95 px-3 py-2.5 backdrop-blur-md sm:min-h-[76px] sm:gap-3 sm:px-5 sm:py-3 lg:px-6">
           <button type="button" onClick={() => router.push("/messages")} aria-label="Retour aux discussions" className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-xl text-kelo-muted transition-colors hover:bg-kelo-background hover:text-kelo-text">
@@ -381,7 +381,7 @@ export default function ConversationPage() {
 
           <form
             onSubmit={handleSend}
-            className="sticky bottom-0 z-20 border-t border-kelo-border bg-white/95 px-3 pt-2.5 pb-[calc(4.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.04)] backdrop-blur-md sm:px-5 sm:pt-3 sm:pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:px-6 lg:py-3"
+            className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom)+var(--kelo-keyboard-offset,0px))] z-50 border-t border-kelo-border bg-white/98 px-3 pt-2.5 pb-2 shadow-[0_-6px_20px_rgba(0,0,0,0.08)] backdrop-blur-xl sm:px-5 sm:pt-3 sm:pb-3 lg:static lg:z-auto lg:border-t lg:bg-white/95 lg:px-6 lg:py-3 lg:shadow-none"
           >
             <div className="mx-auto flex w-full max-w-4xl items-end gap-2">
               <div className="relative min-w-0 flex-1">
@@ -393,9 +393,7 @@ export default function ConversationPage() {
                     setText(event.target.value);
                   }}
                   onKeyDown={handleComposerKeyDown}
-                  onFocus={() => {
-                    if (!verified) requireVerification();
-                  }}
+                  onFocus={handleComposerFocus}
                   readOnly={!verified}
                   placeholder={verified ? "Écrire un message..." : "Vérifiez votre compte pour répondre..."}
                   rows={1}
