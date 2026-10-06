@@ -139,7 +139,18 @@ async function authenticateRequester(session: RequestSession) {
   return { agent, did, handle };
 }
 
-async function authenticateCertificationRepo() {
+async function authenticateCertificationRepo(requester: { agent: AtpAgent; did: string; handle: string }, requesterIsAdmin: boolean) {
+  // Pour l’administrateur principal, utiliser directement la session AT Protocol
+  // déjà authentifiée évite de dépendre d’un ancien app-password Render.
+  // Les certificateurs de confiance continuent d’utiliser le compte central.
+  if (requesterIsAdmin) {
+    return {
+      agent: requester.agent,
+      repoDid: requester.did,
+      repoHandle: requester.handle,
+    };
+  }
+
   if (!CERTIFICATION_REPO_APP_PASSWORD) {
     throw new Error(
       "Configuration du dépôt de certification incomplète : mot de passe administrateur manquant."
@@ -207,8 +218,8 @@ export async function POST(request: Request) {
     const requester = await authenticateRequester(session);
     if (!requester.did || !requester.handle) return NextResponse.json({ error: "Impossible de vérifier l’identité du compte connecté." }, { status: 401 });
 
-    const certificationRepo = await authenticateCertificationRepo();
     const requesterIsAdmin = isMainAdmin(requester.did, requester.handle);
+    const certificationRepo = await authenticateCertificationRepo(requester, requesterIsAdmin);
     const requesterHasFlower = await requesterIsTrustedVerifier(certificationRepo.agent, certificationRepo.repoDid, requester.did);
 
     if (!requesterIsAdmin && !requesterHasFlower) return NextResponse.json({ error: "Accès refusé : vous n’êtes ni administrateur Kelo Social ni certificateur de confiance." }, { status: 403 });
