@@ -265,7 +265,7 @@ export default function ConversationPage() {
         <section className="flex min-h-0 flex-1 flex-col">
           <div
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 pb-[calc(var(--kelo-composer-height)+5.5rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-4 sm:pb-6 lg:px-6"
-            style={{ "--kelo-composer-height": `${composerHeight}px` } as React.CSSProperties}
+            style={{ "--kelo-composer-height": `${composerHeight}px` } as CSSProperties}
           >
             {loading && messages.length === 0 && <p className="py-10 text-center text-sm text-kelo-muted">Chargement...</p>}
             {error && messages.length === 0 && <p className="py-10 text-center text-sm text-kelo-danger">{error}</p>}
