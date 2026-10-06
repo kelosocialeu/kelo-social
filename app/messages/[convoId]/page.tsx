@@ -248,7 +248,7 @@ export default function ConversationPage() {
 
         <section className="flex min-h-0 flex-1 flex-col">
           <div
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 pb-[calc(var(--kelo-composer-height)+4.5rem+var(--kelo-keyboard-offset,0px)+env(safe-area-inset-bottom))] sm:px-5 sm:py-4 sm:pb-6 lg:px-6"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 pb-[calc(var(--kelo-composer-height)+5rem+var(--kelo-keyboard-offset,0px)+env(safe-area-inset-bottom))] sm:px-5 sm:py-4 sm:pb-6 lg:px-6"
             style={{ "--kelo-composer-height": `${composerHeight}px` } as CSSProperties}
           >
             {loading && messages.length === 0 && <p className="py-10 text-center text-sm text-kelo-muted">Chargement...</p>}
@@ -365,7 +365,7 @@ export default function ConversationPage() {
 
           <form
             onSubmit={handleSend}
-            className="fixed inset-x-0 bottom-[calc(4.5rem+var(--kelo-keyboard-offset,0px))] z-50 border-t border-kelo-border bg-white/98 px-3 pt-2.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-6px_20px_rgba(0,0,0,0.08)] backdrop-blur-xl sm:px-5 sm:pt-3 sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:static lg:z-auto lg:border-t lg:bg-white/95 lg:px-6 lg:py-3 lg:shadow-none"
+            className="fixed inset-x-0 bottom-[calc(4.5rem+var(--kelo-keyboard-offset,0px))] z-50 border-t border-kelo-border bg-white px-3 pt-2.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-6px_20px_rgba(0,0,0,0.08)] sm:px-5 sm:pt-3 sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:static lg:z-auto lg:border-t lg:bg-white lg:px-6 lg:py-3 lg:shadow-none"
           >
             <div className="mx-auto flex w-full max-w-4xl items-end gap-2">
               <div className="relative min-w-0 flex-1">
