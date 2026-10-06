@@ -179,22 +179,56 @@ export default function ConversationPage() {
   return (
     <div className="flex min-h-[100dvh] w-full overflow-x-hidden bg-kelo-background font-sans text-kelo-text">
       <Sidebar handle={handle} onLogout={handleLogout} />
-      <main className="flex min-h-[100dvh] min-w-0 flex-1 flex-col border-x border-kelo-border bg-white shadow-kelo">
-        <header className="sticky top-0 z-20 flex min-h-[78px] items-center gap-3 border-b border-kelo-border bg-white/95 px-4 py-3 backdrop-blur-md sm:px-5 lg:px-6">
-          <button type="button" onClick={() => router.push("/messages")} aria-label="Retour aux discussions" className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-xl text-kelo-muted transition-colors hover:bg-kelo-background hover:text-kelo-text">←</button>
-          {otherUser?.handle ? <Link href={`/profile/${otherUser.handle}`} className="flex min-w-0 items-center gap-3 rounded-xl transition-opacity hover:opacity-80"><Avatar src={otherUser.avatar} fallback={otherUser.handle?.[0]?.toUpperCase() || "U"} size="sm" /><div className="min-w-0"><div className="flex min-w-0 flex-wrap items-center gap-2"><h1 className="max-w-full truncate text-base font-extrabold text-kelo-text sm:text-lg">{otherUser.displayName}</h1><AccountBadges actor={otherUser} identitySize="sm" certificationSize={15} gap="xs" /></div><p className="truncate text-xs text-kelo-muted sm:text-sm">@{otherUser.handle}</p><p className="mt-0.5 text-[11px] text-kelo-muted sm:text-xs">Conversation privée</p></div></Link> : <div className="min-w-0"><h1 className="text-lg font-extrabold text-kelo-text">Discussion</h1><p className="text-xs text-kelo-muted">Conversation privée</p></div>}
-          {refreshing && messages.length > 0 && <span className="ml-auto text-xs text-kelo-muted">Actualisation…</span>}
+      <main className="flex min-h-[100dvh] min-w-0 flex-1 flex-col border-x border-kelo-border bg-white pb-[calc(4.5rem+env(safe-area-inset-bottom))] shadow-kelo lg:pb-0">
+        <header className="sticky top-0 z-30 flex min-h-[70px] items-center gap-2 border-b border-kelo-border bg-white/95 px-3 py-2.5 backdrop-blur-md sm:min-h-[76px] sm:gap-3 sm:px-5 sm:py-3 lg:px-6">
+          <button type="button" onClick={() => router.push("/messages")} aria-label="Retour aux discussions" className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-xl text-kelo-muted transition-colors hover:bg-kelo-background hover:text-kelo-text">
+            ←
+          </button>
+
+          {otherUser?.handle ? (
+            <Link href={`/profile/${otherUser.handle}`} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl transition-opacity hover:opacity-80 sm:gap-3">
+              <Avatar src={otherUser.avatar} fallback={otherUser.handle?.[0]?.toUpperCase() || "U"} size="sm" />
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
+                  <h1 className="max-w-[calc(100vw-145px)] truncate text-[15px] font-extrabold text-kelo-text sm:max-w-full sm:text-lg">
+                    {otherUser.displayName}
+                  </h1>
+                  <AccountBadges actor={otherUser} identitySize="sm" certificationSize={15} gap="xs" />
+                </div>
+                <p className="truncate text-[11px] text-kelo-muted sm:text-sm">@{otherUser.handle}</p>
+                <p className="hidden text-[11px] text-kelo-muted sm:block sm:text-xs">Conversation privée</p>
+              </div>
+            </Link>
+          ) : (
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base font-extrabold text-kelo-text sm:text-lg">Discussion</h1>
+              <p className="text-[11px] text-kelo-muted sm:text-xs">Conversation privée</p>
+            </div>
+          )}
+
+          {refreshing && messages.length > 0 && <span className="hidden shrink-0 text-xs text-kelo-muted sm:inline">Actualisation…</span>}
         </header>
+
         <section className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 pb-6 sm:px-5 lg:px-6">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 pb-5 sm:px-5 sm:py-4 sm:pb-6 lg:px-6">
             {loading && messages.length === 0 && <p className="py-10 text-center text-sm text-kelo-muted">Chargement...</p>}
             {error && messages.length === 0 && <p className="py-10 text-center text-sm text-kelo-danger">{error}</p>}
+
             {messages.map((message: any, index: number) => {
               const isMine = message.sender?.did === myDid;
               const senderHandle = message.sender?.handle || otherUser?.handle;
               const senderAvatar = message.sender?.avatar || otherUser?.avatar;
-              return <div key={message.id || index} className={`mb-4 flex items-end gap-2 ${isMine ? "justify-end" : "justify-start"}`}>{!isMine && senderHandle && <Link href={`/profile/${senderHandle}`} className="flex-shrink-0 transition-opacity hover:opacity-80"><Avatar src={senderAvatar} fallback={senderHandle[0]?.toUpperCase() || "U"} size="sm" /></Link>}<div
-                    className="relative min-w-0 max-w-[82%]"
+
+              return (
+                <div key={message.id || index} className={`mb-4 flex items-end gap-2 sm:mb-5 ${isMine ? "justify-end" : "justify-start"}`}>
+                  {!isMine && senderHandle && (
+                    <Link href={`/profile/${senderHandle}`} className="flex-shrink-0 transition-opacity hover:opacity-80">
+                      <Avatar src={senderAvatar} fallback={senderHandle[0]?.toUpperCase() || "U"} size="sm" />
+                    </Link>
+                  )}
+
+                  <div
+                    className="relative min-w-0 max-w-[88%] sm:max-w-[78%] lg:max-w-[70%]"
                     onPointerDown={(event) => startMessageLongPress(String(message.id || index), event.pointerType)}
                     onPointerUp={clearMessageLongPress}
                     onPointerCancel={clearMessageLongPress}
@@ -205,29 +239,29 @@ export default function ConversationPage() {
                     }}
                   >
                     <div className={`flex flex-col gap-1 ${isMine ? "items-end" : "items-start"}`}>
-                      <div className={`flex items-center gap-1 ${isMine ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[82%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm sm:max-w-[72%] lg:max-w-[60%] ${isMine ? "rounded-br-md bg-kelo-gradient text-white" : "rounded-bl-md bg-kelo-background text-kelo-text"}`}>
+                      <div className={`flex w-full items-center gap-1 ${isMine ? "justify-end" : "justify-start"}`}>
+                        <div className={`min-w-0 whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2.5 text-[15px] leading-relaxed shadow-sm sm:px-4 sm:text-sm ${isMine ? "rounded-br-md bg-kelo-gradient text-white" : "rounded-bl-md bg-kelo-background text-kelo-text"}`}>
                           {message.text}
                         </div>
+
                         <MessageActionMenu
-                        convoId={convoId}
-                        message={message}
-                        myDid={myDid}
-                        align={isMine ? "left" : "right"}
-                        open={activeMessageId === String(message.id || index)}
-                        onOpenChange={(open) =>
-                          setActiveMessageId(open ? String(message.id || index) : null)
-                        }
-                        onMessageUpdated={updateMessage}
-                        onReport={() =>
-                          message.sender?.did &&
-                          setReportTarget({
-                            memberDid: message.sender.did,
-                            messageText: message.text || "",
-                          })
-                        }
-                      />
+                          convoId={convoId}
+                          message={message}
+                          myDid={myDid}
+                          align={isMine ? "left" : "right"}
+                          open={activeMessageId === String(message.id || index)}
+                          onOpenChange={(open) => setActiveMessageId(open ? String(message.id || index) : null)}
+                          onMessageUpdated={updateMessage}
+                          onReport={() =>
+                            message.sender?.did &&
+                            setReportTarget({
+                              memberDid: message.sender.did,
+                              messageText: message.text || "",
+                            })
+                          }
+                        />
                       </div>
+
                       {Array.isArray(message.reactions) && message.reactions.length > 0 && (
                         <div className={`flex max-w-full flex-wrap gap-1.5 ${isMine ? "justify-end" : "justify-start"}`} aria-label="Réactions">
                           {Array.from(
@@ -243,6 +277,7 @@ export default function ConversationPage() {
                               (reaction: any) =>
                                 String(reaction?.value) === reactionValue && reaction?.sender?.did === myDid
                             );
+
                             return (
                               <button
                                 key={reactionValue}
@@ -261,25 +296,101 @@ export default function ConversationPage() {
                     </div>
                   </div>
                 </div>
+              );
             })}
-            {!loading && !error && messages.length === 0 && <div className="flex min-h-[50vh] items-center justify-center px-6"><div className="max-w-sm text-center"><div className="text-4xl" aria-hidden="true">💬</div><h2 className="mt-4 text-lg font-bold text-kelo-text">Commencez la discussion</h2><p className="mt-2 text-sm text-kelo-muted">Envoyez votre premier message.</p></div></div>}
+
+            {!loading && !error && messages.length === 0 && (
+              <div className="flex min-h-[50vh] items-center justify-center px-6">
+                <div className="max-w-sm text-center">
+                  <div className="text-4xl" aria-hidden="true">💬</div>
+                  <h2 className="mt-4 text-lg font-bold text-kelo-text">Commencez la discussion</h2>
+                  <p className="mt-2 text-sm text-kelo-muted">Envoyez votre premier message.</p>
+                </div>
+              </div>
+            )}
+
             <div ref={bottomRef} />
           </div>
-          {!verified && verificationChecked && <button type="button" onClick={requireVerification} className="border-t border-kelo-border bg-kelo-background px-4 py-3 text-left text-sm text-kelo-muted sm:px-5 lg:px-6"><span className="font-bold text-kelo-text">Vérification requise :</span>{" "}vous pouvez lire cette discussion, mais pas envoyer de message.</button>}
-          <form onSubmit={handleSend} className="sticky bottom-0 border-t border-kelo-border bg-white/95 px-3 py-3 backdrop-blur-md sm:px-5 lg:px-6">
-            <div className="flex items-end gap-2">
+
+          {!verified && verificationChecked && (
+            <button
+              type="button"
+              onClick={requireVerification}
+              className="border-t border-kelo-border bg-kelo-background px-3 py-3 text-left text-sm text-kelo-muted sm:px-5 lg:px-6"
+            >
+              <span className="font-bold text-kelo-text">Vérification requise :</span>{" "}
+              vous pouvez lire cette discussion, mais pas envoyer de message.
+            </button>
+          )}
+
+          <form
+            onSubmit={handleSend}
+            className="sticky bottom-0 z-20 border-t border-kelo-border bg-white/95 px-3 pt-2.5 pb-[calc(4.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.04)] backdrop-blur-md sm:px-5 sm:pt-3 sm:pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:px-6 lg:py-3"
+          >
+            <div className="mx-auto flex w-full max-w-4xl items-end gap-2">
               <div className="relative min-w-0 flex-1">
-                <textarea ref={composerRef} value={text} onChange={(event) => { if (!requireVerification()) return; setText(event.target.value); }} onKeyDown={handleComposerKeyDown} onFocus={() => { if (!verified) requireVerification(); }} readOnly={!verified} placeholder={verified ? "Écrire un message..." : "Vérifiez votre compte pour répondre..."} rows={1} className="max-h-40 min-h-[46px] w-full resize-none overflow-y-auto rounded-2xl bg-kelo-background px-4 py-3 pr-12 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-kelo-primary read-only:cursor-not-allowed read-only:opacity-60" />
-                <button type="button" onClick={() => { if (!requireVerification()) return; setEmojiOpen((value) => !value); }} disabled={!verified} className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full text-kelo-primary transition hover:bg-white disabled:opacity-40" title="Tous les émojis" aria-label="Tous les émojis"><Laugh className="h-5 w-5" /></button>
-                {emojiOpen && verified && <div className="absolute bottom-14 right-0 z-30"><KeloEmojiPicker onSelect={insertEmoji} /></div>}
-                {verified && <p className="mt-1 px-1 text-[11px] text-kelo-muted">Entrée : nouvelle ligne · Ctrl/⌘ + Entrée : envoyer</p>}
+                <textarea
+                  ref={composerRef}
+                  value={text}
+                  onChange={(event) => {
+                    if (!requireVerification()) return;
+                    setText(event.target.value);
+                  }}
+                  onKeyDown={handleComposerKeyDown}
+                  onFocus={() => {
+                    if (!verified) requireVerification();
+                  }}
+                  readOnly={!verified}
+                  placeholder={verified ? "Écrire un message..." : "Vérifiez votre compte pour répondre..."}
+                  rows={1}
+                  className="max-h-40 min-h-[46px] w-full resize-none overflow-y-auto rounded-2xl border border-kelo-border bg-kelo-background px-4 py-3 pr-12 text-[15px] leading-relaxed focus:border-kelo-primary focus:outline-none focus:ring-2 focus:ring-kelo-primary/20 read-only:cursor-not-allowed read-only:opacity-60 sm:text-sm"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!requireVerification()) return;
+                    setEmojiOpen((value) => !value);
+                  }}
+                  disabled={!verified}
+                  className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full text-kelo-primary transition hover:bg-white disabled:opacity-40"
+                  title="Tous les émojis"
+                  aria-label="Tous les émojis"
+                >
+                  <Laugh className="h-5 w-5" />
+                </button>
+
+                {emojiOpen && verified && (
+                  <div className="absolute bottom-14 right-0 z-40 max-w-[calc(100vw-1.5rem)]">
+                    <KeloEmojiPicker onSelect={insertEmoji} />
+                  </div>
+                )}
+
+                {verified && (
+                  <p className="mt-1 hidden px-1 text-[11px] text-kelo-muted sm:block">
+                    Entrée : nouvelle ligne · Ctrl/⌘ + Entrée : envoyer
+                  </p>
+                )}
               </div>
-              <button type="submit" disabled={sending || !text.trim() || !verified} className="flex-shrink-0 rounded-full bg-kelo-gradient px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6">{sending ? "Envoi..." : "Envoyer"}</button>
+
+              <button
+                type="submit"
+                disabled={sending || !text.trim() || !verified}
+                className="flex h-[46px] flex-shrink-0 items-center justify-center rounded-full bg-kelo-gradient px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6"
+              >
+                {sending ? "Envoi..." : "Envoyer"}
+              </button>
             </div>
           </form>
         </section>
       </main>
-      <MessageReportDialog open={!!reportTarget} memberDid={reportTarget?.memberDid} messageText={reportTarget?.messageText} onClose={() => setReportTarget(null)} />
+
+      <MessageReportDialog
+        open={!!reportTarget}
+        memberDid={reportTarget?.memberDid}
+        messageText={reportTarget?.messageText}
+        onClose={() => setReportTarget(null)}
+      />
       <VerificationRequiredDialog open={dialogOpen} onClose={closeDialog} />
     </div>
   );
