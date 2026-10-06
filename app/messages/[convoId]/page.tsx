@@ -217,7 +217,7 @@ export default function ConversationPage() {
         className="flex h-[100dvh] min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-x border-kelo-border bg-white shadow-kelo"
         style={{ "--kelo-composer-height": `${composerHeight}px` } as CSSProperties}
       >
-        <header className="sticky top-0 z-30 flex min-h-[70px] items-center gap-2 border-b border-kelo-border bg-white/95 px-3 py-2.5 backdrop-blur-md sm:min-h-[76px] sm:gap-3 sm:px-5 sm:py-3 lg:px-6">
+        <header className="sticky top-0 z-30 mt-[13px] flex min-h-[70px] items-center gap-2 border-b border-kelo-border bg-white/95 px-3 py-2.5 backdrop-blur-md sm:mt-0 sm:min-h-[76px] sm:gap-3 sm:px-5 sm:py-3 lg:px-6">
           <button type="button" onClick={() => router.push("/messages")} aria-label="Retour aux discussions" className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-xl text-kelo-muted transition-colors hover:bg-kelo-background hover:text-kelo-text">
             ←
           </button>
@@ -365,7 +365,7 @@ export default function ConversationPage() {
 
           <form
             onSubmit={handleSend}
-            className="fixed inset-x-0 bottom-[calc(4.5rem+var(--kelo-keyboard-offset,0px))] z-50 border-t border-kelo-border bg-white px-3 pt-2.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-6px_20px_rgba(0,0,0,0.08)] sm:px-5 sm:pt-3 sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:static lg:z-auto lg:border-t lg:bg-white lg:px-6 lg:py-3 lg:shadow-none"
+            className="fixed inset-x-0 bottom-[calc(4.5rem-13px+var(--kelo-keyboard-offset,0px))] z-50 border-t border-kelo-border bg-white px-3 pt-2.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-6px_20px_rgba(0,0,0,0.08)] sm:px-5 sm:pt-3 sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:static lg:z-auto lg:border-t lg:bg-white lg:px-6 lg:py-3 lg:shadow-none"
           >
             <div className="mx-auto flex w-full max-w-4xl items-end gap-2">
               <div className="relative min-w-0 flex-1">
