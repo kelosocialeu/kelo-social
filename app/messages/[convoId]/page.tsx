@@ -49,7 +49,6 @@ export default function ConversationPage() {
   const hasLoadedRef = useRef(false);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerBarRef = useRef<HTMLFormElement>(null);
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [composerHeight, setComposerHeight] = useState(92);
 
   useEffect(() => {
@@ -59,7 +58,6 @@ export default function ConversationPage() {
       if (typeof window === "undefined" || !window.visualViewport) return;
       const viewport = window.visualViewport;
       const keyboardVisible = window.innerHeight - viewport.height > 120;
-      setKeyboardOpen(keyboardVisible);
       document.documentElement.style.setProperty(
         "--kelo-keyboard-offset",
         keyboardVisible ? `${Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)}px` : "0px"
