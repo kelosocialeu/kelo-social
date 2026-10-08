@@ -40,7 +40,7 @@ export async function GET(request: Request) {
         callback.searchParams.set("code", code);
         if (state) callback.searchParams.set("state", state);
         callback.searchParams.set("iss", publicIssuer(request));
-        const response = NextResponse.redirect(callback);
+        const response = NextResponse.redirect(callback, { status: 303 });
         response.headers.append("Set-Cookie", "kelo_mcp_signup=; Max-Age=0; Path=/api/mcp/oauth/authorize; HttpOnly; Secure; SameSite=Lax");
         return response;
       }
@@ -227,7 +227,7 @@ export async function POST(request: Request) {
     const callback = new URL(redirectUri);
     callback.searchParams.set("code", code);
     if (state) callback.searchParams.set("state", state);
-    callback.searchParams.set("iss", new URL(request.url).origin);
+    callback.searchParams.set("iss", publicIssuer(request));
     const response = NextResponse.redirect(callback);
     response.headers.append("Set-Cookie", "kelo_mcp_login=; Max-Age=0; Path=/api/mcp/oauth/authorize; HttpOnly; Secure; SameSite=Lax");
     return response;
