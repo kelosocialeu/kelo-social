@@ -22,6 +22,27 @@ export function createMcpLoginChallenge(input: { identifier: string; password: s
   const tag = cipher.getAuthTag();
   return [iv.toString("base64url"), tag.toString("base64url"), body.toString("base64url")].join(".");
 }
+export function createMcpSignupChallenge(input: { clientId: string; redirectUri: string; responseType: string; state: string; codeChallenge: string; scope: string; did: string; handle: string; accessJwt: string; refreshJwt: string }) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", challengeKey(), iv);
+  const payload = { ...input, exp: Math.floor(Date.now() / 1000) + 600 };
+  const body = Buffer.concat([cipher.update(JSON.stringify(payload), "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return [iv.toString("base64url"), tag.toString("base64url"), body.toString("base64url")].join(".");
+}
+
+export function readMcpSignupChallenge(value: string) {
+  try {
+    const [ivRaw, tagRaw, bodyRaw] = value.split(".");
+    if (!ivRaw || !tagRaw || !bodyRaw) return null;
+    const decipher = createDecipheriv("aes-256-gcm", challengeKey(), Buffer.from(ivRaw, "base64url"));
+    decipher.setAuthTag(Buffer.from(tagRaw, "base64url"));
+    const payload = JSON.parse(Buffer.concat([decipher.update(Buffer.from(bodyRaw, "base64url")), decipher.final()]).toString("utf8")) as any;
+    if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload as { clientId: string; redirectUri: string; responseType: string; state: string; codeChallenge: string; scope: string; did: string; handle: string; accessJwt: string; refreshJwt: string; exp: number };
+  } catch { return null; }
+}
+
 export function readMcpLoginChallenge(value: string) {
   try {
     const [ivRaw, tagRaw, bodyRaw] = value.split(".");
