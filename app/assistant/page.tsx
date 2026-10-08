@@ -50,6 +50,9 @@ export default function AssistantPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           accessToken: session.accessJwt,
+          did: session.did,
+          handle: session.handle,
+          pdsUrl: session.pdsUrl,
           messages: nextMessages,
         }),
       });
