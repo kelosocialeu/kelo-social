@@ -41,10 +41,10 @@ export function createAccessToken(input: { did:string; handle:string; pdsUrl:str
 export function createRefreshToken(input: { did:string; handle:string; pdsUrl:string; refreshJwt:string; scope:string }) { const now=Math.floor(Date.now()/1000); return signPayload({kind:"refresh", exp:now+REFRESH_TTL, iat:now, ...input}); }
 export function verifyMcpAccessToken(token:string) { const payload=readSigned<any>(token); return payload?.kind==="access" ? payload : null; }
 export function verifyMcpRefreshToken(token:string) { const payload=readSigned<any>(token); return payload?.kind==="refresh" ? payload : null; }
-export async function loginForMcp(identifier:string,password:string) {
+export async function loginForMcp(identifier:string,password:string,authFactorToken?:string) {
   const discovered=await discoverAccount(identifier);
   const agent=createAtpAgent(discovered.pdsUrl);
-  await agent.login({identifier:discovered.identifier,password});
+  await agent.login({identifier:discovered.identifier,password,...(authFactorToken ? {authFactorToken} : {})} as any);
   if(!agent.session) throw new Error("Le PDS n'a pas retourné de session.");
   const document=await resolveDidDocument(agent.session.did);
   const pdsUrl=extractPdsUrl(document);
