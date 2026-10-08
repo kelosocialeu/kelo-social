@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual, createCipheriv, createDecipheriv, randomBytes, createHash } from "node:crypto";
 import { createAtpAgent } from "@/lib/atproto/client";
 import { discoverAccount, extractPdsUrl, resolveDidDocument } from "@/lib/atproto/discovery";
 
@@ -14,6 +14,23 @@ function b64(value: string) { return Buffer.from(value).toString("base64url"); }
 function unb64(value: string) { return Buffer.from(value, "base64url").toString("utf8"); }
 function signPayload(payload: Record<string, unknown>) { const body = b64(JSON.stringify(payload)); const signature = createHmac("sha256", secret()).update(body).digest("base64url"); return "kelo_" + body + "." + signature; }
 function readSigned<T extends OAuthClaims>(token: string): T | null { try { if (!token.startsWith("kelo_")) return null; const parts = token.slice(5).split("."); const body = parts[0]; const signature = parts[1]; if (!body || !signature) return null; const expected = createHmac("sha256", secret()).update(body).digest("base64url"); const a = Buffer.from(signature); const b = Buffer.from(expected); if (a.length !== b.length || !timingSafeEqual(a, b)) return null; const payload = JSON.parse(unb64(body)) as T; if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null; return payload; } catch { return null; } }
+function challengeKey() { return createHash("sha256").update(secret()).digest(); }
+export function createMcpLoginChallenge(input: { identifier: string; password: string; clientId: string; redirectUri: string; scope: string; codeChallenge: string; state: string }) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", challengeKey(), iv);
+  const body = Buffer.concat([cipher.update(JSON.stringify(input), "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return [iv.toString("base64url"), tag.toString("base64url"), body.toString("base64url")].join(".");
+}
+export function readMcpLoginChallenge(value: string) {
+  try {
+    const [ivRaw, tagRaw, bodyRaw] = value.split(".");
+    if (!ivRaw || !tagRaw || !bodyRaw) return null;
+    const decipher = createDecipheriv("aes-256-gcm", challengeKey(), Buffer.from(ivRaw, "base64url"));
+    decipher.setAuthTag(Buffer.from(tagRaw, "base64url"));
+    return JSON.parse(Buffer.concat([decipher.update(Buffer.from(bodyRaw, "base64url")), decipher.final()]).toString("utf8")) as { identifier: string; password: string; clientId: string; redirectUri: string; scope: string; codeChallenge: string; state: string };
+  } catch { return null; }
+}
 function origin(request: Request) { return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || new URL(request.url).origin; }
 
 export function protectedResourceMetadata(request: Request) { const base = origin(request); return { resource: base + "/api/mcp", authorization_servers: [base], scopes_supported: DEFAULT_SCOPES, bearer_methods_supported: ["header"] }; }
