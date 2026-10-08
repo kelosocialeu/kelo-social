@@ -151,7 +151,7 @@ export async function POST(request: Request) {
     let password = String(form.get("password") || "");
 
     if (factorStep) {
-      const challenge = request.headers.get("cookie")?.match(/(?:^|;\\s*)kelo_mcp_login=([^;]+)/)?.[1];
+      const challenge = request.headers.get("cookie")?.split(";").map((part) => part.trim()).find((part) => part.startsWith("kelo_mcp_login="))?.slice("kelo_mcp_login=".length);
       if (!challenge) return errorPage("Code de sécurité expiré", "Recommencez la connexion depuis votre application.", 400);
       const decoded = readMcpLoginChallenge(decodeURIComponent(challenge));
       if (!decoded) return errorPage("Code de sécurité expiré", "Recommencez la connexion depuis votre application.", 400);
