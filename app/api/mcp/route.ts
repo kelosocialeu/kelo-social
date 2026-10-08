@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function mcpUrl(request: Request) {
-  return new URL("/api/mcp", request.url);
+  return new URL("/api/mcp", request.url).toString();
 }
 
 async function verifyKeloAccessToken(token: string): Promise<AuthInfo> {
@@ -69,7 +69,7 @@ async function serve(request: Request) {
     verifier: { verifyAccessToken: verifyKeloAccessToken },
     requiredScopes: ["kelo:read"],
     expectedResource: mcpUrl(request),
-    resourceMetadataUrl: new URL("/.well-known/oauth-protected-resource/mcp", request.url),
+    resourceMetadataUrl: new URL("/.well-known/oauth-protected-resource/mcp", request.url).toString(),
   });
   const auth = await gate(request);
   if (auth instanceof Response) return auth;
