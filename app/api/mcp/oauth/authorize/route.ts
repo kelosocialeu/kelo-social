@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createAuthorizationCode, createMcpLoginChallenge, loginForMcp, readMcpLoginChallenge, resolveClientMetadata, validateRedirect } from "@/lib/mcp/oauth";
+import { createAuthorizationCode, createMcpLoginChallenge, loginForMcp, readMcpLoginChallenge, readMcpSignupChallenge, resolveClientMetadata, validateRedirect } from "@/lib/mcp/oauth";
+import { extractPdsUrl, resolveDidDocument } from "@/lib/atproto/discovery";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
