@@ -7,7 +7,14 @@ import {
   updateOwnProfile,
 } from "@/lib/atproto/profile-update";
 
-interface MentionActor {\n  did: string;\n  handle: string;\n  displayName?: string;\n  avatar?: string;\n}\n\ninterface EditProfileModalProps {
+interface MentionActor {
+  did: string;
+  handle: string;
+  displayName?: string;
+  avatar?: string;
+}
+
+interface EditProfileModalProps {
   open: boolean;
   profile: any;
   onClose: () => void;
