@@ -68,8 +68,8 @@ async function serve(request: Request) {
   const gate = requireBearerAuth({
     verifier: { verifyAccessToken: verifyKeloAccessToken },
     requiredScopes: ["kelo:read"],
-    expectedResource: mcpUrl(request).toString(),
-    resourceMetadataUrl: new URL("/.well-known/oauth-protected-resource/mcp", request.url),
+    expectedResource: mcpUrl(request),
+    resourceMetadataUrl: new URL("/.well-known/oauth-protected-resource/mcp", request.url).toString(),
   });
   const auth = await gate(request);
   if (auth instanceof Response) return auth;
