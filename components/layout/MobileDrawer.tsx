@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { href: "/search", key: "nav.explore", fallback: "Explorer", icon: Search },
   { href: "/notifications", key: "nav.notifications", fallback: "Notifications", icon: Bell },
   { href: "/messages", key: "nav.messages", fallback: "Discussions", icon: MessageCircle },
+  { href: "/assistant", key: "nav.aiAssistant", fallback: "Kelo AI", icon: Bot },
   { href: "/feeds", key: "nav.feeds", fallback: "Fils d'actu", icon: Hash },
   { href: "/lists", key: "nav.lists", fallback: "Listes", icon: ListChecks },
   { href: "/starter-packs", key: "nav.starterPacks", fallback: "Kits de démarrage", icon: Rocket },
