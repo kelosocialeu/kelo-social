@@ -59,6 +59,7 @@ const handler = createMcpHandler((ctx) => {
     accessToken: String(extra.keloAccessJwt || ""),
     did: String(extra.keloDid || ""),
     handle: String(extra.keloHandle || ""),
+    scopes: info.scopes || [],
     pdsUrl: String(extra.keloPdsUrl || ""),
   };
   return buildKeloMcpServer(auth);
