@@ -30,6 +30,24 @@ export default function OAuthSignupCallbackPage() {
 
         const returnTo = sessionStorage.getItem("kelo-oauth-return") || "/login";
         sessionStorage.removeItem("kelo-oauth-return");
+
+        if (returnTo.startsWith("/api/mcp/oauth/authorize")) {
+          const response = await fetch("/api/mcp/oauth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              action: "signup_complete",
+              returnUrl: returnTo,
+              session: result.session,
+            }),
+          });
+          if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            throw new Error(body?.error || "Impossible de préparer la continuation OAuth.");
+          }
+        }
+
         setMessage(
           returnTo.startsWith("/api/mcp/oauth/authorize")
             ? "Compte Kelo Social créé avec succès. Retour vers l’autorisation OAuth…"
