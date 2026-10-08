@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AuthLayout from "@/components/layout/AuthLayout";
 import { useTranslation } from "@/components/providers/TranslationProvider";
@@ -20,6 +21,7 @@ function getAge(date: string) {
 
 export default function SignupPage() {
   const { t } = useTranslation();
+  const searchParams = useSearchParams();
   const [birthDate, setBirthDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -33,7 +35,8 @@ export default function SignupPage() {
     setError("");
 
     try {
-      await startKeloPdsSignup();
+      const oauthReturn = searchParams.get("oauth_return") || "/login";
+      await startKeloPdsSignup(oauthReturn);
     } catch (err) {
       console.error("Kelo PDS OAuth signup failed:", err);
       setLoading(false);
