@@ -52,7 +52,7 @@ async function verifyKeloAccessToken(token: string): Promise<AuthInfo> {
 }
 
 const handler = createMcpHandler((ctx) => {
-  const info = ctx.http?.authInfo;
+  const info = ctx.authInfo;
   if (!info) throw new Error("Authentification Kelo Social requise.");
   const extra = info.extra || {};
   const auth: KeloMcpAuth = {
