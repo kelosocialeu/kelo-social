@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     if (!codeChallenge || !/^[A-Za-z0-9_-]{43}$/.test(codeChallenge)) throw new Error("PKCE S256 est obligatoire.");
 
     const allowed = new Set(["kelo:read", "kelo:write"]);
-    const scope = requestedScope.split(/\\s+/).filter(Boolean).filter((item) => allowed.has(item));
+    const scope = requestedScope.split(/\s+/).filter(Boolean).filter((item) => allowed.has(item));
     if (!scope.includes("kelo:read")) scope.unshift("kelo:read");
     const scopeValue = [...new Set(scope)].join(" ");
 
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     if (!codeChallenge || !/^[A-Za-z0-9_-]{43}$/.test(codeChallenge)) throw new Error("PKCE S256 est obligatoire.");
 
     const allowed = new Set(["kelo:read", "kelo:write"]);
-    const requested = requestedScope.split(/\\s+/).filter(Boolean).filter((item) => allowed.has(item));
+    const requested = requestedScope.split(/\s+/).filter(Boolean).filter((item) => allowed.has(item));
     if (!requested.includes("kelo:read")) requested.unshift("kelo:read");
     const scope = [...new Set(requested.filter((item) => item !== "kelo:write" || allowWrite))].join(" ");
 
