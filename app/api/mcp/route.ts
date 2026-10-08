@@ -27,7 +27,7 @@ async function verifyKeloAccessToken(token: string): Promise<AuthInfo> {
   const payload = decodeJwtPayload(token);
   const did = String(payload?.iss || payload?.sub || "");
   if (!did.startsWith("did:")) {
-    throw new OAuthError("Le jeton AT Protocol ne contient pas une identité valide.", OAuthErrorCode.InvalidToken);
+    throw new OAuthError(OAuthErrorCode.InvalidToken, "Le jeton AT Protocol ne contient pas une identité valide.");
   }
 
   let pdsUrl: string;
@@ -37,7 +37,7 @@ async function verifyKeloAccessToken(token: string): Promise<AuthInfo> {
     const parsed = new URL(pdsUrl);
     if (parsed.protocol !== "https:") throw new Error("PDS non sécurisé");
   } catch {
-    throw new OAuthError("Impossible de déterminer le PDS du compte.", OAuthErrorCode.InvalidToken);
+    throw new OAuthError(OAuthErrorCode.InvalidToken, "Impossible de déterminer le PDS du compte.");
   }
 
   let session: any;
@@ -50,11 +50,11 @@ async function verifyKeloAccessToken(token: string): Promise<AuthInfo> {
     if (!response.ok) throw new Error("invalid session");
     session = await response.json();
   } catch {
-    throw new OAuthError("La session Kelo Social a expiré ou est invalide.", OAuthErrorCode.InvalidToken);
+    throw new OAuthError(OAuthErrorCode.InvalidToken, "La session Kelo Social a expiré ou est invalide.");
   }
 
   if (session.did !== did) {
-    throw new OAuthError("L'identité du jeton ne correspond pas au compte AT Protocol.", OAuthErrorCode.InvalidToken);
+    throw new OAuthError(OAuthErrorCode.InvalidToken, "L'identité du jeton ne correspond pas au compte AT Protocol.");
   }
 
   const expiresAt = typeof payload?.exp === "number" ? payload.exp : Math.floor(Date.now() / 1000) + 300;
