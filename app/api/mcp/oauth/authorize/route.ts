@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { createAuthorizationCode, createMcpLoginChallenge, loginForMcp, readMcpLoginChallenge, readMcpSignupChallenge, resolveClientMetadata, validateRedirect } from "@/lib/mcp/oauth";
 import { extractPdsUrl, resolveDidDocument } from "@/lib/atproto/discovery";
 
+function publicIssuer(request: Request) {
+  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || new URL(request.url).origin;
+}
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -35,7 +39,7 @@ export async function GET(request: Request) {
         const callback = new URL(redirectUri);
         callback.searchParams.set("code", code);
         if (state) callback.searchParams.set("state", state);
-        callback.searchParams.set("iss", new URL(request.url).origin);
+        callback.searchParams.set("iss", publicIssuer(request));
         const response = NextResponse.redirect(callback);
         response.headers.append("Set-Cookie", "kelo_mcp_signup=; Max-Age=0; Path=/api/mcp/oauth/authorize; HttpOnly; Secure; SameSite=Lax");
         return response;
