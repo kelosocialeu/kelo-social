@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createAccessToken } from "@/lib/mcp/oauth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "L'agent IA Kelo Social n'est pas encore configuré (GROQ_API_KEY manquante)." }, { status: 503 });
   }
 
-  let body: { messages?: AgentMessage[]; accessToken?: string };
+  let body: { messages?: AgentMessage[]; accessToken?: string; did?: string; handle?: string; pdsUrl?: string };
   try {
     body = await request.json();
   } catch {
@@ -31,6 +32,9 @@ export async function POST(request: Request) {
   }
 
   const accessToken = String(body.accessToken || "").trim();
+  const did = String(body.did || "").trim();
+  const handle = String(body.handle || "").trim();
+  const pdsUrl = String(body.pdsUrl || "").trim();
   const messages = Array.isArray(body.messages)
     ? body.messages
         .filter((message) => (message?.role === "user" || message?.role === "assistant") && typeof message.content === "string")
@@ -38,7 +42,7 @@ export async function POST(request: Request) {
         .map((message) => ({ role: message.role, content: message.content.slice(0, 6000) }))
     : [];
 
-  if (!accessToken || messages.length === 0) {
+  if (!accessToken || !did || !handle || !pdsUrl || messages.length === 0) {
     return NextResponse.json({ error: "Session utilisateur ou message manquant." }, { status: 400 });
   }
 
@@ -67,7 +71,7 @@ export async function POST(request: Request) {
           server_description: "Outils officiels Kelo Social. Ils permettent de lire le compte connecté et d'effectuer des actions AT Protocol au nom de cet utilisateur.",
           server_url: `${baseUrl(request)}/api/mcp`,
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${createAccessToken({ did, handle, pdsUrl, accessJwt: accessToken, scope: "kelo:read kelo:write" })}`,
           },
           require_approval: "never",
         },
