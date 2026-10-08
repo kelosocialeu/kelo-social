@@ -14,6 +14,40 @@ interface MentionActor {
   avatar?: string;
 }
 
+type ActiveMention = { query: string; start: number; end: number };
+
+function getActiveMention(text: string, caret: number): ActiveMention | null {
+  const before = text.slice(0, caret);
+  const match = before.match(/(?:^|\s)@([a-zA-Z0-9._-]*)$/);
+  if (!match) return null;
+  const query = match[1] || "";
+  const start = caret - query.length - 1;
+  return { query, start, end: caret };
+}
+
+async function searchMentionActors(query: string, signal: AbortSignal): Promise<MentionActor[]> {
+  if (!query.trim()) return [];
+  const response = await fetch(
+    "https://public.api.bsky.app/xrpc/app.bsky.actor.searchActors?q=" + encodeURIComponent(query) + "&limit=8",
+    { signal, headers: { Accept: "application/json" } }
+  );
+  if (!response.ok) return [];
+  const data = await response.json();
+  return Array.isArray(data?.actors)
+    ? data.actors.map((actor: any) => ({
+        did: String(actor.did || ""),
+        handle: String(actor.handle || ""),
+        displayName: actor.displayName ? String(actor.displayName) : undefined,
+        avatar: actor.avatar ? String(actor.avatar) : undefined,
+      })).filter((actor: MentionActor) => actor.did && actor.handle)
+    : [];
+}
+
+function insertMention(text: string, start: number, end: number, handle: string) {
+  const value = text.slice(0, start) + "@" + handle + " " + text.slice(end);
+  return { text: value, caret: start + handle.length + 2 };
+}
+
 interface EditProfileModalProps {
   open: boolean;
   profile: any;
