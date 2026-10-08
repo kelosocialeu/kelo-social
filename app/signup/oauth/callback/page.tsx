@@ -28,13 +28,17 @@ export default function OAuthSignupCallbackPage() {
           return;
         }
 
+        const returnTo = sessionStorage.getItem("kelo-oauth-return") || "/login";
+        sessionStorage.removeItem("kelo-oauth-return");
         setMessage(
-          "Compte Kelo Social créé avec succès. Redirection vers la connexion…",
+          returnTo.startsWith("/api/mcp/oauth/authorize")
+            ? "Compte Kelo Social créé avec succès. Retour vers l’autorisation OAuth…"
+            : "Compte Kelo Social créé avec succès. Redirection vers la connexion…",
         );
 
         window.setTimeout(() => {
-          router.replace("/login");
-        }, 1200);
+          router.replace(returnTo);
+        }, 800);
       } catch (error) {
         console.error("Kelo OAuth signup callback failed:", error);
 
