@@ -81,10 +81,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // OAuth authorization requests can be submitted as
-  // application/x-www-form-urlencoded. Accept that form at the issuer
-  // endpoint too, then redirect the browser to the real authorization page.
-  const contentType = request.headers.get("content-type") || "";
+  // OAuth authorization requests can be submitted as\n  // application/x-www-form-urlencoded. Accept that form at the issuer\n  // endpoint too, then redirect the browser to the real authorization page.
   if (!contentType.includes("application/x-www-form-urlencoded")) {
     return NextResponse.json(
       { error: "invalid_request", error_description: "Requête OAuth invalide." },
