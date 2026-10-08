@@ -6,6 +6,7 @@ export interface KeloMcpAuth {
   pdsUrl: string;
   did: string;
   handle: string;
+  scopes: string[];
 }
 
 type XrpcOptions = {
@@ -52,7 +53,7 @@ function result(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
 }
 
-function errorResult(error: unknown) {
+function requireWrite(auth: KeloMcpAuth) {\n  if (!auth.scopes.includes("kelo:write")) throw new Error("Cette action nécessite l’autorisation « Agir sur Kelo Social ». Reconnectez le client MCP et accordez cette permission.");\n}\n\nfunction errorResult(error: unknown) {
   return { isError: true, content: [{ type: "text" as const, text: error instanceof Error ? error.message : String(error) }] };
 }
 
@@ -132,7 +133,7 @@ export function buildKeloMcpServer(auth: KeloMcpAuth) {
     title: "Publier une publication",
     description: "Publier un nouveau post sur le compte de l'utilisateur. Utiliser uniquement quand l'utilisateur demande explicitement de publier.",
     inputSchema: z.object({ text: z.string().min(1).max(3000) }),
-  }, async ({ text }) => {
+  }, async ({ text }) => {\n    requireWrite(auth);
     try { return result(await createRecord(auth, "app.bsky.feed.post", { $type: "app.bsky.feed.post", text, createdAt: new Date().toISOString() })); } catch (error) { return errorResult(error); }
   });
 
@@ -146,7 +147,7 @@ export function buildKeloMcpServer(auth: KeloMcpAuth) {
       rootUri: z.string().optional(),
       rootCid: z.string().optional(),
     }),
-  }, async ({ text, parentUri, parentCid, rootUri, rootCid }) => {
+  }, async ({ text, parentUri, parentCid, rootUri, rootCid }) => {\n    requireWrite(auth);
     try {
       const root = rootUri && rootCid ? { uri: rootUri, cid: rootCid } : { uri: parentUri, cid: parentCid };
       return result(await createRecord(auth, "app.bsky.feed.post", {
@@ -160,7 +161,7 @@ export function buildKeloMcpServer(auth: KeloMcpAuth) {
     title: "Supprimer une publication",
     description: "Supprimer une publication appartenant au compte connecté. Action irréversible : utiliser uniquement sur demande explicite.",
     inputSchema: z.object({ uri: z.string().min(10) }),
-  }, async ({ uri }) => {
+  }, async ({ uri }) => {\n    requireWrite(auth);
     try {
       const parts = uriParts(uri);
       if (parts.repo !== auth.did || parts.collection !== "app.bsky.feed.post") throw new Error("Vous ne pouvez supprimer que vos propres publications.");
@@ -173,7 +174,7 @@ export function buildKeloMcpServer(auth: KeloMcpAuth) {
     title: "Suivre un compte",
     description: "Suivre un compte avec le compte actuellement connecté.",
     inputSchema: z.object({ actor: z.string().min(1).max(200) }),
-  }, async ({ actor }) => {
+  }, async ({ actor }) => {\n    requireWrite(auth);
     try {
       const did = await resolveActorDid(auth, actor);
       return result(await createRecord(auth, "app.bsky.graph.follow", { $type: "app.bsky.graph.follow", subject: did, createdAt: new Date().toISOString() }));
@@ -184,7 +185,7 @@ export function buildKeloMcpServer(auth: KeloMcpAuth) {
     title: "Ne plus suivre un compte",
     description: "Arrêter de suivre un compte avec le compte actuellement connecté.",
     inputSchema: z.object({ actor: z.string().min(1).max(200) }),
-  }, async ({ actor }) => {
+  }, async ({ actor }) => {\n    requireWrite(auth);
     try {
       const did = await resolveActorDid(auth, actor);
       const relationships = await xrpc(auth, "app.bsky.graph.getRelationships", { params: { actor: auth.did, others: did } });
@@ -199,7 +200,7 @@ export function buildKeloMcpServer(auth: KeloMcpAuth) {
     title: "Aimer une publication",
     description: "Aimer une publication avec le compte actuellement connecté.",
     inputSchema: z.object({ uri: z.string().min(10), cid: z.string().min(10) }),
-  }, async ({ uri, cid }) => {
+  }, async ({ uri, cid }) => {\n    requireWrite(auth);
     try { return result(await createRecord(auth, "app.bsky.feed.like", { $type: "app.bsky.feed.like", subject: { uri, cid }, createdAt: new Date().toISOString() })); } catch (error) { return errorResult(error); }
   });
 
@@ -207,7 +208,7 @@ export function buildKeloMcpServer(auth: KeloMcpAuth) {
     title: "Retirer un j'aime",
     description: "Retirer le j'aime du compte connecté sur une publication.",
     inputSchema: z.object({ uri: z.string().min(10) }),
-  }, async ({ uri }) => {
+  }, async ({ uri }) => {\n    requireWrite(auth);
     try {
       const posts = await xrpc(auth, "app.bsky.feed.getPosts", { params: { uris: uri } });
       const likeUri = posts.posts?.[0]?.viewer?.like;
@@ -221,7 +222,7 @@ export function buildKeloMcpServer(auth: KeloMcpAuth) {
     title: "Reposter une publication",
     description: "Reposter une publication avec le compte actuellement connecté.",
     inputSchema: z.object({ uri: z.string().min(10), cid: z.string().min(10) }),
-  }, async ({ uri, cid }) => {
+  }, async ({ uri, cid }) => {\n    requireWrite(auth);
     try { return result(await createRecord(auth, "app.bsky.feed.repost", { $type: "app.bsky.feed.repost", subject: { uri, cid }, createdAt: new Date().toISOString() })); } catch (error) { return errorResult(error); }
   });
 
@@ -229,7 +230,7 @@ export function buildKeloMcpServer(auth: KeloMcpAuth) {
     title: "Retirer un repost",
     description: "Retirer le repost du compte connecté sur une publication.",
     inputSchema: z.object({ uri: z.string().min(10) }),
-  }, async ({ uri }) => {
+  }, async ({ uri }) => {\n    requireWrite(auth);
     try {
       const posts = await xrpc(auth, "app.bsky.feed.getPosts", { params: { uris: uri } });
       const repostUri = posts.posts?.[0]?.viewer?.repost;
