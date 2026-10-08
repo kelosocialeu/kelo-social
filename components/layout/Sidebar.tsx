@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Home, Search, Bell, MessageCircle, Hash, ListChecks, Rocket, Bookmark,
+  Home, Search, Bell, MessageCircle, Hash, ListChecks, Rocket, Bookmark, Bot,
   User, Settings, ShieldCheck, BadgeCheck, PenSquare, LogOut, Newspaper, Clapperboard, Gamepad2,
 } from "lucide-react";
 
@@ -25,6 +25,7 @@ const NAV_ITEMS = [
   { href: "/journal", key: "nav.journal", fallback: "Journal", icon: Newspaper },
   { href: "/notifications", key: "nav.notifications", fallback: "Notifications", icon: Bell },
   { href: "/messages", key: "nav.messages", fallback: "Discussions", icon: MessageCircle },
+  { href: "/assistant", key: "nav.aiAssistant", fallback: "Kelo AI", icon: Bot },
   { href: "/feeds", key: "nav.feeds", fallback: "Fils d'actu", icon: Hash },
   { href: "/lists", key: "nav.lists", fallback: "Listes", icon: ListChecks },
   { href: "/starter-packs", key: "nav.starterPacks", fallback: "Kits de démarrage", icon: Rocket },
