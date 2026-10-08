@@ -49,6 +49,9 @@ export async function POST(request: Request) {
     const callback = new URL(redirectUri);
     callback.searchParams.set("code", code);
     if (state) callback.searchParams.set("state", state);
+    // RFC 9207: Claude advertises issuer validation, so the authorization response
+    // must carry the exact issuer advertised by /.well-known/oauth-authorization-server.
+    callback.searchParams.set("iss", new URL(request.url).origin);
     return NextResponse.redirect(callback);
   } catch (error) {
     return new NextResponse("<!doctype html><h1>Connexion Kelo Social impossible</h1><p>"+escape(error instanceof Error ? error.message : "Erreur de connexion")+"</p><p>Vous pouvez fermer cette fenêtre et recommencer depuis votre client MCP.</p>", { status: 400, headers: { "Content-Type": "text/html; charset=utf-8" } });
