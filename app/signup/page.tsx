@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AuthLayout from "@/components/layout/AuthLayout";
@@ -19,7 +19,7 @@ function getAge(date: string) {
   return age;
 }
 
-export default function SignupPage() {
+function SignupForm() {
   const { t } = useTranslation();
   const searchParams = useSearchParams();
   const [birthDate, setBirthDate] = useState("");
@@ -111,5 +111,13 @@ export default function SignupPage() {
         </Link>
       </div>
     </AuthLayout>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupForm />
+    </Suspense>
   );
 }
