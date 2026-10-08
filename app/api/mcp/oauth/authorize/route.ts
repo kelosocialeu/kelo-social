@@ -19,6 +19,29 @@ export async function GET(request: Request) {
   const requestedScope = params.get("scope") || "kelo:read kelo:write";
 
   try {
+    const cookie = request.headers.get("cookie") || "";
+    const rawSignup = cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith("kelo_mcp_signup="))?.slice("kelo_mcp_signup=".length);
+    if (rawSignup) {
+      const signup = readMcpSignupChallenge(decodeURIComponent(rawSignup));
+      if (signup && signup.clientId === clientId && signup.redirectUri === redirectUri && signup.codeChallenge === codeChallenge) {
+        const metadata = await resolveClientMetadata(clientId);
+        validateRedirect(metadata, redirectUri);
+        const pdsUrl = extractPdsUrl(await resolveDidDocument(signup.did));
+        const code = createAuthorizationCode({
+          clientId, redirectUri, codeChallenge, scope: signup.scope,
+          did: signup.did, handle: signup.handle, accessJwt: signup.accessJwt,
+          refreshJwt: signup.refreshJwt, pdsUrl,
+        });
+        const callback = new URL(redirectUri);
+        callback.searchParams.set("code", code);
+        if (state) callback.searchParams.set("state", state);
+        callback.searchParams.set("iss", new URL(request.url).origin);
+        const response = NextResponse.redirect(callback);
+        response.headers.append("Set-Cookie", "kelo_mcp_signup=; Max-Age=0; Path=/api/mcp/oauth/authorize; HttpOnly; Secure; SameSite=Lax");
+        return response;
+      }
+    }
+
     const metadata = await resolveClientMetadata(clientId);
     validateRedirect(metadata, redirectUri);
     if (responseType !== "code") throw new Error("response_type code obligatoire.");
